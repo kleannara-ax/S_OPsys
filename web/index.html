@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>S&OP 계획 시스템</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=20260410g">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-container">
+            <div class="header-text">
+                <h1>S&OP 계획 시스템</h1>
+                <p>SCM 플래너를 위한 자재별 판매/생산/재고 통합 관리 대시보드</p>
+            </div>
+            <div class="header-actions" style="align-items:center;">
+                <span id="header-user-info" style="font-size:0.88rem; color:#334155; font-weight:500;"></span>
+                <button type="button" class="small secondary" id="btn-logout" style="display:none;" onclick="doLogout()">로그아웃</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <nav class="view-tabs" role="tablist" aria-label="주요 기능 화면 선택">
+            <button class="view-tab active" type="button" data-view-target="summary" role="tab" aria-selected="true" aria-controls="view-summary">통합 계획 요약</button>
+            <button class="view-tab" type="button" data-view-target="planner" role="tab" aria-selected="false" aria-controls="view-planner">기준정보 관리</button>
+            <button class="view-tab" type="button" data-view-target="sales-upload" role="tab" aria-selected="false" aria-controls="view-sales-upload">판매계획 업로드</button>
+            <button class="view-tab" type="button" data-view-target="table" role="tab" aria-selected="false" aria-controls="view-table">생산계획 현황</button>
+            <button class="view-tab" type="button" data-view-target="line-capa" role="tab" aria-selected="false" aria-controls="view-line-capa">생산 CAPA 현황</button>
+            <button class="view-tab" type="button" data-view-target="inventory" role="tab" aria-selected="false" aria-controls="view-inventory">계획 대비 실적 현황</button>
+            <button class="view-tab" type="button" data-view-target="analytics" role="tab" aria-selected="false" aria-controls="view-analytics">재고 분석 대시보드</button>
+            <button class="view-tab" type="button" data-view-target="optimal-inventory" role="tab" aria-selected="false" aria-controls="view-optimal-inventory">적정재고관리</button>
+            <button class="view-tab" type="button" data-view-target="change-history" role="tab" aria-selected="false" aria-controls="view-change-history">변경 이력 관리</button>
+            <button class="view-tab" type="button" data-view-target="interface-master" role="tab" aria-selected="false" aria-controls="view-interface-master">인터페이스 관리</button>
+            <button class="view-tab" type="button" data-view-target="user-mgmt" role="tab" aria-selected="false" aria-controls="view-user-mgmt">사용자 관리</button>
+        </nav>
+        <section class="summary-section view-section" id="view-summary" data-view="summary">
+            <div class="summary-meta">
+                <span id="summary-month-context" class="summary-context">전체 월 기준</span>
+            </div>
+            <article class="summary-card">
+                <h3>재고 부족 자재 수</h3>
+                <p id="summary-inventory-alert" class="summary-value">-</p>
+                <span class="summary-sub">목표 대비 월말 재고가 부족한 자재 수량</span>
+                <div id="summary-inventory-shortage-breakdown" class="summary-breakdown"></div>
+            </article>
+            <article class="summary-card">
+                <h3>과재고 자재 수</h3>
+                <p id="summary-overstock" class="summary-value">-</p>
+                <span class="summary-sub">목표 대비 월말 재고가 1.5배 이상인 자재 수량</span>
+                <div id="summary-inventory-overstock-breakdown" class="summary-breakdown"></div>
+            </article>
+            <article class="summary-card">
+                <h3>CAPA 초과 라인 수</h3>
+                <p id="summary-capa-alert" class="summary-value">-</p>
+                <span class="summary-sub">라인 총생산이 CAPA를 초과한 라인 수</span>
+                <div id="summary-capa-breakdown" class="summary-breakdown"></div>
+            </article>
+            <article class="summary-card">
+                <h3>총 생산 계획 물량</h3>
+                <p id="summary-total-production" class="summary-value">-</p>
+                <span class="summary-sub">모든 자재의 계획 생산 물량 합계</span>
+                <div id="summary-total-production-breakdown" class="summary-breakdown"></div>
+            </article>
+            <article class="summary-card">
+                <h3>평균 CAPA 사용률</h3>
+                <p id="summary-avg-capa" class="summary-value">-</p>
+                <span class="summary-sub">라인 총생산 / CAPA 평균 비율</span>
+                <div id="summary-avg-capa-breakdown" class="summary-breakdown"></div>
+            </article>
+            <article class="summary-card summary-card-sales-accuracy">
+                <h3>판매 계획 대비 실적</h3>
+                <p id="summary-sales-accuracy" class="summary-value">-</p>
+                <span id="summary-sales-accuracy-caption" class="summary-sub">선택 월 판매 계획 대비 실적 평균</span>
+                <div id="summary-sales-accuracy-breakdown" class="summary-breakdown" aria-live="polite"></div>
+            </article>
+            <article class="summary-card summary-card-production-accuracy">
+                <h3>생산 계획 대비 실적</h3>
+                <p id="summary-production-accuracy" class="summary-value">-</p>
+                <span id="summary-production-accuracy-caption" class="summary-sub">선택 월 생산 계획 대비 실적 평균</span>
+                <div id="summary-production-accuracy-breakdown" class="summary-breakdown" aria-live="polite"></div>
+            </article>
+        </section>
+
+        <section class="planner-section view-section" id="view-planner" data-view="planner">
+
+            <!-- 서브메뉴 탭 -->
+            <nav class="planner-sub-tabs" role="tablist" aria-label="기준정보 관리 하위 메뉴">
+                <button class="planner-sub-tab active" type="button" data-sub-target="sub-base-material" role="tab" aria-selected="true">기본자재 마스터</button>
+                <button class="planner-sub-tab" type="button" data-sub-target="sub-recent-sales" role="tab" aria-selected="false">최근 3개월 판매실적 엑셀 업로드</button>
+                <button class="planner-sub-tab" type="button" data-sub-target="sub-line-capa" role="tab" aria-selected="false">라인 CAPA 관리</button>
+                <button class="planner-sub-tab" type="button" data-sub-target="sub-line-item" role="tab" aria-selected="false">생산자재 마스터 관리</button>
+                <button class="planner-sub-tab" type="button" data-sub-target="sub-material-renewal" role="tab" aria-selected="false">리뉴얼 자재 연결 마스터</button>
+                <button class="planner-sub-tab" type="button" data-sub-target="sub-plant-storage" role="tab" aria-selected="false">플랜트별 저장위치 선택</button>
+            </nav>
+
+            <!-- [1] 기본 자재마스터 -->
+            <section class="base-material-master planner-sub-section" data-planner-sub="sub-base-material" aria-labelledby="base-material-master-title">
+                <div class="section-subheader">
+                    <div>
+                        <h3 id="base-material-master-title">기본 자재마스터</h3>
+                        <p>SCM 운영구분, 카테고리, 생산라인, 자재코드 등 기본 자재 정보를 등록하고 관리합니다.</p>
+                    </div>
+                </div>
+                <div class="bulk-upload-toolbar">
+                    <button type="button" class="secondary bulk-upload-button" id="btn-oem-vendor-moq-upload">OEM 협력업체/MOQ 일괄 업로드</button>
+                    <button type="button" class="ghost small" id="btn-oem-vendor-moq-template">템플릿 다운로드</button>
+                </div>
+                <div id="oem-vendor-moq-upload-area" class="oem-upload-area hidden">
+                    <div class="oem-upload-card">
+                        <p class="oem-upload-desc">OEM 상품(생산라인에 'OEM' 포함) 자재의 <strong>협력업체명</strong>과 <strong>MOQ(BOX 단위)</strong>를 엑셀로 일괄 업로드합니다.</p>
+                        <div class="oem-upload-actions">
+                            <input type="file" id="oem-vendor-moq-file" accept=".xlsx,.xls,.csv" />
+                            <button type="button" class="primary small" id="btn-oem-vendor-moq-start" disabled>업로드 실행</button>
+                            <button type="button" class="ghost small" id="btn-oem-vendor-moq-cancel">닫기</button>
+                        </div>
+                        <div id="oem-vendor-moq-status" class="oem-upload-status"></div>
+                    </div>
+                </div>
+                <div class="line-capa-layout base-material-master-layout">
+                    <form id="base-material-master-form" class="base-material-master-form line-capa-form" novalidate>
+                        <input type="hidden" id="base-material-master-record-id">
+                        <div class="form-grid condensed base-material-grid">
+                            <label>
+                                SCM운영구분
+                                <input type="text" id="base-mat-scm-area" placeholder="예: 운영" required>
+                            </label>
+                            <label>
+                                카테고리
+                                <input type="text" id="base-mat-hierarchy" placeholder="예: 두루마리" required>
+                            </label>
+                            <label>
+                                생산라인
+                                <input type="text" id="base-mat-prod-unit" placeholder="예: 가공 4호기" required>
+                            </label>
+                            <label>
+                                자재코드
+                                <input type="text" id="base-mat-item-code" placeholder="예: FRT-ADA0055B" required>
+                            </label>
+                            <label>
+                                자재명칭
+                                <input type="text" id="base-mat-item-name" placeholder="예: 3겹 소프트 27m 30롤" required>
+                            </label>
+                            <label>
+                                EA/BAG
+                                <input type="number" id="base-mat-conv1" min="0" step="0.001" placeholder="예: 30.000">
+                            </label>
+                            <label>
+                                BAG/BOX
+                                <input type="number" id="base-mat-conv3" min="0" step="0.001" placeholder="예: 1.000">
+                            </label>
+                            <label>
+                                EA/BOX
+                                <input type="number" id="base-mat-conv2" min="0" step="0.001" placeholder="예: 30.000">
+                            </label>
+                            <label>
+                                BAG/PLT
+                                <input type="number" id="base-mat-conv5" min="0" step="0.001" placeholder="예: 1.000">
+                            </label>
+                            <label>
+                                BOX/PLT
+                                <input type="text" id="base-mat-conv-ratio" readonly class="readonly-input" placeholder="자동 계산">
+                            </label>
+                            <label>
+                                협력업체명
+                                <input type="text" id="base-mat-vendor-name" placeholder="예: (주)협력사">
+                            </label>
+                            <label>
+                                MOQ <span class="unit-label">(BOX)</span>
+                                <input type="number" id="base-mat-moq" min="0" step="1" placeholder="예: 100">
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary" id="btn-base-material-save">저장</button>
+                            <button type="button" class="ghost" id="btn-base-material-reset">초기화</button>
+                        </div>
+                    </form>
+                    <div class="line-capa-table-wrapper base-material-table-wrapper">
+                        <div class="line-capa-table-header base-material-table-header">
+                            <h4>등록된 기본 자재마스터</h4>
+                            <div class="base-material-table-actions">
+                                <button type="button" class="primary small" id="btn-register-production-plan" disabled>생산계획 등록</button>
+                                <div class="line-capa-filters base-material-filters">
+                                    <label>
+                                        SCM운영구분
+                                        <select id="base-material-filter-scm">
+                                            <option value="all">전체</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        생산라인
+                                        <select id="base-material-filter-prod-unit">
+                                            <option value="all">전체</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-wrapper compact">
+                            <table id="base-material-master-table" aria-live="polite">
+                                <thead>
+                                    <tr>
+                                        <th class="col-checkbox"><input type="checkbox" id="base-material-select-all" title="전체 선택"></th>
+                                        <th>SCM운영구분</th>
+                                        <th>카테고리</th>
+                                        <th>생산라인</th>
+                                        <th>자재코드</th>
+                                        <th>자재명칭</th>
+                                        <th>EA/BAG</th>
+                                        <th>BAG/BOX</th>
+                                        <th>EA/BOX</th>
+                                        <th>BAG/PLT</th>
+                                        <th>BOX/PLT</th>
+                                        <th>협력업체명</th>
+                                        <th>MOQ <span class="unit-label base-mat-unit">(BOX)</span></th>
+                                        <th>등록상태</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="base-material-master-empty" class="empty">등록된 기본 자재마스터가 없습니다. 양식을 작성해 추가하세요.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- [2] 최근 3개월 판매실적 엑셀 업로드 -->
+            <section class="recent-sales-upload planner-sub-section" data-planner-sub="sub-recent-sales" aria-labelledby="recent-sales-upload-title">
+                <div class="section-subheader">
+                    <div>
+                        <h3 id="recent-sales-upload-title">최근 3개월 판매실적 엑셀 업로드</h3>
+                        <p>선택한 기준월의 -3월, -2월, -1월 판매실적을 한 번에 업로드하여 생산계획 현황의 최근 3개월 판매실적 평균에 반영합니다.</p>
+                    </div>
+                </div>
+                <div class="recent-sales-upload-body">
+                    <div class="sales-upload-layout recent-sales-upload-layout">
+                        <div class="sales-upload-card">
+                        <h4>업로드 설정</h4>
+                        <p>업로드할 기준월을 먼저 선택한 뒤 엑셀 파일을 업로드하세요. 업로드 값은 각 자재의 3개월 평균으로 계산됩니다.</p>
+                        <div class="form-grid condensed">
+                            <label>
+                                업로드 기준월
+                                <input type="month" id="recent-sales-base-month" required>
+                            </label>
+                        </div>
+                        <div class="sales-upload-actions">
+                            <label class="upload-label" for="recent-sales-file-input">파일 선택 (xlsx, xls, csv)</label>
+                            <input type="file" id="recent-sales-file-input" accept=".xlsx,.xls,.csv">
+                            <button type="button" id="btn-recent-sales-upload-start" class="primary">업로드 실행</button>
+                            <button type="button" id="btn-recent-sales-template" class="secondary">템플릿 다운로드 (XLSX)</button>
+                        </div>
+                        <div id="recent-sales-upload-status" class="sales-status" aria-live="polite">업로드할 기준월과 파일을 선택하세요.</div>
+                    </div>
+                        <div class="sales-upload-card">
+                            <h4>엑셀 템플릿 안내</h4>
+                            <ul>
+                                <li>필수 컬럼: <strong>item_code, m3, m2, m1</strong></li>
+                                <li>m3 = 기준월의 -3개월, m2 = 기준월의 -2개월, m1 = 기준월의 -1개월 판매실적 수량</li>
+                                <li>수량은 숫자로 입력하고 비어있는 값은 0으로 처리됩니다.</li>
+                                <li>업로드된 수량의 합을 3으로 나눈 평균값이 생산계획 현황의 최근 3개월 판매실적 평균에 반영됩니다.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 업로드된 판매실적 현황 카드 -->
+                <div class="recent-sales-view-card">
+                    <div class="recent-sales-view-header">
+                        <h4>업로드된 최근 3개월 판매실적 현황</h4>
+                        <div class="recent-sales-view-filters">
+                            <label>
+                                카테고리
+                                <select id="recent-sales-view-filter-category">
+                                    <option value="all">전체</option>
+                                </select>
+                            </label>
+                            <label>
+                                자재코드
+                                <select id="recent-sales-view-filter-item">
+                                    <option value="all">전체</option>
+                                </select>
+                            </label>
+                            <label>
+                                기준월
+                                <select id="recent-sales-view-filter-month">
+                                    <option value="all">전체</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-wrapper compact recent-sales-view-table-wrapper">
+                        <table id="recent-sales-view-table">
+                            <thead>
+                                <tr>
+                                    <th>카테고리</th>
+                                    <th>자재코드</th>
+                                    <th>자재명칭</th>
+                                    <th>기준월</th>
+                                    <th>-3개월 (M3)</th>
+                                    <th>-2개월 (M2)</th>
+                                    <th>-1개월 (M1)</th>
+                                    <th>합계</th>
+                                    <th>평균</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <div id="recent-sales-view-empty" class="empty">업로드된 판매실적 데이터가 없습니다.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- [3] 라인 CAPA 관리 -->
+            <section class="line-capa-maintenance planner-sub-section" data-planner-sub="sub-line-capa" aria-labelledby="line-capa-management-title">
+                <div class="line-capa-context" role="note">
+                    <h3 id="line-capa-management-title">라인 CAPA 관리</h3>
+                    <p>월별 라인 시간당 CAPA와 일 가동 시간을 등록하고 해당 월 가동 일수를 입력하면 월 총 CAPA가 자동 계산되어 생산계획 현황에 반영됩니다.</p>
+                    <p class="line-capa-hint-text">* 월 총 CAPA = 시간당 CAPA × 일 가동 시간 × 월 가동 일수</p>
+                </div>
+                <div class="bulk-upload-toolbar line-capa-upload-toolbar">
+                    <button type="button" class="secondary bulk-upload-button" id="btn-open-line-capa-bulk-upload">엑셀 일괄 업로드</button>
+                </div>
+                <div class="line-capa-layout">
+                    <form id="line-capa-form" class="line-capa-form" novalidate>
+                        <input type="hidden" id="line-capa-record-id">
+                        <div class="form-grid condensed">
+                            <label>
+                                계획 월
+                                <input type="month" id="line-capa-month" required>
+                            </label>
+                            <label>
+                                생산 라인
+                                <input type="text" id="line-capa-line" list="line-options" placeholder="예: 라인 1" required>
+                            </label>
+                            <label>
+                                시간당 CAPA (EA/시간)
+                                <input type="number" id="line-capa-daily" min="0" step="1" required>
+                            </label>
+                            <label>
+                                일 가동 시간 (시간/일)
+                                <input type="number" id="line-capa-daily-hours" min="0" step="0.1" required>
+                            </label>
+                            <label>
+                                월 가동 일수 (일)
+                                <input type="number" id="line-capa-operating-days" min="0" step="1" required>
+                            </label>
+                            <label>
+                                월 총 CAPA (EA)
+                                <input type="text" id="line-capa-total" readonly>
+                            </label>
+                            <label class="full-width">
+                                비고
+                                <input type="text" id="line-capa-note" placeholder="라인 운영 참고 메모를 입력하세요.">
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary" id="btn-line-capa-save">저장</button>
+                            <button type="button" class="ghost" id="btn-line-capa-reset">초기화</button>
+                        </div>
+                        <datalist id="line-category-options"></datalist>
+                    </form>
+                    <div class="line-capa-table-wrapper">
+                        <div class="line-capa-table-header">
+                            <h4>등록된 라인 CAPA</h4>
+                            <div class="line-capa-filters">
+                                <label>
+                                    생산 라인
+                                    <select id="line-capa-filter-line">
+                                        <option value="all">전체</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    계획 월
+                                    <select id="line-capa-filter-month">
+                                        <option value="all">전체</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="table-wrapper compact">
+                            <table id="line-capa-table" aria-live="polite">
+                                <thead>
+                                    <tr>
+                                        <th>계획 월</th>
+                                        <th>생산 라인</th>
+                                        <th>시간당 CAPA</th>
+                                        <th>일 가동 시간</th>
+                                        <th>월 가동 일수</th>
+                                        <th>월 총 CAPA</th>
+                                        <th>비고</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="line-capa-table-empty" class="empty">등록된 라인 CAPA 정보가 없습니다. 양식을 작성해 추가하세요.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- [4] 생산자재 마스터 관리 -->
+            <section class="line-item-master planner-sub-section" data-planner-sub="sub-line-item" aria-labelledby="line-item-master-title">
+                    <div class="section-subheader">
+                        <div>
+                            <h3 id="line-item-master-title">생산자재 마스터 관리</h3>
+                            <p>자재 코드별 생산 라인과 시간당 생산 수량(EA/시간)을 등록하면 라인 CAPA 대비 자재별 점유율을 산출할 기반 데이터를 확보할 수 있습니다.</p>
+                            <div class="line-item-master-hint" role="note">* 동일 자재 코드는 하나의 생산 라인과만 매칭되며, 중복 등록 시 기존 정보가 갱신됩니다.</div>
+                        </div>
+                    </div>
+                    <div class="bulk-upload-toolbar">
+                        <button type="button" class="secondary bulk-upload-button" id="btn-open-line-master-bulk-upload">엑셀 일괄 업로드</button>
+                    </div>
+                    <div class="line-capa-layout line-item-master-layout">
+                        <form id="line-item-master-form" class="line-item-master-form line-capa-form" novalidate>
+                            <input type="hidden" id="line-item-master-record-id">
+                            <div class="form-grid condensed">
+                                <label>
+                                    자재 코드
+                                    <input type="text" id="line-item-master-code" placeholder="예: MAT-001" required>
+                                </label>
+                                <label>
+                                    생산 라인
+                                    <input type="text" id="line-item-master-line" list="line-options" placeholder="예: 라인 1" required>
+                                </label>
+                                <label>
+                                    시간당 생산 수량 (EA/시간)
+                                    <input type="number" id="line-item-master-hourly" min="0" step="0.1" required>
+                                </label>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary" id="btn-line-item-master-save">저장</button>
+                                <button type="button" class="ghost" id="btn-line-item-master-reset">초기화</button>
+                            </div>
+                        </form>
+                        <div class="line-capa-table-wrapper material-master-table-wrapper">
+                            <div class="line-capa-table-header material-master-table-header">
+                                <h4>등록된 자재 마스터</h4>
+                                <div class="line-capa-filters material-master-filters">
+                                    <label>
+                                        생산 라인
+                                        <select id="line-item-master-filter-line">
+                                            <option value="all">전체</option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="table-wrapper compact">
+                                <table id="line-item-master-table" aria-live="polite">
+                                    <thead>
+                                        <tr>
+                                            <th>자재 코드</th>
+                                            <th>생산 라인</th>
+                                            <th>시간당 생산 수량</th>
+                                            <th>관리</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                                <div id="line-item-master-empty" class="empty">등록된 자재 마스터가 없습니다. 자재 코드를 입력해 추가하세요.</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            <!-- [5] 리뉴얼 자재 연결 마스터 (SAP 인터페이스 수신) -->
+            <section class="material-renewal-master planner-sub-section" data-planner-sub="sub-material-renewal" aria-labelledby="material-renewal-title">
+                    <div class="section-subheader">
+                        <div>
+                            <h3 id="material-renewal-title">리뉴얼 자재 연결 마스터</h3>
+                            <p>SAP 인터페이스를 통해 수신된 리뉴얼 자재 연결 데이터입니다. 기존 자재 코드 1건에 리뉴얼 자재를 최대 3세트까지 연결할 수 있습니다.</p>
+                            <div class="section-hint" role="note">* 데이터는 SAP에서 인터페이스를 통해 자동으로 등록됩니다. 활성화 여부만 변경할 수 있습니다.</div>
+                        </div>
+                    </div>
+                    <div class="material-renewal-layout">
+                        <!-- 기존 form 제거: SAP 인터페이스로만 데이터 등록 -->
+                        <form id="material-renewal-form" class="material-renewal-form line-capa-form hidden" novalidate>
+                            <input type="hidden" id="material-renewal-record-id">
+                        </form>
+                        <datalist id="material-code-options"></datalist>
+                        <div class="material-renewal-table-wrapper table-wrapper compact">
+                            <table id="material-renewal-table" aria-live="polite">
+                                <thead>
+                                    <tr>
+                                        <th rowspan="2">카테고리</th>
+                                        <th rowspan="2">기존 자재 코드</th>
+                                        <th rowspan="2">기존 자재 명칭</th>
+                                        <th colspan="2">리뉴얼 자재 1</th>
+                                        <th colspan="2">리뉴얼 자재 2</th>
+                                        <th colspan="2">리뉴얼 자재 3</th>
+                                        <th colspan="2">리뉴얼 자재 4</th>
+                                        <th colspan="2">리뉴얼 자재 5</th>
+                                        <th rowspan="2">적용 시작 월</th>
+                                        <th rowspan="2">메모</th>
+                                        <th rowspan="2">활성화여부</th>
+                                        <th rowspan="2">생성(변경)일자</th>
+                                        <th rowspan="2">생성(변경)시간</th>
+                                        <th rowspan="2">생성(변경)자</th>
+                                    </tr>
+                                    <tr>
+                                        <th>코드</th>
+                                        <th>명칭</th>
+                                        <th>코드</th>
+                                        <th>명칭</th>
+                                        <th>코드</th>
+                                        <th>명칭</th>
+                                        <th>코드</th>
+                                        <th>명칭</th>
+                                        <th>코드</th>
+                                        <th>명칭</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="material-renewal-empty" class="empty">SAP에서 수신된 리뉴얼 자재 연결 데이터가 없습니다.</div>
+                        </div>
+                    </div>
+                </section>
+
+            <!-- [6] 플랜트별 저장위치 선택 -->
+            <section class="plant-storage-section planner-sub-section" data-planner-sub="sub-plant-storage" aria-labelledby="plant-storage-title">
+                <div class="section-subheader">
+                    <div>
+                        <h3 id="plant-storage-title">플랜트별 저장위치 선택</h3>
+                        <p>각 플랜트별로 사용할 저장위치를 체크박스로 선택합니다. 선택된 저장위치의 가용재고·현재고 데이터가 생산계획 현황에 반영됩니다.</p>
+                        <p class="note-italic">* 향후 SAP I/F 연동을 통해 가용재고·현재고가 자동 업데이트됩니다.</p>
+                    </div>
+                </div>
+                <!-- 플랜트/저장위치 추가 등록 폼 -->
+                <div class="plant-storage-add-form" id="plant-storage-add-form">
+                    <form id="form-add-plant-storage" novalidate>
+                        <div class="plant-storage-add-fields">
+                            <div class="field-group">
+                                <label for="input-plant-code">플랜트</label>
+                                <input type="text" id="input-plant-code" placeholder="예: P600" maxlength="10" required>
+                            </div>
+                            <div class="field-group">
+                                <label for="input-storage-location">저장위치</label>
+                                <input type="text" id="input-storage-location" placeholder="예: 1100" maxlength="20" required>
+                            </div>
+                            <button type="submit" class="primary" id="btn-add-plant-storage">추가</button>
+                        </div>
+                        <p class="plant-storage-add-hint" id="plant-storage-add-hint"></p>
+                    </form>
+                </div>
+
+                <div class="plant-storage-summary" id="plant-storage-summary">
+                    <span class="plant-storage-badge">전체: <strong id="plant-storage-total">0</strong>개</span>
+                    <span class="plant-storage-badge selected">선택: <strong id="plant-storage-selected">0</strong>개</span>
+                    <span class="plant-storage-badge sap-status" id="plant-storage-sap-status">SAP 연동 대기</span>
+                </div>
+                <div class="plant-storage-grid" id="plant-storage-grid">
+                    <!-- JS에서 동적 생성 -->
+                </div>
+            </section>
+
+        </section>
+
+        <section class="sales-upload-section view-section" id="view-sales-upload" data-view="sales-upload">
+            <div class="section-header">
+                <h2>판매계획 업로드</h2>
+                <p>채널별 판매 계획 데이터를 등록하거나 파일로 업로드하면 생산계획 현황의 판매 계획 값에 합산 반영됩니다.</p>
+            </div>
+            <div class="sales-upload-layout">
+                <div class="sales-upload-controls">
+                    <article class="sales-upload-card">
+                        <h3>파일 업로드</h3>
+                        <p>등록 월(<code>YYYY-MM</code>), 자재 코드, <strong>등록된 채널</strong>, 스탠다드 수량(BOX), 프로모션 수량(BOX), 비고(선택) 컬럼을 포함한 XLSX/CSV 파일을 업로드하세요.</p>
+                        <p class="note-italic">* 채널 값은 채널 마스터에 등록된 <code>채널 코드</code>와 정확히 일치해야 합니다.</p>
+                        <div class="sales-upload-actions">
+                            <button type="button" id="btn-sales-template" class="secondary small">템플릿 다운로드 (XLSX)</button>
+                            <label for="sales-file-input" class="upload-label">파일 선택 (xlsx, xls, csv)</label>
+                            <input type="file" id="sales-file-input" accept=".xlsx,.xls,.csv">
+                            <button type="button" id="btn-sales-upload-start" class="primary">업로드 실행</button>
+                        </div>
+                        <div id="sales-upload-status" class="sales-status" aria-live="polite">파일을 선택하면 유효성을 검사한 뒤 업로드합니다.</div>
+                        <p class="note-italic">* 동일 자재/월/채널 조합은 스탠다드·프로모션 수량을 각각 누적 합산합니다. 최소 한 종류의 수량은 입력해야 합니다. 수량은 모두 <strong>BOX</strong> 단위입니다.</p>
+                    </article>
+                    <article class="sales-upload-card sales-channel-card">
+                        <h3>채널 마스터 관리</h3>
+                        <p>판매계획 업로드에 사용할 채널을 미리 등록하세요. 채널 코드가 업로드 파일과 일치해야 등록이 승인됩니다.</p>
+                        <form id="sales-channel-form" class="channel-form" novalidate>
+                            <div class="form-grid condensed">
+                                <label>
+                                    채널 코드
+                                    <input type="text" id="channel-key" placeholder="예: ONLINE" maxlength="32" required>
+                                </label>
+                                <label>
+                                    채널 명칭
+                                    <input type="text" id="channel-name" placeholder="예: 온라인 몰" required>
+                                </label>
+                                <label class="full-width">
+                                    설명 (선택)
+                                    <input type="text" id="channel-description" placeholder="내부 메모 또는 참고 정보를 입력하세요.">
+                                </label>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary">채널 등록</button>
+                            </div>
+                        </form>
+                        <div class="channel-master-list" aria-live="polite">
+                            <ul id="sales-channel-list" class="channel-list"></ul>
+                            <div id="sales-channel-empty" class="empty">등록된 채널이 없습니다. 채널을 먼저 등록하세요.</div>
+                        </div>
+                    </article>
+                    <form id="sales-upload-form" class="sales-upload-card sales-upload-form" novalidate>
+                        <h3>단건 등록</h3>
+                        <p>채널별 판매 계획을 직접 입력하여 등록할 수 있습니다. 스탠다드·프로모션 수량을 <strong>BOX 단위</strong>로 구분 입력하세요.</p>
+                        <div class="form-grid condensed">
+                            <label>
+                                등록 월
+                                <input type="month" id="sales-month" required>
+                            </label>
+                            <label>
+                                자재 코드
+                                <input type="text" id="sales-item-code" placeholder="예: MAT-001" required>
+                            </label>
+                            <label>
+                                채널
+                                <select id="sales-channel" required>
+                                    <option value="">채널을 선택하세요</option>
+                                </select>
+                            </label>
+                            <label>
+                                스탠다드 수량 (BOX)
+                                <input type="number" id="sales-standard-quantity" min="0" step="1" placeholder="기본 판매 수량" inputmode="numeric">
+                            </label>
+                            <label>
+                                프로모션 수량 (BOX)
+                                <input type="number" id="sales-promotion-quantity" min="0" step="1" placeholder="프로모션 판매 수량" inputmode="numeric">
+                            </label>
+                            <label class="full-width">
+                                비고
+                                <textarea id="sales-note" rows="2" placeholder="선택 사항"></textarea>
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="primary">등록</button>
+                            <button type="button" id="btn-sales-form-reset" class="ghost">초기화</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="sales-upload-data">
+                    <section class="sales-summary-panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>자재·월별 판매 계획 합계</h3>
+                                <p>채널별 업로드 데이터를 합산한 총 판매 계획이며 생산계획 현황의 판매 계획 값에 자동 반영됩니다.</p>
+                            </div>
+                            <div class="sales-summary-filters" aria-label="판매 계획 합계 필터">
+                                <label>
+                                    계획 월
+                                    <select id="sales-summary-filter-month">
+                                        <option value="all">전체</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    카테고리
+                                    <select id="sales-summary-filter-category">
+                                        <option value="all">전체</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="note-italic">* 합계 행에서 ‘상세 보기’를 누르면 해당 행 바로 아래에 채널별 스탠다드·프로모션 구성이 펼쳐지며, 다시 누르면 접을 수 있습니다.</p>
+                        <div class="table-wrapper compact">
+                            <table id="sales-summary-table">
+                                <thead>
+                                    <tr>
+                                        <th>계획 월</th>
+                                        <th>카테고리</th>
+                                        <th>자재 코드</th>
+                                        <th>자재 명칭</th>
+                                        <th>스탠다드 계획 (BOX)</th>
+                                        <th>프로모션 계획 (BOX)</th>
+                                        <th>총 판매 계획 (BOX)</th>
+                                        <th>채널별 상세</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="sales-summary-empty" class="empty">판매계획 업로드 데이터가 없습니다.</div>
+                        </div>
+                        <template id="sales-summary-detail-template">
+                            <div class="channel-detail-panel channel-detail-inline" aria-live="polite">
+                                <div class="detail-header">
+                                    <div>
+                                        <h4>채널별 상세</h4>
+                                        <p data-detail-context>표에서 ‘상세 보기’를 선택하면 채널별 스탠다드·프로모션 분포가 여기에 표시됩니다.</p>
+                                    </div>
+                                    <button type="button" class="ghost small detail-close">닫기</button>
+                                </div>
+                                <div class="detail-meta">
+                                    <span data-detail-month>계획 월: -</span>
+                                    <span data-detail-item>자재: -</span>
+                                    <span data-detail-total>총합: -</span>
+                                </div>
+                                <div class="table-wrapper compact">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>채널</th>
+                                                <th>스탠다드 (BOX)</th>
+                                                <th>프로모션 (BOX)</th>
+                                                <th>총합 (BOX)</th>
+                                                <th>설명</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody data-detail-body></tbody>
+                                    </table>
+                                    <div class="empty" data-detail-empty>채널별 상세 데이터가 없습니다.</div>
+                                </div>
+                            </div>
+                        </template>
+                    </section>
+                    <section class="sales-upload-list">
+                        <div class="panel-header">
+                            <div>
+                                <h3>업로드 원천 데이터</h3>
+                                <p>파일 업로드 및 단건 등록으로 생성된 상세 내역을 확인하고 삭제할 수 있습니다.</p>
+                            </div>
+                        </div>
+                        <div class="table-wrapper compact">
+                            <table id="sales-upload-table">
+                                <thead>
+                                    <tr>
+                                        <th>등록 월</th>
+                                        <th>자재 코드</th>
+                                        <th>채널</th>
+                                        <th>스탠다드 (BOX)</th>
+                                        <th>프로모션 (BOX)</th>
+                                        <th>총 수량 (BOX)</th>
+                                        <th>비고</th>
+                                        <th>등록 일시</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                            <div id="sales-upload-empty" class="empty">등록된 판매계획 업로드 데이터가 없습니다.</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        <section class="table-section view-section" id="view-table" data-view="table">
+            <div class="section-header">
+                <h2>자재별 생산계획 현황</h2>
+                <p>월말 재고와 CAPA 초과 여부를 자동으로 계산하여 표기합니다.</p>
+            </div>
+            <div class="product-type-tabs" role="tablist" aria-label="제품 유형 선택">
+                <button type="button" class="product-type-tab active" role="tab" aria-selected="true" data-product-type="all">생산</button>
+                <button type="button" class="product-type-tab" role="tab" aria-selected="false" data-product-type="oem">OEM</button>
+            </div>
+            <div class="table-filters">
+                <div class="filters">
+                    <label>
+                        자재 코드
+                        <select id="filter-item">
+                            <option value="all">전체</option>
+                        </select>
+                    </label>
+                    <label class="multi-select-label">
+                        카테고리
+                        <div class="multi-select-dropdown" id="filter-category-dropdown">
+                            <button type="button" class="multi-select-toggle" id="filter-category-toggle">
+                                <span class="multi-select-text">전체</span>
+                                <span class="multi-select-arrow">▾</span>
+                            </button>
+                            <div class="multi-select-menu hidden" id="filter-category-menu">
+                                <label class="multi-select-option multi-select-option-all">
+                                    <input type="checkbox" value="all" checked> 전체
+                                </label>
+                                <div class="multi-select-options" id="filter-category-options"></div>
+                            </div>
+                        </div>
+                    </label>
+                    <label>
+                        생산 라인
+                        <select id="filter-line">
+                            <option value="all">전체</option>
+                        </select>
+                    </label>
+                    <label>
+                        계획 월
+                        <select id="filter-month">
+                            <option value="all">전체</option>
+                        </select>
+                    </label>
+                    <label>
+                        재고 상태
+                        <select id="filter-inventory-status">
+                            <option value="all">전체</option>
+                            <option value="alert">재고 부족</option>
+                            <option value="overstock">과재고</option>
+                            <option value="safe">적정</option>
+                        </select>
+                    </label>
+                    <label>
+                        CAPA 상태
+                        <select id="filter-capa-status">
+                            <option value="all">전체</option>
+                            <option value="alert">CAPA 초과</option>
+                            <option value="safe">CAPA 적정</option>
+                            <option value="warning-buffer">CAPA 여유</option>
+                            <option value="warning-missing">CAPA 미등록</option>
+                        </select>
+                    </label>
+                    <div class="filter-actions">
+                        <button id="btn-apply-filters" type="button" class="primary">필터 적용</button>
+                        <button id="btn-clear-filters" type="button" class="ghost">필터 초기화</button>
+                    </div>
+                </div>
+                <div class="table-toolbar" aria-live="polite">
+                    <div class="toolbar-actions">
+                        <button id="btn-export-xlsx" type="button" class="secondary">엑셀 내보내기 (XLSX)</button>
+                        <button id="btn-confirm-production-changes" type="button" class="primary" disabled aria-disabled="true">변경 로그 확정 (0건)</button>
+                        <button id="btn-open-target-inventory-upload" type="button" class="secondary">SKU별 적정재고 업로드</button>
+                    </div>
+                    <span class="toolbar-note" id="bulk-confirm-note">* 확정 대기 건수가 있는 경우에만 버튼이 활성화됩니다. 예측(전월 연동) 행을 수정한 값은 시뮬레이션 용도로만 적용되며 변경 로그에는 기록되지 않습니다.</span>
+                </div>
+            </div>
+            <div class="table-scroll-container">
+                <div class="system-date-display" id="system-date-display"></div>
+                <button type="button" class="table-scroll-btn table-scroll-left hidden" aria-label="표를 왼쪽으로 스크롤" data-direction="left">
+                    <span aria-hidden="true">◀</span>
+                </button>
+                <div class="table-wrapper" data-scroll-wrapper>
+                    <table id="plan-table">
+                    <thead>
+                        <tr class="header-row-1">
+                            <th class="col-month sticky-col sticky-col-1" rowspan="2">계획 월</th>
+                            <th class="col-priority sticky-col sticky-col-2" rowspan="2">우선순위</th>
+                            <th class="col-category sticky-col sticky-col-3" rowspan="2">카테고리</th>
+                            <th class="col-item-code sticky-col sticky-col-4" rowspan="2">자재 코드</th>
+                            <th class="col-item-name sticky-col sticky-col-5" rowspan="2">자재 명칭</th>
+                            <th class="col-production-line" rowspan="2">생산 라인</th>
+                            <th class="col-vendor-name" rowspan="2" style="display:none;">협력업체명</th>
+                            <th class="col-available-inventory" rowspan="2">가용재고<br><span class="unit-label">BOX</span></th>
+                            <th class="col-current-inventory" rowspan="2">현재고<br><span class="unit-label">BOX</span></th>
+                            <th class="col-current-inv-days" rowspan="2">재고일수<br><span class="unit-label">(현재고기준)</span></th>
+                            <th class="col-current-depletion-date" rowspan="2">소진일자<br><span class="unit-label">(현재고기준)</span></th>
+                            <th rowspan="2">판매 계획<br><span class="unit-label">BOX</span></th>
+                            <th rowspan="2">판매 실적<br><span class="unit-label">BOX</span></th>
+                            <th class="col-delivery-rate" rowspan="2">납품율<br><span class="unit-label delivery-rate-formula" id="delivery-rate-formula"></span></th>
+                            <th class="col-sales-avg" rowspan="2">최근 3개월<br>판매실적 평균<br><span class="unit-label">BOX</span></th>
+                            <th class="col-sales-stddev" rowspan="2">최근 3개월<br>판매실적 편차<br><span class="unit-label">BOX</span></th>
+                            <th rowspan="2">잔여 판매<br><span class="unit-label">BOX</span></th>
+                            <th class="col-production-plan unit-group-header group-a" colspan="3">제안 생산계획</th>
+                            <th class="col-required-qty unit-group-header group-b" colspan="3">적정재고 대비 필요량</th>
+                            <th class="col-adjusted-plan unit-group-header group-a" colspan="3">보정 생산계획</th>
+                            <th class="col-vehicle-count" rowspan="2" style="display:none;">분할<br>(MOQ기준)</th>
+                            <th class="col-manual-input" rowspan="2">수작업 투입수량<br><span class="unit-label">BOX</span></th>
+                            <th class="col-moq unit-group-header group-b" colspan="3" style="display:none;">MOQ</th>
+                            <th class="col-line-total unit-group-header group-b" colspan="3">라인 총 생산</th>
+                            <th class="col-production-actual unit-group-header group-a" colspan="3">생산실적</th>
+                            <th class="col-production-remaining unit-group-header group-b" colspan="3">잔여생산</th>
+                            <th class="col-production-progress" rowspan="2">생산진행<br>현황(%)</th>
+                            <th rowspan="2">예상 월말 재고<br><span class="unit-label">BOX</span></th>
+                            <th class="col-inventory-days" rowspan="2">재고일수<br><span class="unit-label">(예상월말재고기준)</span></th>
+                            <th class="col-depletion-date" rowspan="2">소진일자<br><span class="unit-label">(예상월말재고기준)</span></th>
+                            <th class="col-target-inventory" rowspan="2">SKU별 적정재고<br><span class="unit-label">BOX</span></th>
+                            <th rowspan="2">재고 상태</th>
+                            <th class="col-line-capa" rowspan="2">라인 CAPA</th>
+                            <th class="col-capa-ratio" rowspan="2">CAPA 대비</th>
+                            <th class="col-capa-status" rowspan="2">CAPA 상태</th>
+                            <th class="col-production-lead-time" rowspan="2">생산소요시간</th>
+                            <th class="col-notes" rowspan="2">비고</th>
+                            <th rowspan="2">관리</th>
+                        </tr>
+                        <tr class="header-row-2">
+                            <!-- 제안 생산계획 (group-a) -->
+                            <th class="sub-unit sub-first group-a">EA</th>
+                            <th class="sub-unit sub-mid group-a">BAG</th>
+                            <th class="sub-unit sub-last group-a">BOX</th>
+                            <!-- 적정재고 대비 필요량 (group-b) -->
+                            <th class="sub-unit sub-first group-b">EA</th>
+                            <th class="sub-unit sub-mid group-b">BAG</th>
+                            <th class="sub-unit sub-last group-b">BOX</th>
+                            <!-- 보정 생산계획 (group-a) -->
+                            <th class="sub-unit sub-first group-a">EA</th>
+                            <th class="sub-unit sub-mid group-a">BAG</th>
+                            <th class="sub-unit sub-last group-a">BOX</th>
+                            <!-- MOQ (group-b, OEM only) -->
+                            <th class="sub-unit sub-first group-b col-moq" style="display:none;">EA</th>
+                            <th class="sub-unit sub-mid group-b col-moq" style="display:none;">BAG</th>
+                            <th class="sub-unit sub-last group-b col-moq" style="display:none;">BOX</th>
+                            <!-- 라인 총 생산 (group-b) -->
+                            <th class="sub-unit sub-first group-b col-line-total">EA</th>
+                            <th class="sub-unit sub-mid group-b col-line-total">BAG</th>
+                            <th class="sub-unit sub-last group-b col-line-total">BOX</th>
+                            <!-- 생산실적 (group-a) -->
+                            <th class="sub-unit sub-first group-a">EA</th>
+                            <th class="sub-unit sub-mid group-a">BAG</th>
+                            <th class="sub-unit sub-last group-a">BOX</th>
+                            <!-- 잔여생산 (group-b) -->
+                            <th class="sub-unit sub-first group-b">EA</th>
+                            <th class="sub-unit sub-mid group-b">BAG</th>
+                            <th class="sub-unit sub-last group-b">BOX</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="48" class="empty">데이터가 없습니다. 생산계획을 등록해 보세요.</td>
+                        </tr>
+                    </tbody>
+                    </table>
+                </div>
+                <button type="button" class="table-scroll-btn table-scroll-right hidden" aria-label="표를 오른쪽으로 스크롤" data-direction="right">
+                    <span aria-hidden="true">▶</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="line-capa-section view-section" id="view-line-capa" data-view="line-capa">
+            <div class="section-header">
+                <h2>생산 CAPA 현황</h2>
+                <p>선택된 필터 조건에 따라 각 라인의 총 생산량과 CAPA 대비 현황을 한눈에 확인하세요.</p>
+            </div>
+            <div class="line-capa-body">
+                <div class="line-capa-usage-panel" id="line-capa-usage-panel">
+                    <div class="line-capa-usage-header">
+                        <h3>라인별 자재 CAPA 점유율</h3>
+                        <p id="line-capa-usage-context">현재 필터 조건에 맞는 자재별 CAPA 점유율을 확인하세요.</p>
+                    </div>
+                    <div class="line-capa-usage-filters" role="group" aria-label="생산 CAPA 필터">
+                        <label>
+                            월
+                            <select id="line-capa-usage-filter-month">
+                                <option value="all">전체</option>
+                            </select>
+                        </label>
+                        <label>
+                            카테고리
+                            <select id="line-capa-usage-filter-category">
+                                <option value="all">전체</option>
+                            </select>
+                        </label>
+                        <label>
+                            라인
+                            <select id="line-capa-usage-filter-line">
+                                <option value="all">전체</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="line-capa-usage-content">
+                        <div class="line-capa-usage-summary" role="region" aria-live="polite">
+                            <h4>월 기준 CAPA 점유율 분포</h4>
+                            <p id="line-capa-usage-summary-context">월 필터를 선택하면 해당 월의 라인별 CAPA 대비 점유율을 한눈에 확인할 수 있습니다.</p>
+                            <div id="line-capa-usage-summary-empty" class="empty hidden">월을 선택하면 라인별 CAPA 대비 점유율을 가로 막대 그래프로 확인할 수 있습니다.</div>
+                            <div class="chart-container line-capa-usage-summary-chart hidden">
+                                <canvas id="line-capa-usage-summary-chart" aria-label="월 기준 라인별 CAPA 대비 점유율 가로 막대 그래프"></canvas>
+                            </div>
+                        </div>
+                        <aside id="line-capa-cards-wrapper" class="line-capa-usage-sidecards" role="region" aria-live="polite" aria-labelledby="line-capa-sidecards-title">
+                            <h4 id="line-capa-sidecards-title">라인별 CAPA 요약</h4>
+                            <p class="line-capa-sidecards-hint">필터 조건에 맞는 라인의 총 생산량·CAPA·부족 수량을 확인하세요.</p>
+                            <div id="line-capa-cards" class="line-capa-cards hidden" aria-live="polite"></div>
+                        </aside>
+                    </div>
+                    <div class="line-capa-usage-breakdown" role="group" aria-label="라인별 CAPA 점유율 상세">
+                        <div class="line-capa-usage-chart-container">
+                            <h4 id="line-capa-usage-chart-title" class="line-capa-usage-chart-title">라인별 자재 CAPA 점유율</h4>
+                            <div id="line-capa-usage-chart-empty" class="empty">라인별 CAPA 요약 카드에서 라인을 클릭하거나 Enter 키로 활성화하면 자재별 CAPA 점유율 그래프가 표시됩니다.</div>
+                            <div class="chart-container line-capa-usage-chart hidden" role="region" aria-live="polite">
+                                <canvas id="line-capa-usage-chart" aria-label="선택한 라인의 자재별 CAPA 점유율 가로 누적 막대 그래프"></canvas>
+                            </div>
+                        </div>
+                        <aside id="line-capa-usage-legend" class="line-capa-usage-legend hidden" role="region" aria-live="polite" aria-labelledby="line-capa-usage-legend-title">
+                            <h4 id="line-capa-usage-legend-title">자재별 CAPA 점유율 범례</h4>
+                            <p class="line-capa-usage-legend-hint" id="line-capa-usage-legend-hint">라인별 CAPA 요약 카드에서 라인을 클릭하거나 Enter 키로 활성화하면 자재별 비중과 수량을 확인할 수 있습니다.</p>
+                            <ul id="line-capa-usage-legend-list" class="line-capa-usage-legend-list" aria-label="자재별 CAPA 점유율 범례 목록"></ul>
+                        </aside>
+                    </div>
+                    <div id="line-capa-usage-empty" class="empty hidden">조건에 맞는 데이터가 없습니다. 월·라인·카테고리 필터를 확인해 주세요.</div>
+                </div>
+                <div id="line-capa-empty" class="empty">조건에 맞는 라인 데이터가 없습니다. 필터를 조정하거나 생산계획을 입력하세요.</div>
+                <div class="line-capa-usage-trend" id="line-capa-usage-trend" role="region" aria-live="polite" aria-labelledby="line-capa-trend-title">
+                    <div class="line-capa-trend-header">
+                        <h4 id="line-capa-trend-title">라인별 3개월 생산·CAPA 추이</h4>
+                        <p class="line-capa-trend-hint">라인 카드를 클릭하거나 Enter 키로 활성화하면 최근 3개월 생산량과 CAPA 추이를 비교할 수 있습니다.</p>
+                    </div>
+                    <div class="chart-container line-capa-chart hidden">
+                        <div id="line-capa-chart-prompt" class="chart-placeholder">라인 카드를 클릭하거나 Enter 키로 활성화하면 최근 3개월 생산량과 CAPA 추이를 확인할 수 있습니다.</div>
+                        <canvas id="line-capa-chart" class="hidden" aria-label="라인 월별 생산량 및 CAPA 추이"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="inventory-forecast-section view-section" id="view-inventory" data-view="inventory">
+            <div class="inventory-forecast-panel">
+                <div class="inventory-accuracy-summary-panel">
+                    <div class="inventory-accuracy-header">
+                        <div class="inventory-accuracy-intro">
+                            <h4>카테고리별 판매·생산실적 적중율 요약</h4>
+                            <p class="panel-sub" id="inventory-accuracy-summary-description">선택한 기준 월과 집계 방식을 조합하여 카테고리별 계획 대비 실적 비율을 확인하세요.</p>
+                        </div>
+                        <div class="inventory-accuracy-controls">
+                            <label class="panel-control" for="dashboard-accuracy-mode">
+                                집계 방식
+                                <select id="dashboard-accuracy-mode">
+                                    <option value="cumulative">연초~기준월 누적</option>
+                                    <option value="rolling">기준월 포함 최근 4개월</option>
+                                </select>
+                            </label>
+                            <label class="panel-control" for="dashboard-base-month">
+                                기준 월 선택
+                                <select id="dashboard-base-month"></select>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-wrapper compact">
+                        <table id="inventory-accuracy-summary-table">
+                            <thead>
+                                <tr id="inventory-accuracy-summary-head-main"></tr>
+                                <tr id="inventory-accuracy-summary-head-sub"></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div id="inventory-accuracy-summary-empty" class="empty hidden">카테고리 요약 적중율 데이터를 찾을 수 없습니다.</div>
+                    <div id="inventory-accuracy-summary-charts" class="inventory-accuracy-summary-charts hidden" aria-live="polite">
+                        <article class="inventory-accuracy-chart-card" data-chart="sales" data-empty-text="판매 적중율 데이터를 표시할 수 없습니다.">
+                            <header class="inventory-accuracy-chart-card-header">
+                                <h5>카테고리별 판매 적중율 추이</h5>
+                                <p>월별 계획 대비 실적 비율(%)</p>
+                            </header>
+                            <div class="inventory-accuracy-chart-canvas">
+                                <canvas id="inventory-accuracy-sales-chart" aria-label="카테고리별 판매 적중율 추이" role="img"></canvas>
+                            </div>
+                        </article>
+                        <article class="inventory-accuracy-chart-card" data-chart="production" data-empty-text="생산 적중율 데이터를 표시할 수 없습니다.">
+                            <header class="inventory-accuracy-chart-card-header">
+                                <h5>카테고리별 생산 적중율 추이</h5>
+                                <p>월별 계획 대비 실적 비율(%)</p>
+                            </header>
+                            <div class="inventory-accuracy-chart-canvas">
+                                <canvas id="inventory-accuracy-production-chart" aria-label="카테고리별 생산 적중율 추이" role="img"></canvas>
+                            </div>
+                        </article>
+                    </div>
+                    <div id="inventory-accuracy-summary-chart-empty" class="empty hidden">차트를 표시할 적중율 데이터가 없습니다.</div>
+                </div>
+                <div class="panel-header">
+                    <div>
+                        <h3>자재별 3개월 재고 전망</h3>
+                        <p class="panel-sub">선택한 기준 월을 포함하여 3개월 동안의 현재고·생산 계획·월말 재고 흐름을 한눈에 비교하세요.</p>
+                    </div>
+                </div>
+                <div class="table-wrapper compact">
+                    <div class="inventory-legend" aria-live="polite">
+                        <span class="legend-item legend-shortage">부족 재고</span>
+                        <span class="legend-item legend-overstock">과재고</span>
+                    </div>
+                    <table id="inventory-forecast-table">
+                        <thead>
+                            <tr>
+                                <th rowspan="2">카테고리</th>
+                                <th rowspan="2">자재 코드</th>
+                                <th rowspan="2" class="col-item-name">자재 명칭</th>
+                                <th colspan="8" id="forecast-month-0" class="month-group-heading month-col-start month-col-end month-col-first month-index-0">기준 월</th>
+                                <th colspan="8" id="forecast-month-1" class="month-group-heading month-col-start month-col-end month-index-1">+1개월</th>
+                                <th colspan="8" id="forecast-month-2" class="month-group-heading month-col-start month-col-end month-index-2">+2개월</th>
+                            </tr>
+                            <tr>
+                                <th class="month-subhead month-col-start month-col-first month-index-0 month-divider-right">현재고</th>
+                                <th class="month-subhead month-index-0 month-divider-companion">판매 계획</th>
+                                <th class="month-subhead month-index-0 month-divider-companion">판매 실적</th>
+                                <th class="month-subhead month-index-0 month-divider-right">판매 적중율</th>
+                                <th class="month-subhead month-index-0 month-divider-companion">생산 계획</th>
+                                <th class="month-subhead month-index-0 month-divider-companion">생산 실적</th>
+                                <th class="month-subhead month-index-0 month-divider-right">생산 적중율</th>
+                                <th class="month-subhead month-col-end month-index-0 month-divider-companion">월말 재고</th>
+                                <th class="month-subhead month-col-start month-index-1 month-divider-right">현재고</th>
+                                <th class="month-subhead month-index-1 month-divider-companion">판매 계획</th>
+                                <th class="month-subhead month-index-1 month-divider-companion">판매 실적</th>
+                                <th class="month-subhead month-index-1 month-divider-right">판매 적중율</th>
+                                <th class="month-subhead month-index-1 month-divider-companion">생산 계획</th>
+                                <th class="month-subhead month-index-1 month-divider-companion">생산 실적</th>
+                                <th class="month-subhead month-index-1 month-divider-right">생산 적중율</th>
+                                <th class="month-subhead month-col-end month-index-1 month-divider-companion">월말 재고</th>
+                                <th class="month-subhead month-col-start month-index-2 month-divider-right">현재고</th>
+                                <th class="month-subhead month-index-2 month-divider-companion">판매 계획</th>
+                                <th class="month-subhead month-index-2 month-divider-companion">판매 실적</th>
+                                <th class="month-subhead month-index-2 month-divider-right">판매 적중율</th>
+                                <th class="month-subhead month-index-2 month-divider-companion">생산 계획</th>
+                                <th class="month-subhead month-index-2 month-divider-companion">생산 실적</th>
+                                <th class="month-subhead month-index-2 month-divider-right">생산 적중율</th>
+                                <th class="month-subhead month-col-end month-index-2 month-divider-companion">월말 재고</th>
+                            </tr>
+                                                </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="inventory-forecast-empty" class="empty hidden">조건에 맞는 재고 전망 데이터가 없습니다.</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="change-history-section view-section" id="view-change-history" data-view="change-history">
+            <div class="section-header">
+                <h2>변경 이력 관리</h2>
+                <p>생산계획과 판매계획 업로드에 대한 변경 이력을 한눈에 확인하고 CSV로 내보낼 수 있습니다.</p>
+            </div>
+            <div class="change-history-tabs" role="tablist" aria-label="변경 이력 유형 선택">
+                <button type="button" class="history-tab active" id="history-tab-production" role="tab" aria-selected="true" aria-controls="history-panel-production" data-history-target="production">생산계획 변경 로그</button>
+                <button type="button" class="history-tab" id="history-tab-upload" role="tab" aria-selected="false" aria-controls="history-panel-upload" data-history-target="upload">판매계획 업로드 이력</button>
+            </div>
+            <div class="history-tab-panels">
+                <article class="history-panel" id="history-panel-production" role="tabpanel" aria-labelledby="history-tab-production" data-history-panel="production">
+                    <div class="panel-header">
+                        <div>
+                            <h3>생산계획 변경 로그</h3>
+                            <p>생산계획 현황에서 수량을 조정한 뒤 상단 <strong>‘변경 로그 확정’</strong> 버튼을 누르면 확정 시점 기준 로그가 누적되어 최신 순으로 정렬됩니다.</p>
+                        </div>
+                        <div class="history-filters" aria-label="생산계획 변경 필터">
+                            <label>
+                                변경 유형
+                                <select id="history-filter-type">
+                                    <option value="all">전체</option>
+                                    <option value="created">신규 등록</option>
+                                    <option value="updated">수정</option>
+                                    <option value="deleted">삭제</option>
+                                </select>
+                            </label>
+                            <label>
+                                계획 월
+                                <select id="history-filter-month">
+                                    <option value="all">전체</option>
+                                </select>
+                            </label>
+                            <label>
+                                자재 코드
+                                <select id="history-filter-item">
+                                    <option value="all">전체</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-wrapper compact">
+                        <table id="change-history-table">
+                            <thead>
+                                <tr>
+                                    <th>변경 유형</th>
+                                    <th>확정 일시</th>
+                                    <th>자재 코드</th>
+                                    <th class="col-item-name">자재 명칭</th>
+                                    <th>계획 월</th>
+                                    <th>변경 전 생산 계획 (BOX)</th>
+                                    <th>변경 후 생산 계획 (BOX)</th>
+                                    <th>증감 (BOX)</th>
+                                    <th>판매 계획 (BOX)</th>
+                                    <th>현재고 (BOX)</th>
+                                    <th>적정재고 (BOX)</th>
+                                    <th>예상 월말 재고 (BOX)</th>
+                                    <th>생산 라인</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <div id="change-history-empty" class="empty hidden">변경 이력 데이터가 없습니다. 생산계획을 조정한 뒤 상단 ‘변경 로그 확정’ 버튼을 누르면 로그가 기록됩니다.</div>
+                    </div>
+                    <div class="panel-footer">
+                        <button type="button" id="history-export" class="secondary small">CSV 내보내기</button>
+                        <span class="data-note">* 상단 ‘변경 로그 확정’ 버튼을 누른 시점의 생산 계획과 주요 지표가 저장되며, 동일 자재라도 누적 이력이 남습니다.</span>
+                    </div>
+                </article>
+                <article class="history-panel hidden" id="history-panel-upload" role="tabpanel" aria-labelledby="history-tab-upload" data-history-panel="upload">
+                    <div class="panel-header">
+                        <div>
+                            <h3>판매계획 업로드 이력</h3>
+                            <p>업로드된 판매 계획 데이터를 행 단위로 확인하고 기간·자재 코드 필터로 필요한 항목만 조회하세요.</p>
+                        </div>
+                        <div class="history-upload-filters" aria-label="업로드 이력 필터">
+                            <label>
+                                시작일
+                                <input type="date" id="upload-history-filter-from">
+                            </label>
+                            <label>
+                                종료일
+                                <input type="date" id="upload-history-filter-to">
+                            </label>
+                            <label>
+                                자재 코드
+                                <select id="upload-history-filter-item">
+                                    <option value="all">전체</option>
+                                </select>
+                            </label>
+                            <button type="button" class="ghost small" id="upload-history-filter-reset">필터 초기화</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper compact">
+                        <table id="change-upload-history-table">
+                            <thead>
+                                <tr>
+                                    <th rowspan="2">업로드 일시</th>
+                                    <th rowspan="2">업로드 방식</th>
+                                    <th rowspan="2">업로드 참조</th>
+                                    <th rowspan="2">변경 유형</th>
+                                    <th rowspan="2">계획 월</th>
+                                    <th rowspan="2">자재 코드</th>
+                                    <th rowspan="2" class="col-item-name">자재 명칭</th>
+                                    <th rowspan="2">판매 채널</th>
+                                    <th colspan="3" class="group-heading group-current-heading">업로드 후 수량 (EA)</th>
+                                    <th colspan="3" class="group-heading group-previous-heading">업로드 이전 수량 (EA)</th>
+                                    <th rowspan="2" class="col-notes">비고</th>
+                                    <th rowspan="2" class="col-notes">이전 비고</th>
+                                </tr>
+                                <tr>
+                                    <th class="subheading">스탠다드</th>
+                                    <th class="subheading">프로모션</th>
+                                    <th class="subheading">총 수량</th>
+                                    <th class="subheading">스탠다드</th>
+                                    <th class="subheading">프로모션</th>
+                                    <th class="subheading">총 수량</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                        <div id="change-upload-history-empty" class="empty hidden">업로드된 판매 계획 데이터가 없습니다. 판매계획 업로드 탭에서 파일을 등록하면 상세 내역이 표시됩니다.</div>
+                    </div>
+                    <span class="data-note">* 모든 업로드 행이 시간 순으로 기록되며, ‘업로드 후 수량’과 ‘업로드 이전 수량’ 영역에서 값을 세트로 비교할 수 있습니다.</span>
+                </article>
+            </div>
+        </section>
+
+        <section class="dashboard-section view-section" id="view-analytics" data-view="analytics">
+            <div class="section-header">
+                <h2>재고 분석 대시보드</h2>
+                <p>자재별 판매/생산/재고 추이를 시각화하여 의사결정을 지원합니다.</p>
+            </div>
+            <section class="analytics-risk-panel" aria-label="재고 위험 자재 목록">
+                <div class="panel-header">
+                    <div>
+                        <h3>재고 위험 자재 스냅샷</h3>
+                        <p>생산계획 현황에서 재고 상태가 <strong>부족</strong> 또는 <strong>과재고</strong>인 자재를 요약합니다. 행을 클릭하면 아래 그래프가 해당 자재로 전환됩니다.</p>
+                    </div>
+                    <div class="analytics-controls" aria-label="재고 분석 계획 월 필터">
+                        <label>
+                            계획 월
+                            <select id="analytics-month-filter" data-manual-selection="false">
+                                <option value="all">전체</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+                <div class="table-wrapper compact">
+                    <table id="inventory-risk-table">
+                        <thead>
+                            <tr>
+                                <th>계획 월</th>
+                                <th>자재 코드</th>
+                                <th class="col-item-name">자재 명칭</th>
+                                <th>판매 계획</th>
+                                <th>판매 실적</th>
+                                <th>생산 계획</th>
+                                <th>생산 실적</th>
+                                <th>예상 월말 재고</th>
+                                <th>재고 상태</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="inventory-risk-empty" class="empty hidden">재고 위험 상태(부족/과재고)에 해당하는 자재가 없습니다.</div>
+                </div>
+            </section>
+            <div class="dashboard-controls">
+                <label>
+                    자재 선택
+                    <select id="chart-item-select">
+                        <option value="">자재를 선택하세요</option>
+                    </select>
+                </label>
+            </div>
+            <div class="chart-container">
+                <canvas id="plan-chart"></canvas>
+            </div>
+        </section>
+
+        <section class="dashboard-section optimal-inventory-section view-section" id="view-optimal-inventory" data-view="optimal-inventory">
+            <div class="section-header">
+                <h2>적정재고관리</h2>
+                <p>카테고리별 월말 재고와 적정재고를 비교해 재고 적정성을 점검하세요. 기본 조회 범위는 2025년 1월 이후 데이터입니다.</p>
+            </div>
+            <div class="optimal-controls" aria-label="적정재고관리 연도 범위 및 옵션">
+                <label>
+                    기준 연도
+                    <select id="optimal-year">
+                        <option value="all">전체</option>
+                    </select>
+                </label>
+                <label>
+                    집계 방식
+                    <select id="optimal-aggregation-mode">
+                        <option value="all">전체 월</option>
+                        <option value="cumulative">연초~기준월 누적</option>
+                        <option value="rolling">기준월 포함 최근 4개월</option>
+                    </select>
+                </label>
+                <div class="optimal-highlight-legend hidden" id="optimal-highlight-legend" aria-live="polite">
+                    <span class="legend-indicator" aria-hidden="true"></span>
+                    <span id="optimal-highlight-text">생산계획 현황에서 선택한 월이 강조 표시됩니다.</span>
+                </div>
+            </div>
+            <div class="optimal-summary-card">
+                <div class="table-wrapper compact">
+                    <table id="optimal-summary-table">
+                        <thead>
+                            <tr id="optimal-summary-header">
+                                <th rowspan="2">카테고리</th>
+                                <th rowspan="2" id="optimal-baseline-header" class="optimal-baseline-col">2025년 적정재고(BOX)</th>
+                            </tr>
+                            <tr id="optimal-summary-subheader"></tr>
+                        </thead>
+                        <tbody id="optimal-summary-body"></tbody>
+                        <tfoot>
+                            <tr id="optimal-summary-total" class="hidden"></tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div id="optimal-empty" class="empty hidden">표시할 데이터가 없습니다. 월 범위를 조정하거나 생산/재고 데이터를 확인해 주세요.</div>
+            </div>
+            <div class="optimal-chart-card">
+                <h3>월별 총합 추이</h3>
+                <p class="chart-note">선택한 범위에서 카테고리 합계 기준으로 월말 재고와 목표 재고를 비교합니다.</p>
+                <div class="optimal-chart-container">
+                    <canvas id="optimal-chart" aria-label="월별 재고 총합 비교 차트"></canvas>
+                </div>
+            </div>
+
+            <div class="optimal-baseline-card" id="optimal-baseline-manager">
+                <h3>년도별 적정재고 기준 등록</h3>
+                <div class="optimal-baseline-description-group">
+                    <p class="optimal-baseline-description">카테고리별로 연도에 맞는 적정재고 기준 수량을 등록하면 적정재고관리 표에서 즉시 반영됩니다. 동일 연도·카테고리 조합은 신규 등록 시 최신 값으로 덮어쓰기됩니다.</p>
+                    <p class="optimal-baseline-description">생산계획 현황에 없는 카테고리는 표에서 자동으로 숨겨집니다.</p>
+                </div>
+                <form id="optimal-baseline-form" class="optimal-baseline-form" novalidate>
+                    <input type="hidden" id="optimal-baseline-id">
+                    <div class="optimal-baseline-grid">
+                        <label>
+                            적용 연도
+                            <input type="number" id="optimal-baseline-year" min="2020" max="2100" step="1" placeholder="예: 2025" required>
+                        </label>
+                        <label>
+                            카테고리
+                            <input type="text" id="optimal-baseline-category" list="optimal-baseline-category-options" placeholder="예: 배터리 모듈" required>
+                        </label>
+                        <label>
+                            적정 재고 수량 (BOX)
+                            <input type="number" id="optimal-baseline-quantity" min="0" step="1" placeholder="예: 1200" required>
+                        </label>
+                        <label class="full-width">
+                            비고 (선택)
+                            <input type="text" id="optimal-baseline-notes" placeholder="필요 시 메모를 남겨주세요.">
+                        </label>
+                    </div>
+                    <datalist id="optimal-baseline-category-options"></datalist>
+                    <div class="optimal-baseline-actions">
+                        <button type="submit" class="primary" id="optimal-baseline-submit">기준 등록</button>
+                        <button type="button" class="secondary" id="optimal-baseline-update" disabled>수정</button>
+                        <button type="button" class="danger" id="optimal-baseline-delete" disabled>삭제</button>
+                        <button type="button" class="ghost" id="optimal-baseline-reset">초기화</button>
+                    </div>
+                    <div id="optimal-baseline-mode-indicator" class="optimal-baseline-mode-indicator hidden"></div>
+                </form>
+                <div class="table-wrapper compact optimal-baseline-table-wrapper">
+                    <table id="optimal-baseline-table" class="hidden">
+                        <thead>
+                            <tr id="optimal-baseline-table-header">
+                                <th scope="col" rowspan="2" class="baseline-category-header">카테고리</th>
+                            </tr>
+                            <tr id="optimal-baseline-table-subheader"></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <div id="optimal-baseline-empty" class="empty">등록된 적정재고 기준이 없습니다. 위 폼에서 값을 추가하세요.</div>
+                </div>
+            </div>
+        </section>
+        <section class="dev-schedule-section view-section" id="view-dev-schedule" data-view="dev-schedule">
+            <div class="section-header">
+                <h2>개발 일정 관리</h2>
+                <p>연속적 소프트웨어 개발 및 시스템 연동 일정을 등록하고 진행 상황을 관리합니다.</p>
+            </div>
+            <div class="dev-schedule-layout">
+                <div class="dev-schedule-controls">
+                    <article class="dev-schedule-card">
+                        <h3>일정 등록</h3>
+                        <form id="dev-schedule-form" class="dev-schedule-form" novalidate>
+                            <input type="hidden" id="dev-schedule-id">
+                            <div class="form-grid condensed">
+                                <label>
+                                    일정 날짜
+                                    <input type="date" id="dev-schedule-date" required>
+                                </label>
+                                <label>
+                                    시간
+                                    <input type="time" id="dev-schedule-time">
+                                </label>
+                                <label class="full-width">
+                                    제목
+                                    <input type="text" id="dev-schedule-title" placeholder="예: 연속적 소프트웨어 개발 및 시스템 연동" required>
+                                </label>
+                                <label>
+                                    카테고리
+                                    <select id="dev-schedule-category">
+                                        <option value="">선택하세요</option>
+                                        <option value="소프트웨어 개발">소프트웨어 개발</option>
+                                        <option value="시스템 연동">시스템 연동</option>
+                                        <option value="인프라 구축">인프라 구축</option>
+                                        <option value="테스트/QA">테스트/QA</option>
+                                        <option value="배포/릴리즈">배포/릴리즈</option>
+                                        <option value="미팅/회의">미팅/회의</option>
+                                        <option value="기타">기타</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    우선순위
+                                    <select id="dev-schedule-priority">
+                                        <option value="low">낮음</option>
+                                        <option value="medium" selected>보통</option>
+                                        <option value="high">높음</option>
+                                        <option value="critical">긴급</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    상태
+                                    <select id="dev-schedule-status">
+                                        <option value="planned">계획</option>
+                                        <option value="in_progress">진행중</option>
+                                        <option value="completed">완료</option>
+                                        <option value="on_hold">보류</option>
+                                        <option value="cancelled">취소</option>
+                                    </select>
+                                </label>
+                                <label>
+                                    담당자
+                                    <input type="text" id="dev-schedule-assignee" placeholder="예: 개발팀">
+                                </label>
+                                <label>
+                                    진행률 (%)
+                                    <input type="number" id="dev-schedule-progress" min="0" max="100" step="5" value="0">
+                                </label>
+                                <label class="full-width">
+                                    상세 설명
+                                    <textarea id="dev-schedule-description" rows="3" placeholder="개발 내용, 연동 대상 시스템 등을 기술하세요."></textarea>
+                                </label>
+                                <label class="full-width">
+                                    비고
+                                    <textarea id="dev-schedule-notes" rows="2" placeholder="참고 사항을 입력하세요."></textarea>
+                                </label>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="primary" id="btn-dev-schedule-save">저장</button>
+                                <button type="button" class="ghost" id="btn-dev-schedule-reset">초기화</button>
+                            </div>
+                        </form>
+                    </article>
+                </div>
+                <div class="dev-schedule-data">
+                    <div class="dev-schedule-filters-bar">
+                        <label>
+                            상태 필터
+                            <select id="dev-schedule-filter-status">
+                                <option value="all">전체</option>
+                                <option value="planned">계획</option>
+                                <option value="in_progress">진행중</option>
+                                <option value="completed">완료</option>
+                                <option value="on_hold">보류</option>
+                                <option value="cancelled">취소</option>
+                            </select>
+                        </label>
+                        <label>
+                            카테고리 필터
+                            <select id="dev-schedule-filter-category">
+                                <option value="all">전체</option>
+                                <option value="소프트웨어 개발">소프트웨어 개발</option>
+                                <option value="시스템 연동">시스템 연동</option>
+                                <option value="인프라 구축">인프라 구축</option>
+                                <option value="테스트/QA">테스트/QA</option>
+                                <option value="배포/릴리즈">배포/릴리즈</option>
+                                <option value="미팅/회의">미팅/회의</option>
+                                <option value="기타">기타</option>
+                            </select>
+                        </label>
+                        <label>
+                            우선순위 필터
+                            <select id="dev-schedule-filter-priority">
+                                <option value="all">전체</option>
+                                <option value="critical">긴급</option>
+                                <option value="high">높음</option>
+                                <option value="medium">보통</option>
+                                <option value="low">낮음</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="dev-schedule-timeline" id="dev-schedule-timeline" aria-live="polite">
+                    </div>
+                    <div id="dev-schedule-empty" class="empty">등록된 개발 일정이 없습니다. 위 양식을 작성하여 일정을 추가하세요.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 인터페이스 관리 -->
+        <section class="interface-master-section view-section" id="view-interface-master" data-view="interface-master">
+            <div class="section-header">
+                <h2>인터페이스 관리</h2>
+                <p>SAP ↔ S&OP 시스템 간 인터페이스를 관리합니다. 마스터 등록, 수행 주기 설정, 수행 이력 조회 및 에러건 재수행이 가능합니다.</p>
+            </div>
+
+            <!-- 서브탭 -->
+            <div class="change-history-tabs" role="tablist" aria-label="인터페이스 관리 서브메뉴">
+                <button type="button" class="history-tab active" id="if-sub-tab-master" data-if-target="master">인터페이스 마스터 관리</button>
+                <button type="button" class="history-tab" id="if-sub-tab-execution" data-if-target="execution">인터페이스 수행관리</button>
+                <button type="button" class="history-tab" id="if-sub-tab-history" data-if-target="history">인터페이스 이력관리</button>
+            </div>
+
+            <!-- ===== 인터페이스 마스터 관리 ===== -->
+            <div class="if-sub-panel" id="if-panel-master">
+                <div style="margin-bottom:8px; text-align:right;">
+                    <button type="button" class="primary small" id="btn-if-master-add-row">+ 신규 등록</button>
+                </div>
+                <div class="table-wrapper compact">
+                    <table class="data-table" id="interface-master-table">
+                        <thead><tr>
+                            <th>인터페이스 ID</th><th>인터페이스 명</th><th>송신</th><th>수신</th>
+                            <th>RFC Func. / REST URL</th><th>RFC Param</th><th>실행명령어</th>
+                            <th>등록자</th><th>수정자</th><th>관리</th>
+                        </tr></thead>
+                        <tbody id="interface-master-tbody">
+                            <tr><td colspan="10" class="empty">등록된 인터페이스가 없습니다.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ===== 인터페이스 수행관리 ===== -->
+            <div class="if-sub-panel hidden" id="if-panel-execution">
+                <div style="margin-bottom:8px; text-align:right;">
+                    <button type="button" class="primary small" id="btn-if-exec-add-row">+ 신규 등록</button>
+                </div>
+                <div class="table-wrapper compact">
+                    <table class="data-table" id="if-exec-table">
+                        <thead><tr>
+                            <th>인터페이스 ID</th><th>인터페이스 명</th><th>수행 주기</th><th>수행 시간/간격</th>
+                            <th>활성</th><th>마지막 수행</th><th>마지막 수행 상태</th><th>다음 수행 예정</th><th>비고</th>
+                            <th>등록자</th><th>관리</th>
+                        </tr></thead>
+                        <tbody id="if-exec-tbody">
+                            <tr><td colspan="11" class="empty">등록된 수행 설정이 없습니다.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ===== 인터페이스 이력관리 ===== -->
+            <div class="if-sub-panel hidden" id="if-panel-history">
+                <div class="form-row" style="margin-bottom:12px; gap:8px; align-items:center;">
+                    <label style="flex:0 0 auto;">필터:</label>
+                    <select id="if-hist-filter-status" style="width:160px;">
+                        <option value="">전체</option>
+                        <option value="SUCCESS">성공</option>
+                        <option value="ERROR">에러</option>
+                        <option value="RETRY_SUCCESS">재수행 성공</option>
+                        <option value="RETRY_ERROR">재수행 에러</option>
+                        <option value="RUNNING">수행중</option>
+                    </select>
+                    <select id="if-hist-filter-if" style="width:200px;">
+                        <option value="">전체 인터페이스</option>
+                    </select>
+                    <button type="button" class="primary small" id="btn-if-hist-refresh">새로고침</button>
+                </div>
+                <div class="table-wrapper compact">
+                    <table class="data-table" id="if-hist-table">
+                        <thead><tr>
+                            <th>No</th><th>인터페이스 ID</th><th>인터페이스 명</th><th>수행구분</th>
+                            <th>시작시간</th><th>종료시간</th><th>소요(ms)</th>
+                            <th>처리건수</th><th>미처리건수</th><th>상태</th><th>에러메시지</th>
+                            <th>실행명령어</th><th>관리</th>
+                        </tr></thead>
+                        <tbody id="if-hist-tbody">
+                            <tr><td colspan="13" class="empty">수행 이력이 없습니다.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 사용자 관리 -->
+        <section class="user-mgmt-section view-section" id="view-user-mgmt" data-view="user-mgmt">
+            <div class="section-header">
+                <h2>사용자 관리</h2>
+                <p>시스템 사용자 계정을 등록, 수정, 삭제할 수 있습니다.</p>
+            </div>
+            <div style="margin-bottom:8px; text-align:right;">
+                <button type="button" class="primary small" id="btn-user-add-row">+ 사용자 등록</button>
+            </div>
+            <div class="table-wrapper compact">
+                <table class="data-table" id="user-mgmt-table" style="width:100%; table-layout:auto;">
+                    <thead><tr>
+                        <th>사용자 ID</th><th>사용자명</th><th>비밀번호</th><th>이메일</th><th>부서</th>
+                        <th>권한</th><th>활성</th><th>마지막 로그인</th><th>등록일</th><th>관리</th>
+                    </tr></thead>
+                    <tbody id="user-mgmt-tbody">
+                        <tr><td colspan="10" class="empty">등록된 사용자가 없습니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="bulk-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="bulk-upload-title">
+        <div class="modal-backdrop" data-close-modal></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="bulk-upload-title">엑셀/CSV 일괄 업로드</h3>
+                <button class="ghost modal-close" type="button" id="btn-close-bulk-upload">닫기</button>
+            </div>
+            <div class="modal-body">
+                <nav class="bulk-target-tabs" role="tablist">
+                    <button type="button" class="bulk-target-tab active" data-bulk-target="production" aria-selected="true">기초 데이터 등록</button>
+                    <button type="button" class="bulk-target-tab" data-bulk-target="line-capa" aria-selected="false">라인 CAPA 업로드</button>
+                    <button type="button" class="bulk-target-tab" data-bulk-target="line-master" aria-selected="false">자재 마스터 업로드</button>
+                </nav>
+                <div class="bulk-target-panels">
+                    <section class="bulk-panel" data-bulk-target="production">
+                        <p class="modal-description">
+                            엑셀 또는 CSV 파일을 업로드하면 여러 자재의 생산계획을 한 번에 등록할 수 있습니다.<br>
+                            아래 템플릿을 내려받아 작성하거나, 동일한 컬럼명을 사용해 파일을 준비하세요.
+                        </p>
+                        <div class="modal-instructions">
+                            <button type="button" class="secondary small" data-bulk-template="production">기초 데이터 등록 템플릿 다운로드 (XLSX)</button>
+                            <ul>
+                                <li>필수 컬럼: <strong>item_code, item_name, category, production_line, month(YYYY-MM), production_plan, beginning_inventory, target_ending_inventory</strong></li>
+                                <li>판매 계획(<code>sales_plan</code>)과 라인 CAPA는 각각 판매계획 업로드/라인 CAPA 관리 화면에서 자동 반영됩니다.</li>
+                                <li>month는 <code>YYYY-MM</code> 형식 또는 Excel 날짜(월 기준)로 입력하세요.</li>
+                                <li>수량 컬럼은 숫자만 입력하며, 공란은 0으로 처리됩니다.</li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section class="bulk-panel hidden" data-bulk-target="line-capa">
+                        <p class="modal-description">
+                            라인별 시간당 CAPA, 가동 시간, 가동 일수를 기반으로 월 총 CAPA를 일괄 등록합니다.<br>
+                            업로드한 값은 동일 월·카테고리·라인 조합의 기존 데이터를 최신 값으로 덮어씁니다.
+                        </p>
+                        <div class="modal-instructions">
+                            <button type="button" class="secondary small" data-bulk-template="line-capa">라인 CAPA 템플릿 다운로드 (XLSX)</button>
+                            <ul>
+                                <li>필수 컬럼: <strong>line_category, production_line, month(YYYY-MM), daily_capa, daily_operating_hours, planned_operating_days</strong></li>
+                                <li><code>computed_capa</code> 컬럼을 추가하면 그대로 사용하고, 없으면 자동으로 <em>시간당 CAPA × 일 가동 시간 × 월 가동 일수</em>를 계산합니다.</li>
+                                <li>비고는 <code>note</code> 컬럼으로 선택 입력할 수 있으며, 숫자 필드는 모두 0보다 큰 값이어야 합니다.</li>
+                                <li>라인/카테고리 표기는 등록 화면의 자동 완성 값과 동일하게 작성하면 입력 시 도움이 됩니다.</li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section class="bulk-panel hidden" data-bulk-target="line-master">
+                        <p class="modal-description">
+                            자재 코드별 라인 매핑과 시간당 생산 수량을 일괄 등록하거나 갱신합니다.<br>
+                            동일 자재 코드는 업로드된 값으로 덮어쓰여 최신 정보가 반영됩니다.
+                        </p>
+                        <div class="modal-instructions">
+                            <button type="button" class="secondary small" data-bulk-template="line-master">자재 마스터 템플릿 다운로드 (XLSX)</button>
+                            <ul>
+                                <li>필수 컬럼: <strong>item_code, production_line, hourly_throughput</strong></li>
+                                <li>item_code는 자동으로 대문자로 변환되며, 공백 없이 입력하세요.</li>
+                                <li>hourly_throughput은 0보다 큰 숫자로 작성해야 하며, 필요 시 소수점 한 자리까지 입력할 수 있습니다.</li>
+                                <li>생산 라인은 등록 화면의 자동 완성 목록과 동일한 라벨을 사용하면 관리가 쉬워집니다.</li>
+                            </ul>
+                        </div>
+                    </section>
+                </div>
+                <div class="modal-upload">
+                    <label class="upload-label" for="bulk-file-input">
+                        파일 선택 (xlsx, xls, csv)
+                    </label>
+                    <input type="file" id="bulk-file-input" accept=".xlsx,.xls,.csv">
+                    <button type="button" id="btn-start-bulk-upload" class="primary">업로드 시작</button>
+                </div>
+                <div id="bulk-upload-status" class="bulk-status" aria-live="polite"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SKU별 적정재고 업로드 모달 -->
+    <div id="target-inventory-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="target-inventory-upload-title">
+        <div class="modal-backdrop" data-close-target-inv-modal></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="target-inventory-upload-title">SKU별 적정재고 업로드</h3>
+                <button class="ghost modal-close" type="button" id="btn-close-target-inventory-upload">닫기</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">
+                    엑셀 또는 CSV 파일을 업로드하면 SKU별 적정재고를 한 번에 등록할 수 있습니다.<br>
+                    아래 템플릿을 내려받아 작성하거나, 동일한 컬럼명을 사용해 파일을 준비하세요.
+                </p>
+                <div class="modal-instructions">
+                    <button type="button" class="secondary small" id="btn-target-inventory-template">적정재고 템플릿 다운로드 (XLSX)</button>
+                    <ul>
+                        <li>필수 컬럼: <strong>month (계획월, YYYY-MM), item_code (자재코드), target_ending_inventory (적정재고)</strong></li>
+                        <li>month는 <code>YYYY-MM</code> 형식으로 입력하세요. (예: 2026-04)</li>
+                        <li>적정재고는 BOX 단위 숫자로 입력하며, 공란이나 0은 무시됩니다.</li>
+                        <li>동일 월·자재코드의 기존 적정재고가 업로드된 값으로 덮어써집니다.</li>
+                    </ul>
+                </div>
+                <div class="modal-upload">
+                    <label class="upload-label" for="target-inventory-file-input">
+                        파일 선택 (xlsx, xls, csv)
+                    </label>
+                    <input type="file" id="target-inventory-file-input" accept=".xlsx,.xls,.csv">
+                    <button type="button" id="btn-start-target-inventory-upload" class="primary">업로드 시작</button>
+                </div>
+                <div id="target-inventory-upload-status" class="bulk-status" aria-live="polite"></div>
+            </div>
+        </div>
+    </div>
+
+    <template id="row-template">
+        <tr>
+            <td data-field="month" class="col-month sticky-col sticky-col-1"></td>
+            <td data-field="priority" class="col-priority sticky-col sticky-col-2"></td>
+            <td data-field="category" class="col-category sticky-col sticky-col-3"></td>
+            <td data-field="item_code" class="col-item-code sticky-col sticky-col-4"></td>
+            <td data-field="item_name" class="col-item-name sticky-col sticky-col-5"></td>
+            <td data-field="production_line" class="col-production-line"></td>
+            <td data-field="vendor_name" class="col-vendor-name" style="display:none;"></td>
+            <td data-field="available_inventory" class="number col-available-inventory"></td>
+            <td data-field="beginning_inventory" class="number col-current-inventory"></td>
+            <td data-field="current_inventory_days" class="number col-current-inv-days"></td>
+            <td data-field="current_depletion_date" class="col-current-depletion-date"></td>
+            <td data-field="sales_plan" class="number"></td>
+            <td data-field="sales_actual" class="number"></td>
+            <td data-field="delivery_rate" class="number col-delivery-rate"></td>
+            <td data-field="sales_actual_avg_3m" class="col-sales-avg"></td>
+            <td data-field="sales_actual_stddev_3m" class="number col-sales-stddev"></td>
+            <td data-field="sales_remaining" class="number"></td>
+            <!-- 제안 생산계획 EA/BAG/BOX (group-a) -->
+            <td data-field="production_plan_ea" class="number sub-ea group-a col-production-plan"></td>
+            <td data-field="production_plan_bag" class="number sub-bag group-a col-production-plan"></td>
+            <td data-field="production_plan_box" class="number sub-box group-a col-production-plan"></td>
+            <!-- 적정재고 대비 필요량 EA/BAG/BOX (group-b) -->
+            <td data-field="required_quantity_ea" class="number sub-ea group-b col-required-qty"></td>
+            <td data-field="required_quantity_bag" class="number sub-bag group-b col-required-qty"></td>
+            <td data-field="required_quantity_box" class="number sub-box group-b col-required-qty"></td>
+            <!-- 보정 생산계획 EA/BAG/BOX (group-a) -->
+            <td data-field="adjusted_production_plan_ea" class="number sub-ea group-a col-adjusted-plan"></td>
+            <td data-field="adjusted_production_plan_bag" class="number sub-bag group-a col-adjusted-plan"></td>
+            <td data-field="adjusted_production_plan_box" class="number sub-box group-a col-adjusted-plan"></td>
+            <!-- 차량대수 (OEM only) -->
+            <td data-field="vehicle_count" class="number col-vehicle-count" style="display:none;"></td>
+            <!-- 수작업 투입수량 (BOX) -->
+            <td data-field="manual_input_quantity" class="number col-manual-input"></td>
+            <!-- MOQ EA/BAG/BOX (group-b, OEM only) -->
+            <td data-field="moq_ea" class="number sub-ea group-b col-moq" style="display:none;"></td>
+            <td data-field="moq_bag" class="number sub-bag group-b col-moq" style="display:none;"></td>
+            <td data-field="moq_box" class="number sub-box group-b col-moq" style="display:none;"></td>
+            <!-- 라인 총 생산 EA/BAG/BOX (group-b) -->
+            <td data-field="line_total_production_ea" class="number sub-ea group-b col-line-total"></td>
+            <td data-field="line_total_production_bag" class="number sub-bag group-b col-line-total"></td>
+            <td data-field="line_total_production_box" class="number sub-box group-b col-line-total"></td>
+            <!-- 생산실적 EA/BAG/BOX (group-a) -->
+            <td data-field="production_actual_ea" class="number sub-ea group-a col-production-actual"></td>
+            <td data-field="production_actual_bag" class="number sub-bag group-a col-production-actual"></td>
+            <td data-field="production_actual_box" class="number sub-box group-a col-production-actual"></td>
+            <!-- 잔여생산 EA/BAG/BOX (group-b) -->
+            <td data-field="production_remaining_ea" class="number sub-ea group-b col-production-remaining"></td>
+            <td data-field="production_remaining_bag" class="number sub-bag group-b col-production-remaining"></td>
+            <td data-field="production_remaining_box" class="number sub-box group-b col-production-remaining"></td>
+            <td data-field="production_progress" class="col-production-progress"></td>
+            <td data-field="ending_inventory" class="number"></td>
+            <td data-field="inventory_days" class="number col-inventory-days"></td>
+            <td data-field="depletion_date" class="col-depletion-date"></td>
+            <td data-field="target_ending_inventory" class="number col-target-inventory"></td>
+            <td data-field="inventory_status"></td>
+            <td data-field="line_capacity_limit" class="number col-line-capa"></td>
+            <td data-field="line_capacity_ratio" class="col-capa-ratio"></td>
+            <td data-field="line_capacity_status" class="col-capa-status"></td>
+            <td data-field="production_lead_time" class="col-production-lead-time"></td>
+            <td data-field="notes" class="col-notes"></td>
+            <td class="actions">
+                <button class="ghost btn-edit" type="button">편집</button>
+                <button class="danger btn-delete" type="button">삭제</button>
+            </td>
+        </tr>
+    </template>
+
+    <!-- SKU별 적정재고 업로드 모달 -->
+    <div id="target-inventory-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="target-inventory-upload-title">
+        <div class="modal-backdrop" data-close-modal="target-inventory-upload-modal"></div>
+        <div class="modal-content" style="max-width:540px;">
+            <div class="modal-header">
+                <h3 id="target-inventory-upload-title">SKU별 적정재고 업로드</h3>
+                <button type="button" class="modal-close" data-close-modal="target-inventory-upload-modal" aria-label="닫기">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="bulk-upload-section">
+                    <p class="upload-desc">계획월, 자재코드, 적정재고 컬럼이 포함된 XLSX/CSV 파일을 업로드하세요.</p>
+                    <div class="upload-actions">
+                        <button id="btn-target-inventory-template" type="button" class="secondary small">📥 적정재고 템플릿 다운로드 (XLSX)</button>
+                    </div>
+                    <div class="upload-dropzone" style="margin-top:14px;">
+                        <input type="file" id="target-inventory-file-input" accept=".xlsx,.xls,.csv" />
+                    </div>
+                    <div class="upload-status-area" style="margin-top:12px;">
+                        <button id="btn-target-inventory-upload-start" type="button" class="primary" disabled>업로드 시작</button>
+                        <span id="target-inventory-upload-status" class="upload-status-msg"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="js/main.js?v=20260423a" defer></script>
+</body>
+</html>

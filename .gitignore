@@ -1,0 +1,31 @@
+# Logs
+*.log
+
+# Build artifacts
+build/
+.gradle/
+*.jar
+
+# Node
+node_modules/
+package-lock.json
+package.json
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# H2 Database files (backed up separately)
+module-sales/data/*.trace.db
+module-sales/data/*.lock.db
+
+# Temp files
+*.pid
+*.sock
+supervisord.*
+rfc_spec.xlsx

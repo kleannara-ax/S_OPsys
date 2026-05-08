@@ -2,6 +2,7 @@
 -- module-sales: S&OP 생산계획 관리 모듈 시드 데이터
 -- MariaDB 10.11+  |  CHARSET=utf8mb4
 -- 실행 순서: 01_schema.sql → 02_seed_data.sql
+-- 최종 수정: 2026-05-08
 -- ============================================================
 
 -- ────────────────────────────────────────────
@@ -15,7 +16,7 @@ VALUES
 -- ────────────────────────────────────────────
 -- 2. 인터페이스 마스터 시드 데이터 (SNOP_RFC_001 ~ 006)
 -- ────────────────────────────────────────────
-INSERT IGNORE INTO mod_interface_master (INTERFACE_ID, INTERFACE_NAME, SENDER, RECEIVER, RFC_URL, RFC_PARAM, EXEC_COMMAND, CREATED_BY, CREATED_AT)
+INSERT IGNORE INTO mod_sales_interface_master (INTERFACE_ID, INTERFACE_NAME, SENDER, RECEIVER, RFC_URL, RFC_PARAM, EXEC_COMMAND, CREATED_BY, CREATED_AT)
 VALUES
     ('SNOP_RFC_001', '자재마스터',       'SAP', 'S&OP', '/sales-api/rfc/SNOP_RFC_001', '{"param":"A"}',  '/home/user/webapp/scripts/rfc/run_rfc_001.sh', 'SYSTEM', NOW()),
     ('SNOP_RFC_002', '일자별재고',       'SAP', 'S&OP', '/sales-api/rfc/SNOP_RFC_002', NULL,             '/home/user/webapp/scripts/rfc/run_rfc_002.sh', 'SYSTEM', NOW()),
@@ -25,11 +26,24 @@ VALUES
     ('SNOP_RFC_006', '리뉴얼자재연결',   'SAP', 'S&OP', '/sales-api/rfc/SNOP_RFC_006', '{"param":"A"}',  '/home/user/webapp/scripts/rfc/run_rfc_006.sh', 'SYSTEM', NOW());
 
 -- ────────────────────────────────────────────
--- 3. 플랜트 저장위치 시드 데이터
+-- 3. 인터페이스 수행관리 시드 데이터 (SNOP_RFC_001 ~ 006)
+--    InterfaceSchedulerService 가 30초 주기로 NEXT_EXECUTION_AT 기준 수행
+-- ────────────────────────────────────────────
+INSERT IGNORE INTO mod_sales_interface_execution (INTERFACE_ID, INTERFACE_NAME, SCHEDULE_TYPE, EXECUTION_TIME, IS_ACTIVE, DESCRIPTION, NEXT_EXECUTION_AT, CREATED_BY, CREATED_AT)
+VALUES
+    ('SNOP_RFC_001', '자재마스터',       'DAILY', '06:00', 1, 'SAP 자재마스터 일일 동기화',       DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 6 HOUR,  'SYSTEM', NOW()),
+    ('SNOP_RFC_002', '일자별재고',       'DAILY', '06:00', 1, 'SAP 일자별재고 일일 동기화',       DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 6 HOUR,  'SYSTEM', NOW()),
+    ('SNOP_RFC_003', '생산실적',         'DAILY', '06:00', 1, 'SAP 생산실적 일일 동기화',         DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 6 HOUR,  'SYSTEM', NOW()),
+    ('SNOP_RFC_004', '판매실적',         'DAILY', '06:00', 1, 'SAP 판매실적 일일 동기화',         DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 6 HOUR,  'SYSTEM', NOW()),
+    ('SNOP_RFC_005', '월말마감실적',     'DAILY', '23:00', 1, 'SAP 월말마감실적 일일 동기화',     CURDATE() + INTERVAL 23 HOUR,                           'SYSTEM', NOW()),
+    ('SNOP_RFC_006', '리뉴얼자재연결',   'DAILY', '07:00', 1, 'SAP 리뉴얼자재연결 일일 동기화',   DATE_ADD(CURDATE(), INTERVAL 1 DAY) + INTERVAL 7 HOUR,  'SYSTEM', NOW());
+
+-- ────────────────────────────────────────────
+-- 4. 플랜트 저장위치 시드 데이터
 -- ────────────────────────────────────────────
 
 -- P200 플랜트
-INSERT IGNORE INTO mod_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
+INSERT IGNORE INTO mod_sales_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
 VALUES
     ('P200', 'P200', '1100', 0, 'SYSTEM', NOW()),
     ('P200', 'P200', '1110', 0, 'SYSTEM', NOW()),
@@ -47,7 +61,7 @@ VALUES
     ('P200', 'P200', '7600', 0, 'SYSTEM', NOW());
 
 -- P300 플랜트
-INSERT IGNORE INTO mod_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
+INSERT IGNORE INTO mod_sales_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
 VALUES
     ('P300', 'P300', '1200', 0, 'SYSTEM', NOW()),
     ('P300', 'P300', '1500', 0, 'SYSTEM', NOW()),
@@ -65,7 +79,7 @@ VALUES
     ('P300', 'P300', '5100', 0, 'SYSTEM', NOW());
 
 -- P400 플랜트
-INSERT IGNORE INTO mod_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
+INSERT IGNORE INTO mod_sales_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
 VALUES
     ('P400', 'P400', '4100', 0, 'SYSTEM', NOW()),
     ('P400', 'P400', '4200', 0, 'SYSTEM', NOW()),
@@ -88,7 +102,7 @@ VALUES
     ('P400', 'P400', 'S001', 0, 'SYSTEM', NOW());
 
 -- P500 플랜트
-INSERT IGNORE INTO mod_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
+INSERT IGNORE INTO mod_sales_plant_storage_location (PLANT_CODE, PLANT_NAME, STORAGE_LOCATION, IS_SELECTED, CREATED_BY, CREATED_AT)
 VALUES
     ('P500', 'P500', '1200', 0, 'SYSTEM', NOW()),
     ('P500', 'P500', '1600', 0, 'SYSTEM', NOW()),

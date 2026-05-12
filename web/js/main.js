@@ -7967,7 +7967,7 @@ async function handleRegisterProductionPlan() {
             production_line: (master.production_unit || '').trim(),
             vendor_name: (master.vendor_name || '').trim() || null,
             moq: master.moq != null ? master.moq : null,
-            month: defaultMonth,
+            plan_month: defaultMonth,
             sales_plan: 0,
             sales_actual: null,
             production_plan: 0,
@@ -13248,11 +13248,28 @@ async function handleFormSubmit(event) {
     }
 }
 
+/* 프론트엔드 필드명 → 백엔드 DTO 필드명 변환 */
+function toSnopApiPayload(data) {
+    const payload = { ...data };
+    /* month → plan_month (DTO: planMonth) */
+    if (payload.month !== undefined && payload.plan_month === undefined) {
+        payload.plan_month = payload.month;
+        delete payload.month;
+    }
+    /* optimal_inventory_2025 → optimal_inventory (DTO: optimalInventory) */
+    if (payload.optimal_inventory_2025 !== undefined && payload.optimal_inventory === undefined) {
+        payload.optimal_inventory = payload.optimal_inventory_2025;
+        delete payload.optimal_inventory_2025;
+    }
+    return payload;
+}
+
 async function createRecord(data) {
+    const payload = toSnopApiPayload(data);
     const response = await fetch('/sales-api/snop-records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
     });
     if (response.status === 409) {
         const errorBody = await response.json();
@@ -13268,10 +13285,11 @@ async function createRecord(data) {
 }
 
 async function updateRecord(id, data) {
+    const payload = toSnopApiPayload(data);
     const response = await fetch(`/sales-api/snop-records/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
     });
     if (!response.ok) {
         throw new Error('생산계획 수정 실패');

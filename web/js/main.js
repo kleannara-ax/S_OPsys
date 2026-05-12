@@ -1894,7 +1894,7 @@ function normalizeSalesUpload(record, channelIndex) {
 
     return {
         id: record.id,
-        month: sanitizeText(record.month).trim(),
+        month: sanitizeText(record.month ?? record.plan_month ?? '').trim(),
         item_code: sanitizeText(record.item_code).trim(),
         channel: resolvedChannelKey || rawChannel,
         channel_name: channelName,
@@ -1912,7 +1912,7 @@ function normalizeSalesUploadHistory(record) {
         id: record.id,
         upload_type: sanitizeText(record.upload_type).trim() || 'file',
         upload_reference: sanitizeText(record.upload_reference).trim(),
-        month: sanitizeText(record.month).trim(),
+        month: sanitizeText(record.month ?? record.plan_month ?? '').trim(),
         item_code: sanitizeText(record.item_code).trim(),
         channel: sanitizeText(record.channel).trim(),
         quantity: toNumber(record.quantity),
@@ -15943,11 +15943,23 @@ function handleSalesUploadTemplateDownload() {
     }
 }
 
+/* 프론트엔드 필드명 → 백엔드 SalesPlanUploadDto 필드명 변환 */
+function toSalesUploadApiPayload(data) {
+    const payload = { ...data };
+    /* month → plan_month (DTO: planMonth → Jackson snake_case → plan_month) */
+    if (payload.month !== undefined && payload.plan_month === undefined) {
+        payload.plan_month = payload.month;
+        delete payload.month;
+    }
+    return payload;
+}
+
 async function createSalesUpload(data) {
+    const payload = toSalesUploadApiPayload(data);
     const response = await fetch('/sales-api/sales-plan-uploads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
     });
     if (!response.ok) {
         throw new Error('판매 계획 업로드 실패');
@@ -15956,10 +15968,11 @@ async function createSalesUpload(data) {
 }
 
 async function updateSalesUpload(id, data) {
+    const payload = toSalesUploadApiPayload(data);
     const response = await fetch(`/sales-api/sales-plan-uploads/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
     });
     if (!response.ok) {
         throw new Error('판매 계획 데이터 수정 실패');

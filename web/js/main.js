@@ -4038,9 +4038,8 @@ function enrichRecord(record, lineStats, overrides = {}) {
         salesActual = normalizedRecordSalesActual;
         salesActualSource = 'record';
     } else {
-        const fallbackKey = `${sanitizeText(record.id || record.item_code)}|${sanitizeText(record.month)}|sales`;
-        salesActual = generateFallbackActual(salesPlan, fallbackKey, { minRatio: 0.88, maxRatio: 0.99 });
-        salesActualSource = 'fallback';
+        salesActual = null;
+        salesActualSource = 'none';
     }
     const salesRemaining = Number.isFinite(salesActual) ? salesPlan - salesActual : null;
 
@@ -4068,34 +4067,8 @@ function enrichRecord(record, lineStats, overrides = {}) {
         productionActual = normalizedRecordActual;
         productionActualSource = 'record';
     } else {
-        const fallbackKey = `${sanitizeText(record.id || record.item_code)}|${sanitizeText(record.month)}|production`;
-        const fallbackStore = state.productionActualFallbacks instanceof Map
-            ? state.productionActualFallbacks
-            : null;
-        const baseForFallback = toNumber(record.production_plan);
-        const fallbackBaseValue = Number.isFinite(baseForFallback) && baseForFallback > 0
-            ? baseForFallback
-            : (Number.isFinite(productionPlan) && productionPlan > 0 ? productionPlan : 0);
-        if (fallbackStore && fallbackBaseValue > 0) {
-            if (!fallbackStore.has(fallbackKey)) {
-                fallbackStore.set(
-                    fallbackKey,
-                    generateFallbackActual(
-                        fallbackBaseValue,
-                        fallbackKey,
-                        { minRatio: 0.9, maxRatio: 1.02 },
-                    ),
-                );
-            }
-            productionActual = fallbackStore.get(fallbackKey);
-        } else {
-            productionActual = generateFallbackActual(
-                fallbackBaseValue > 0 ? fallbackBaseValue : productionPlan,
-                fallbackKey,
-                { minRatio: 0.9, maxRatio: 1.02 },
-            );
-        }
-        productionActualSource = 'fallback';
+        productionActual = null;
+        productionActualSource = 'none';
     }
     const overrideRemaining = parseNumberOrNull(overrides.production_remaining);
     const recordRemaining = parseNumberOrNull(record.production_remaining);
@@ -6649,12 +6622,11 @@ async function loadData() {
             snopRecords = extractData(snopPayload);
         } else {
             const status = snopResponse ? snopResponse.status : 'no-response';
-            console.warn(`S&OP 생산계획 데이터를 불러오는 중 응답 상태(${status})가 비정상입니다. 샘플 데이터를 사용합니다.`);
+            console.warn(`S&OP 생산계획 데이터를 불러오는 중 응답 상태(${status})가 비정상입니다.`);
         }
-        if (!Array.isArray(snopRecords) || snopRecords.length === 0) {
-            snopRecords = buildSampleSnopRecords();
+        if (!Array.isArray(snopRecords)) {
+            snopRecords = [];
         }
-        snopRecords = injectSampleProductionPlans(snopRecords);
         state.rawData = snopRecords.map(normalizeRecord)
             .filter((record) => {
                 /* 필수 필드(item_code, month)가 없는 불완전한 레코드 제외 */

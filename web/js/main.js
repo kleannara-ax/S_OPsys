@@ -6902,6 +6902,24 @@ async function loadData() {
                 }
             });
         }
+        /* 기본 자재마스터에서 자재명·카테고리 보충 (대소문자 무관 매칭) */
+        (state.baseMaterialMasters || []).forEach((master) => {
+            if (!master) return;
+            const code = sanitizeText(master.item_code).trim();
+            if (!code) return;
+            const lowerCode = code.toLowerCase();
+            const name = sanitizeText(master.item_name).trim();
+            const category = sanitizeText(master.hierarchy_name).trim();
+            /* 원본 코드(대문자)와 소문자 변환 코드 모두 등록 */
+            if (name) {
+                if (!itemNameMap.has(code)) itemNameMap.set(code, name);
+                if (!itemNameMap.has(lowerCode)) itemNameMap.set(lowerCode, name);
+            }
+            if (category) {
+                if (!itemCategoryMap.has(code)) itemCategoryMap.set(code, category);
+                if (!itemCategoryMap.has(lowerCode)) itemCategoryMap.set(lowerCode, category);
+            }
+        });
         state.salesAggregates = buildSalesAggregates(state.salesUploads, {
             itemNameMap,
             itemCategoryMap,

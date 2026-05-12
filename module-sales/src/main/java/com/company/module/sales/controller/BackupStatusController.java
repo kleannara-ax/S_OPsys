@@ -3,7 +3,6 @@ package com.company.module.sales.controller;
 import com.company.module.sales.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.BufferedReader;
@@ -79,7 +78,6 @@ public class BackupStatusController {
     }
 
     @PostMapping("/trigger")
-    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> triggerBackup() {
         Map<String, Object> result = new LinkedHashMap<>();
         try {

@@ -1350,9 +1350,9 @@ function getLineCompositeKey(line, category, month) {
 
 function getSalesAggregateKey(itemCode, month) {
     const code = sanitizeText(itemCode).trim();
-    const cleanMonth = sanitizeText(month).trim();
-    if (!code || !cleanMonth) return null;
-    return `${code}__${cleanMonth}`;
+    if (!code) return null;
+    /* 자재코드 기준으로만 그룹핑 — 같은 자재는 월이 달라도 합산 */
+    return code;
 }
 
 function getSalesUploadComboKey(itemCode, month, channel) {
@@ -3162,7 +3162,7 @@ function buildSalesAggregates(records, options = {}) {
         if (!baseMap.has(key)) {
             baseMap.set(key, {
                 item_code: canonicalCode,
-                month: sanitizeText(record.month).trim(),
+                months: new Set(),
                 total: 0,
                 standardTotal: 0,
                 promotionTotal: 0,
@@ -3170,6 +3170,8 @@ function buildSalesAggregates(records, options = {}) {
             });
         }
         const entry = baseMap.get(key);
+        const recordMonth = sanitizeText(record.month).trim();
+        if (recordMonth) entry.months.add(recordMonth);
         const totalQuantity = Math.max(0, toNumber(record.quantity));
         const standardQuantity = Math.max(0, toNumber(record.standard_quantity));
         const promotionQuantity = Math.max(0, toNumber(record.promotion_quantity));
@@ -3229,7 +3231,7 @@ function buildSalesAggregates(records, options = {}) {
         const entry = {
             key,
             item_code: value.item_code,
-            month: value.month,
+            month: Array.from(value.months).sort().join(', '),
             total: value.total,
             standardTotal: value.standardTotal,
             promotionTotal: value.promotionTotal,
@@ -3246,8 +3248,8 @@ function buildSalesAggregates(records, options = {}) {
     });
 
     aggregateList.sort((a, b) => {
-        const monthCompare = sanitizeText(a.month).localeCompare(sanitizeText(b.month));
-        if (monthCompare !== 0) return monthCompare;
+        const catCompare = sanitizeText(a.category).localeCompare(sanitizeText(b.category));
+        if (catCompare !== 0) return catCompare;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));
     });
 
@@ -16013,10 +16015,11 @@ async function createSalesUploadLog(data) {
 
 async function createSalesUploadHistory(data) {
     if (!data) return null;
+    const payload = toSalesUploadApiPayload(data);
     const response = await fetch('/sales-api/sales-plan-upload-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
     });
     if (!response.ok) {
         throw new Error('판매 계획 업로드 상세 이력 저장 실패');

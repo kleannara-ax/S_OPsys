@@ -796,19 +796,27 @@ textarea:focus {
     grid-template-columns: minmax(360px, 1.1fr) minmax(480px, 1.6fr);
 }
 
-.base-material-grid {
+.form-grid.base-material-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 14px;
 }
 
 .base-material-grid label {
     display: flex;
     flex-direction: column;
+    justify-content: flex-end;
     gap: 4px;
     font-size: 0.88rem;
     font-weight: 500;
     color: #334155;
+}
+
+.base-material-grid label .unit-label {
+    display: inline;
+    margin-top: 0;
+    font-size: 0.82rem;
+    color: #64748b;
 }
 
 .base-material-grid input {
@@ -1369,6 +1377,7 @@ textarea:focus {
 
 .channel-form .form-actions {
     justify-content: flex-end;
+    margin-top: 8px;
 }
 
 .channel-master-list {

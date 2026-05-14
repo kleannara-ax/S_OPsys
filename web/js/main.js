@@ -1349,14 +1349,14 @@ function getLineCompositeKey(line, category, month) {
 }
 
 function getSalesAggregateKey(itemCode, month) {
-    const code = sanitizeText(itemCode).trim();
+    const code = sanitizeText(itemCode).trim().toLowerCase();
     if (!code) return null;
-    /* 자재코드 기준으로만 그룹핑 — 같은 자재는 월이 달라도 합산 */
+    /* 자재코드 기준으로만 그룹핑 — 대소문자 무시, 같은 자재는 월이 달라도 합산 */
     return code;
 }
 
 function getSalesUploadComboKey(itemCode, month, channel) {
-    const code = sanitizeText(itemCode).trim();
+    const code = sanitizeText(itemCode).trim().toLowerCase();
     const cleanMonth = sanitizeText(month).trim();
     const channelKey = normalizeChannelKey(channel);
     if (!code || !cleanMonth || !channelKey) return null;
@@ -1953,7 +1953,7 @@ function computeLineCapaTotal(hourlyCapa, dailyOperatingHours, operatingDays) {
 
 function normalizeLineCapaPlan(record) {
     const productionLine = sanitizeText(record.production_line).trim();
-    const month = sanitizeText(record.month).trim();
+    const month = sanitizeText(record.month ?? record.plan_month ?? '').trim();
     const lineCategory = sanitizeText(record.line_category ?? record.category ?? '').trim();
     const hourlyCapa = toNumber(record.daily_capa);
     const dailyHours = (() => {
@@ -4656,7 +4656,6 @@ function renderInventoryForecastTable(baseMonth, filteredRecords) {
                 if (header) header.textContent = '-';
             });
         }
-        renderInventoryAccuracyTable([], []);
         renderInventoryAccuracySummaryTable([], []);
         if (emptyState) {
             emptyState.classList.remove('hidden');
@@ -7322,7 +7321,7 @@ async function handleLineCapaFormSubmit(event) {
         const response = await fetch(endpoint, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(toLineCapaApiPayload(payload)),
         });
         if (!response.ok) {
             throw new Error('라인 CAPA 저장 실패');
@@ -15963,6 +15962,17 @@ function handleSalesUploadTemplateDownload() {
     }
 }
 
+/* 프론트엔드 필드명 → 백엔드 LineCapaPlanDto 필드명 변환 */
+function toLineCapaApiPayload(data) {
+    const payload = { ...data };
+    /* month → plan_month (DTO: planMonth → Jackson snake_case → plan_month) */
+    if (payload.month !== undefined && payload.plan_month === undefined) {
+        payload.plan_month = payload.month;
+        delete payload.month;
+    }
+    return payload;
+}
+
 /* 프론트엔드 필드명 → 백엔드 SalesPlanUploadDto 필드명 변환 */
 function toSalesUploadApiPayload(data) {
     const payload = { ...data };
@@ -16135,7 +16145,7 @@ async function persistLineCapaRecord(payload, recordId) {
     const response = await fetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(toLineCapaApiPayload(payload)),
     });
     if (!response.ok) {
         throw new Error(recordId ? '라인 CAPA 수정 실패' : '라인 CAPA 등록 실패');

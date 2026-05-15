@@ -16819,7 +16819,8 @@ async function handleTargetInventoryUploadStart() {
         try {
             const response = await fetch('/sales-api/snop-records?limit=5000');
             if (response.ok) {
-                const allRecords = await response.json();
+                const allRecordsPayload = await response.json();
+                const allRecords = extractData(allRecordsPayload);
                 (allRecords || []).forEach((rec) => {
                     const code = getNormalizedItemCode(rec.item_code);
                     const month = sanitizeText(rec.month || rec.plan_month || '').trim();

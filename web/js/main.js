@@ -16000,7 +16000,7 @@ async function createSalesUpload(data) {
 async function updateSalesUpload(id, data) {
     const payload = toSalesUploadApiPayload(data);
     const response = await fetch(`/sales-api/sales-plan-uploads/${id}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     });

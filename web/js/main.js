@@ -15839,15 +15839,23 @@ async function handleSalesUploadFormSubmit(event) {
     try {
         let statusMessage = '';
         if (existingRecord && existingRecord.id) {
-            const overwriteNote = sanitizeText(payload.note ?? '').trim();
-            const overwritePayload = {
-                quantity: toNumber(payload.quantity),
-                standard_quantity: toNumber(payload.standard_quantity),
-                promotion_quantity: toNumber(payload.promotion_quantity),
-                note: overwriteNote,
+            /* 기존 수량에 입력 수량을 누적(더하기) */
+            const prevStd = toNumber(previousSnapshot ? previousSnapshot.standard_quantity : 0);
+            const prevPromo = toNumber(previousSnapshot ? previousSnapshot.promotion_quantity : 0);
+            const addedStd = toNumber(payload.standard_quantity);
+            const addedPromo = toNumber(payload.promotion_quantity);
+            const accumulatedStd = prevStd + addedStd;
+            const accumulatedPromo = prevPromo + addedPromo;
+            const accumulatedTotal = accumulatedStd + accumulatedPromo;
+            const accumulateNote = sanitizeText(payload.note ?? '').trim();
+            const accumulatePayload = {
+                quantity: accumulatedTotal,
+                standard_quantity: accumulatedStd,
+                promotion_quantity: accumulatedPromo,
+                note: accumulateNote,
             };
-            await updateSalesUpload(existingRecord.id, overwritePayload);
-            statusMessage = '기존 데이터가 입력한 값으로 갱신되었습니다.';
+            await updateSalesUpload(existingRecord.id, accumulatePayload);
+            statusMessage = `기존 데이터에 수량이 누적되었습니다. (스탠다드 ${prevStd}→${accumulatedStd}, 프로모션 ${prevPromo}→${accumulatedPromo})`;
 
             try {
                 await createSalesUploadHistory({
@@ -15856,15 +15864,15 @@ async function handleSalesUploadFormSubmit(event) {
                     month: payload.month,
                     item_code: payload.item_code,
                     channel: payload.channel,
-                    quantity: overwritePayload.quantity,
-                    standard_quantity: overwritePayload.standard_quantity,
-                    promotion_quantity: overwritePayload.promotion_quantity,
-                    note: overwritePayload.note,
+                    quantity: accumulatePayload.quantity,
+                    standard_quantity: accumulatePayload.standard_quantity,
+                    promotion_quantity: accumulatePayload.promotion_quantity,
+                    note: accumulatePayload.note,
                     previous_quantity: previousSnapshot ? previousSnapshot.quantity : null,
                     previous_standard_quantity: previousSnapshot ? previousSnapshot.standard_quantity : null,
                     previous_promotion_quantity: previousSnapshot ? previousSnapshot.promotion_quantity : null,
                     previous_note: previousSnapshot ? previousSnapshot.note : '',
-                    action: 'overwrite',
+                    action: 'accumulate',
                     target_record_id: existingRecord.id,
                 });
             } catch (historyError) {

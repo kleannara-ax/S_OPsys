@@ -16850,13 +16850,38 @@ async function handleTargetInventoryUploadStart() {
                 continue;
             }
 
-            /* 매칭된 모든 레코드에 적정재고만 업데이트 (다른 필드 덮어쓰기 방지) */
+            /* 매칭된 모든 레코드에 적정재고만 업데이트 (기존 필드 유지) */
             for (const matched of matchedRecords) {
                 try {
+                    /* SnopRecordDto @NotBlank 필수 필드 포함 + 적정재고만 갱신 */
+                    const updatePayload = {
+                        item_code: matched.item_code,
+                        plan_month: matched.plan_month || matched.month || month,
+                        item_name: matched.item_name || '',
+                        category: matched.category || '',
+                        production_line: matched.production_line || '',
+                        plant_code: matched.plant_code || '',
+                        vendor_name: matched.vendor_name || '',
+                        moq: matched.moq ?? null,
+                        sales_plan: matched.sales_plan ?? null,
+                        sales_actual: matched.sales_actual ?? null,
+                        production_plan: matched.production_plan ?? null,
+                        production_actual: matched.production_actual ?? null,
+                        production_remaining: matched.production_remaining ?? null,
+                        beginning_inventory: matched.beginning_inventory ?? null,
+                        available_inventory: matched.available_inventory ?? null,
+                        inventory_unit: matched.inventory_unit || '',
+                        target_ending_inventory: target_ending_inventory,
+                        optimal_inventory: matched.optimal_inventory ?? null,
+                        capacity_limit: matched.capacity_limit ?? null,
+                        manual_input_quantity: matched.manual_input_quantity ?? null,
+                        notes: matched.notes || '',
+                        priority: matched.priority ?? null,
+                    };
                     await fetch(`/sales-api/snop-records/${matched.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ target_ending_inventory: target_ending_inventory }),
+                        body: JSON.stringify(updatePayload),
                     }).then(res => { if (!res.ok) throw new Error('적정재고 업데이트 실패'); });
                     successCount++;
                 } catch (error) {

@@ -1833,7 +1833,7 @@ function recordToPayload(record) {
 function normalizeOptimalBaseline(record) {
     return {
         id: record.id,
-        year: sanitizeText(record.year).trim(),
+        year: sanitizeText(record.base_year ?? record.year ?? '').trim(),
         category: sanitizeText(record.category).trim(),
         optimal_quantity: toNullableNumber(record.optimal_quantity),
         notes: sanitizeText(record.notes).trim(),

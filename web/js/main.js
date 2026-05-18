@@ -10898,7 +10898,7 @@ function validateBaselineFormFields() {
     }
 
     const notesValue = sanitizeText(baselineNotes && baselineNotes.value).trim();
-    return { year: yearValue, category: categoryValue, optimal_quantity: quantityValue, notes: notesValue };
+    return { base_year: yearValue, category: categoryValue, optimal_quantity: quantityValue, notes: notesValue };
 }
 
 /* ── 기준 등록 (신규 POST) ── */
@@ -10927,7 +10927,7 @@ async function handleOptimalBaselineFormSubmit(event) {
         }
 
         await refreshOptimalBaselines({ silent: true });
-        alert(`${payload.year}년 ${payload.category} 적정재고 기준이 등록되었습니다.`);
+        alert(`${payload.base_year}년 ${payload.category} 적정재고 기준이 등록되었습니다.`);
         resetOptimalBaselineForm();
     } catch (error) {
         console.error(error);
@@ -10974,7 +10974,7 @@ async function handleOptimalBaselineUpdateClick() {
         }
 
         await refreshOptimalBaselines({ silent: true });
-        alert(`${payload.year}년 ${payload.category} 적정재고 기준이 수정되었습니다.`);
+        alert(`${payload.base_year}년 ${payload.category} 적정재고 기준이 수정되었습니다.`);
         resetOptimalBaselineForm();
     } catch (error) {
         console.error(error);

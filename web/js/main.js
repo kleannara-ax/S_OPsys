@@ -885,6 +885,7 @@ function populateCategoryFilterOptions(categories, previousSelections) {
         checkbox.addEventListener('change', () => {
             syncCategoryAllCheckbox();
             updateCategoryFilterDisplay();
+            applyFilters();
         });
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(' ' + category));
@@ -17720,10 +17721,17 @@ function bindEvents() {
             if (!optionsContainer) return;
             const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
             if (e.target.checked) {
+                /* '전체' 선택 → 개별 체크 해제 (전체 모드) */
                 checkboxes.forEach(cb => { cb.checked = false; });
                 e.target.indeterminate = false;
+            } else {
+                /* '전체' 해제 → 다시 체크하여 전체 모드 유지 (개별 선택 없이 해제만 하는 것 방지) */
+                e.target.checked = true;
+                e.target.indeterminate = false;
+                checkboxes.forEach(cb => { cb.checked = false; });
             }
             updateCategoryFilterDisplay();
+            applyFilters();
         });
     }
     /* 외부 클릭 시 카테고리 드롭다운 닫기 */

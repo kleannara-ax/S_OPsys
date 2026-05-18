@@ -780,12 +780,16 @@ if (dom.category) {
  */
 function getCategoryFilterValues() {
     const allCb = dom.filters.categoryAllCheckbox;
-    if (allCb && allCb.checked) return 'all';
-
     const optionsContainer = dom.filters.categoryOptions;
     if (!optionsContainer) return 'all';
 
-    const checked = Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'));
+    const checkboxes = Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]'));
+    if (checkboxes.length === 0) return 'all';
+
+    /* '전체' 체크 = 개별 전부 체크 상태 → 'all' 반환 */
+    if (allCb && allCb.checked) return 'all';
+
+    const checked = checkboxes.filter(cb => cb.checked);
     if (checked.length === 0) return 'all';
 
     return checked.map(cb => cb.value);
@@ -822,12 +826,14 @@ function syncCategoryAllCheckbox() {
     const allChecked = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
     const noneChecked = checkboxes.every(cb => !cb.checked);
 
-    if (allChecked || noneChecked) {
+    if (allChecked) {
         allCb.checked = true;
         allCb.indeterminate = false;
-        if (noneChecked) {
-            checkboxes.forEach(cb => { cb.checked = false; });
-        }
+    } else if (noneChecked) {
+        /* 모두 해제 → 전체 선택 상태로 복귀 (전부 체크) */
+        allCb.checked = true;
+        allCb.indeterminate = false;
+        checkboxes.forEach(cb => { cb.checked = true; });
     } else {
         allCb.checked = false;
         allCb.indeterminate = true;
@@ -858,7 +864,7 @@ function resetCategoryFilter() {
     allCb.checked = true;
     allCb.indeterminate = false;
     const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
-    checkboxes.forEach(cb => { cb.checked = false; });
+    checkboxes.forEach(cb => { cb.checked = true; });
     updateCategoryFilterDisplay();
 }
 
@@ -898,7 +904,7 @@ function populateCategoryFilterOptions(categories, previousSelections) {
         if (stillValid.length === 0 || stillValid.length === categories.length) {
             allCb.checked = true;
             allCb.indeterminate = false;
-            optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+            optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
         } else {
             allCb.checked = false;
             allCb.indeterminate = true;
@@ -906,6 +912,7 @@ function populateCategoryFilterOptions(categories, previousSelections) {
     } else {
         allCb.checked = true;
         allCb.indeterminate = false;
+        optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
     }
 
     updateCategoryFilterDisplay();
@@ -17721,14 +17728,13 @@ function bindEvents() {
             if (!optionsContainer) return;
             const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
             if (e.target.checked) {
-                /* '전체' 선택 → 개별 체크 해제 (전체 모드) */
-                checkboxes.forEach(cb => { cb.checked = false; });
+                /* '전체' 선택 → 개별 전부 체크 */
+                checkboxes.forEach(cb => { cb.checked = true; });
                 e.target.indeterminate = false;
             } else {
-                /* '전체' 해제 → 다시 체크하여 전체 모드 유지 (개별 선택 없이 해제만 하는 것 방지) */
-                e.target.checked = true;
-                e.target.indeterminate = false;
+                /* '전체' 해제 → 개별 전부 해제 */
                 checkboxes.forEach(cb => { cb.checked = false; });
+                e.target.indeterminate = false;
             }
             updateCategoryFilterDisplay();
             applyFilters();

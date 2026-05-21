@@ -20,6 +20,9 @@ dependencies {
     implementation 'org.mariadb.jdbc:mariadb-java-client'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 
+    // SAP JCo — libs/ 폴더에 sapjco3.jar 파일 필요
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

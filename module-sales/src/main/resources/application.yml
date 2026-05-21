@@ -1,6 +1,9 @@
 # ──────────────────────────────────────────────
 #  S&OP 생산계획 관리 시스템 — 독립 실행 설정
 # ──────────────────────────────────────────────
+
+# SAP 연결 설정 파일 import
+spring.config.import: optional:classpath:sap-connection.yml
 server:
   port: ${SERVER_PORT:8080}
   servlet:

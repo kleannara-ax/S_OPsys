@@ -33,3 +33,9 @@ rfc_spec.xlsx
 # SAP 연결 설정 (비밀번호 포함 가능 — 서버에서 직접 수정)
 # 초기 템플릿은 Git 포함, 비밀번호 입력 후에는 커밋 주의
 # sap-connection.yml
+
+# SAP JCo 바이너리 (라이선스 제한 — Git에 포함 불가, 서버에 직접 설치)
+module-sales/libs/*.jar
+module-sales/libs/*.so
+module-sales/libs/*.jnilib
+*.jcoDestination

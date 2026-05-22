@@ -51,13 +51,13 @@ public class SapRfcCallerService {
     private static final String FM_RFC_006 = "Z_MM_SNOP_RFC_006";
 
     // ─── SAP 테이블 출력 파라미터 이름 ───
-    // SAP 표준 네이밍 기반 추정값. 실제 SAP 개발 완료 후 확인하여 수정 필요.
-    private static final String TABLE_PARAM_001 = "ET_MATERIAL";
-    private static final String TABLE_PARAM_002 = "ET_STOCK";
-    private static final String TABLE_PARAM_003 = "ET_PRODUCTION";
-    private static final String TABLE_PARAM_004 = "ET_SALES";
-    private static final String TABLE_PARAM_005 = "ET_CLOSING";
-    private static final String TABLE_PARAM_006 = "ET_RENEWAL";
+    // SAP 개발자 확인 완료 (2026-05-22)
+    private static final String TABLE_PARAM_001 = "O_TABLE";   // Z_MM_SNOP_RFC_001
+    private static final String TABLE_PARAM_002 = "T_OUTPUT";  // Z_SD_SNOP_RFC_002
+    private static final String TABLE_PARAM_003 = "T_OUTPUT";  // Z_PP_SNOP_RFC_003
+    private static final String TABLE_PARAM_004 = "T_OUTPUT";  // Z_SD_SNOP_RFC_004
+    private static final String TABLE_PARAM_005 = "T_OUTPUT";  // Z_SD_SNOP_RFC_005
+    private static final String TABLE_PARAM_006 = "O_TABLE";   // Z_MM_SNOP_RFC_006
 
     // ─── SAP IMPORT 파라미터 이름 ───
     // RFC_001, RFC_006: I_TYPE (A=전체, B=변경분)

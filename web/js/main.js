@@ -19216,7 +19216,7 @@ function readMasterRowInputs(row) {
         receiver: get('receiver') || null,
         rfc_url: get('rfc_url') || null,
         rfc_param: get('rfc_param') || null,
-        exec_command: get('exec_command') || null,
+        exec_command: get('exec_command') || '',
         created_by: get('created_by') || null,
         updated_by: get('updated_by') || null
     };
@@ -19258,12 +19258,12 @@ function bindInterfaceMasterEvents() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    if (res.status === 409) {
-                        const err = await res.json();
-                        alert(err.message || '이미 등록된 인터페이스 ID입니다.');
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => null);
+                        const msg = err?.message || err?.error || '등록 실패';
+                        alert(msg);
                         return;
                     }
-                    if (!res.ok) throw new Error('등록 실패');
                     alert('인터페이스가 등록되었습니다.');
                 } else {
                     // 수정
@@ -19272,7 +19272,12 @@ function bindInterfaceMasterEvents() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    if (!res.ok) throw new Error('수정 실패');
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => null);
+                        const msg = err?.message || err?.error || '수정 실패';
+                        alert(msg);
+                        return;
+                    }
                     alert('인터페이스가 수정되었습니다.');
                 }
                 await loadInterfaceMasters();

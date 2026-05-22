@@ -48,14 +48,20 @@ public class InterfaceMasterService {
     @Transactional
     public InterfaceMaster update(Long id, InterfaceMasterDto dto) {
         InterfaceMaster existing = findById(id);
+        // 모든 필드를 전송된 값 그대로 덮어쓰기 (빈칸→null 변환)
         if (dto.getInterfaceId() != null) existing.setInterfaceId(dto.getInterfaceId());
         if (dto.getInterfaceName() != null) existing.setInterfaceName(dto.getInterfaceName());
-        if (dto.getSender() != null) existing.setSender(dto.getSender());
-        if (dto.getReceiver() != null) existing.setReceiver(dto.getReceiver());
-        if (dto.getRfcUrl() != null) existing.setRfcUrl(dto.getRfcUrl());
-        if (dto.getRfcParam() != null) existing.setRfcParam(dto.getRfcParam());
-        if (dto.getExecCommand() != null) existing.setExecCommand(dto.getExecCommand());
+        existing.setSender(blankToNull(dto.getSender()));
+        existing.setReceiver(blankToNull(dto.getReceiver()));
+        existing.setRfcUrl(blankToNull(dto.getRfcUrl()));
+        existing.setRfcParam(blankToNull(dto.getRfcParam()));
+        existing.setExecCommand(blankToNull(dto.getExecCommand()));
         return repository.save(existing);
+    }
+
+    /** 빈 문자열을 null로 변환 */
+    private String blankToNull(String value) {
+        return (value != null && !value.trim().isEmpty()) ? value.trim() : null;
     }
 
     @Transactional

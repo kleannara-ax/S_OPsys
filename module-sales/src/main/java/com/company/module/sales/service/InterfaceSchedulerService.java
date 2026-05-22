@@ -20,15 +20,19 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 인터페이스 스케줄러 서비스
  * - 매 30초마다 수행 예정 시간이 도래한 인터페이스를 실행
  * - exec_command(실행명령어) 우선 실행: 인터페이스 마스터에 등록된 명령어로 전체 로직 수행
- * - exec_command가 없고 rfcUrl만 있으면 HTTP POST로 호출 (SAP 직접 연동)
- * - rfcUrl은 SAP에서 직접 데이터를 보낼 때 사용하는 수신 엔드포인트
+ * - exec_command가 없고 rfcUrl만 있으면 RFC 실행
+ *   → /sales-api/sap/rfc/XXX 패턴이면 SapRfcCallerService 직접 호출 (내부)
+ *   → 그 외 URL이면 HTTP POST 호출 (외부)
  * - 인터페이스 이력을 기록
  */
 @Service
@@ -38,16 +42,26 @@ public class InterfaceSchedulerService {
     private final InterfaceExecutionRepository executionRepo;
     private final InterfaceHistoryRepository historyRepo;
     private final InterfaceMasterRepository masterRepo;
+    private final SapRfcCallerService sapRfcCallerService;
 
     @Value("${server.port:8080}")
     private int serverPort;
 
+    /**
+     * 내부 SAP RFC URL 패턴: /sales-api/sap/rfc/001 ~ 006
+     * 또는 이전 시드 데이터에서 사용하던 /sales/api/sap/rfc/001 패턴도 호환
+     */
+    private static final Pattern INTERNAL_RFC_PATTERN =
+            Pattern.compile("^/sales[-/]api/sap/rfc/(\\d{3})");
+
     public InterfaceSchedulerService(InterfaceExecutionRepository executionRepo,
                                       InterfaceHistoryRepository historyRepo,
-                                      InterfaceMasterRepository masterRepo) {
+                                      InterfaceMasterRepository masterRepo,
+                                      SapRfcCallerService sapRfcCallerService) {
         this.executionRepo = executionRepo;
         this.historyRepo = historyRepo;
         this.masterRepo = masterRepo;
+        this.sapRfcCallerService = sapRfcCallerService;
     }
 
     /**
@@ -118,7 +132,9 @@ public class InterfaceSchedulerService {
     }
 
     /**
-     * RFC URL을 통한 인터페이스 실행 (HTTP POST 호출)
+     * RFC URL을 통한 인터페이스 실행.
+     * <p>/sales-api/sap/rfc/XXX 패턴이면 SapRfcCallerService를 직접 호출합니다 (내부).
+     * 그 외 URL이면 HTTP POST로 호출합니다 (외부).</p>
      */
     public InterfaceHistory executeViaRfcUrl(String interfaceId, String interfaceName,
                                               String rfcUrl, String rfcParam,
@@ -136,83 +152,51 @@ public class InterfaceSchedulerService {
         history = historyRepo.save(history);
 
         try {
-            // RFC URL이 상대경로인 경우 localhost + 현재 서버 포트로 변환
-            String fullUrl = rfcUrl.trim();
-            if (fullUrl.startsWith("/")) {
-                fullUrl = "http://localhost:" + serverPort + fullUrl;
-            }
+            String trimmedUrl = rfcUrl.trim();
 
-            log.info("[IF-EXEC-RFC] 실행: {} - URL: {}", interfaceId, fullUrl);
+            // ── 내부 SAP RFC 패턴 감지: /sales-api/sap/rfc/001 ~ 006 ──
+            // /sales/api/sap/rfc/XXX (이전 시드) 패턴도 호환
+            Matcher rfcMatcher = INTERNAL_RFC_PATTERN.matcher(trimmedUrl);
+            if (rfcMatcher.find()) {
+                // 내부 직접 호출 — HTTP 네트워크 우회
+                String rfcNumber = rfcMatcher.group(1); // "001" ~ "006"
+                log.info("[IF-EXEC-RFC] 내부 직접 호출: {} → RFC_{} (rfcParam={})",
+                        interfaceId, rfcNumber, rfcParam);
 
-            // HTTP POST 호출
-            URL url = new URL(fullUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            conn.setRequestProperty("Accept", "application/json");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(30000);
-            conn.setReadTimeout(300000);
+                Map<String, Object> result = callInternalRfc(rfcNumber, rfcParam, executionType);
 
-            // 요청 본문 구성: 인터페이스 마스터의 rfc_param 값을 포함
-            // RFC param 값은 인터페이스 마스터관리에서 읽어서 전달
-            StringBuilder bodyBuilder = new StringBuilder();
-            bodyBuilder.append("{\"data\":[], \"execution_type\":\"").append(executionType).append("\"");
-            if (rfcParam != null && !rfcParam.trim().isEmpty()) {
-                // rfc_param 값을 JSON 문자열로 안전하게 감싸기
-                // 이미 따옴표로 감싸져 있으면 그대로, 아니면 감싸기
-                String trimmed = rfcParam.trim();
-                if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
-                    bodyBuilder.append(", \"rfc_param\":").append(trimmed);
-                } else {
-                    bodyBuilder.append(", \"rfc_param\":\"").append(trimmed).append("\"");
+                LocalDateTime endTime = LocalDateTime.now();
+                long durationMs = java.time.Duration.between(startTime, endTime).toMillis();
+
+                // 결과에서 처리건수 추출
+                int processedCount = 0;
+                if (result.containsKey("inserted_count")) {
+                    processedCount += toInt(result.get("inserted_count"));
                 }
-            }
-            bodyBuilder.append("}");
-            String requestBody = bodyBuilder.toString();
-            log.info("[IF-EXEC-RFC] 요청 본문: {}", requestBody);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(requestBody.getBytes(StandardCharsets.UTF_8));
-                os.flush();
-            }
-
-            int responseCode = conn.getResponseCode();
-            StringBuilder responseBody = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(
-                            responseCode >= 200 && responseCode < 300
-                                    ? conn.getInputStream()
-                                    : conn.getErrorStream(),
-                            StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    responseBody.append(line).append("\n");
+                if (result.containsKey("updated_count")) {
+                    processedCount += toInt(result.get("updated_count"));
                 }
-            }
-            conn.disconnect();
+                if (result.containsKey("total_received")) {
+                    processedCount = Math.max(processedCount, toInt(result.get("total_received")));
+                }
+                if (processedCount == 0 && result.containsKey("status")) {
+                    processedCount = "SUCCESS".equals(result.get("status")) ? 1 : 0;
+                }
 
-            LocalDateTime endTime = LocalDateTime.now();
-            long durationMs = java.time.Duration.between(startTime, endTime).toMillis();
-
-            if (responseCode >= 200 && responseCode < 300) {
                 String statusPrefix = "RETRY".equals(executionType) ? "RETRY_" : "";
                 history.setStatus(statusPrefix + "SUCCESS");
-                history.setProcessedCount(1);
+                history.setProcessedCount(processedCount);
                 history.setErrorCount(0);
-                log.info("[IF-EXEC-RFC] 성공: {} (HTTP {}, {}ms)", interfaceId, responseCode, durationMs);
-            } else {
-                String statusPrefix = "RETRY".equals(executionType) ? "RETRY_" : "";
-                history.setStatus(statusPrefix + "ERROR");
-                history.setProcessedCount(0);
-                history.setErrorCount(1);
-                String errMsg = "HTTP " + responseCode + "\n" + responseBody;
-                if (errMsg.length() > 1500) errMsg = errMsg.substring(0, 1500) + "...";
-                history.setErrorMessage(errMsg);
-                log.error("[IF-EXEC-RFC] 실패: {} (HTTP {})", interfaceId, responseCode);
-            }
+                history.setEndTime(endTime);
+                history.setDurationMs(durationMs);
 
-            history.setEndTime(endTime);
-            history.setDurationMs(durationMs);
+                log.info("[IF-EXEC-RFC] 내부 호출 성공: {} (RFC_{}, {}건, {}ms)",
+                        interfaceId, rfcNumber, processedCount, durationMs);
+
+            } else {
+                // ── 외부 HTTP POST 호출 ──
+                executeViaHttpPost(history, trimmedUrl, rfcParam, executionType, startTime);
+            }
 
         } catch (Exception e) {
             LocalDateTime endTime = LocalDateTime.now();
@@ -224,11 +208,156 @@ public class InterfaceSchedulerService {
             history.setDurationMs(durationMs);
             history.setProcessedCount(0);
             history.setErrorCount(1);
-            history.setErrorMessage(e.getMessage());
+            String errMsg = e.getMessage();
+            if (errMsg != null && errMsg.length() > 1500) errMsg = errMsg.substring(0, 1500) + "...";
+            history.setErrorMessage(errMsg);
             log.error("[IF-EXEC-RFC] 예외 발생: {} - {}", interfaceId, e.getMessage(), e);
         }
 
         return historyRepo.save(history);
+    }
+
+    /**
+     * 내부 SAP RFC 직접 호출 — SapRfcCallerService를 통해 실행.
+     * HTTP 네트워크 없이 직접 서비스 호출하므로 Connection Refused 문제가 없습니다.
+     *
+     * @param rfcNumber RFC 번호 ("001" ~ "006")
+     * @param rfcParam  인터페이스 마스터의 RFC Param 값 (type 또는 yearMonth)
+     * @param executionType 실행유형 (MANUAL / SCHEDULED / RETRY)
+     * @return RFC 처리 결과 맵
+     */
+    private Map<String, Object> callInternalRfc(String rfcNumber, String rfcParam, String executionType) {
+        // rfcParam에서 따옴표 제거 (DB에 "A" 형태로 저장된 경우 대비)
+        String cleanParam = cleanRfcParam(rfcParam);
+
+        switch (rfcNumber) {
+            case "001":
+                String type001 = (cleanParam != null && !cleanParam.isEmpty()) ? cleanParam : "A";
+                return sapRfcCallerService.callRfc001(type001, executionType);
+
+            case "002":
+                return sapRfcCallerService.callRfc002(executionType);
+
+            case "003":
+                return sapRfcCallerService.callRfc003(executionType);
+
+            case "004":
+                return sapRfcCallerService.callRfc004(executionType);
+
+            case "005":
+                // rfcParam은 YYYYMM 형식, null이면 서비스에서 전월 자동 계산
+                return sapRfcCallerService.callRfc005(cleanParam, executionType);
+
+            case "006":
+                String type006 = (cleanParam != null && !cleanParam.isEmpty()) ? cleanParam : "A";
+                return sapRfcCallerService.callRfc006(type006, executionType);
+
+            default:
+                throw new IllegalArgumentException("지원하지 않는 RFC 번호: " + rfcNumber);
+        }
+    }
+
+    /**
+     * RFC Param 값에서 앞뒤 따옴표를 제거합니다.
+     * 인터페이스 마스터에서 "A" (따옴표 포함) 형태로 입력한 경우 → A 로 변환.
+     */
+    private String cleanRfcParam(String rfcParam) {
+        if (rfcParam == null) return null;
+        String trimmed = rfcParam.trim();
+        if (trimmed.isEmpty()) return null;
+        // 앞뒤 따옴표 제거
+        if (trimmed.length() >= 2 && trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+            trimmed = trimmed.substring(1, trimmed.length() - 1).trim();
+        }
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /** Object를 int로 안전하게 변환 */
+    private int toInt(Object obj) {
+        if (obj == null) return 0;
+        if (obj instanceof Number) return ((Number) obj).intValue();
+        try { return Integer.parseInt(obj.toString()); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /**
+     * 외부 URL로 HTTP POST 호출 (기존 로직).
+     */
+    private void executeViaHttpPost(InterfaceHistory history, String rfcUrl, String rfcParam,
+                                     String executionType, LocalDateTime startTime) throws Exception {
+        String fullUrl = rfcUrl;
+        if (fullUrl.startsWith("/")) {
+            fullUrl = "http://localhost:" + serverPort + fullUrl;
+        }
+
+        log.info("[IF-EXEC-RFC] HTTP POST 호출: {} - URL: {}", history.getInterfaceId(), fullUrl);
+
+        URL url = new URL(fullUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(30000);
+        conn.setReadTimeout(300000);
+
+        // 요청 본문 구성
+        StringBuilder bodyBuilder = new StringBuilder();
+        bodyBuilder.append("{\"data\":[], \"execution_type\":\"").append(executionType).append("\"");
+        if (rfcParam != null && !rfcParam.trim().isEmpty()) {
+            String trimmed = rfcParam.trim();
+            if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+                bodyBuilder.append(", \"rfc_param\":").append(trimmed);
+            } else {
+                bodyBuilder.append(", \"rfc_param\":\"").append(trimmed).append("\"");
+            }
+        }
+        bodyBuilder.append("}");
+        String requestBody = bodyBuilder.toString();
+        log.info("[IF-EXEC-RFC] 요청 본문: {}", requestBody);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(requestBody.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+        }
+
+        int responseCode = conn.getResponseCode();
+        StringBuilder responseBody = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(
+                        responseCode >= 200 && responseCode < 300
+                                ? conn.getInputStream()
+                                : conn.getErrorStream(),
+                        StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                responseBody.append(line).append("\n");
+            }
+        }
+        conn.disconnect();
+
+        LocalDateTime endTime = LocalDateTime.now();
+        long durationMs = java.time.Duration.between(startTime, endTime).toMillis();
+
+        if (responseCode >= 200 && responseCode < 300) {
+            String statusPrefix = "RETRY".equals(executionType) ? "RETRY_" : "";
+            history.setStatus(statusPrefix + "SUCCESS");
+            history.setProcessedCount(1);
+            history.setErrorCount(0);
+            log.info("[IF-EXEC-RFC] HTTP 성공: {} (HTTP {}, {}ms)",
+                    history.getInterfaceId(), responseCode, durationMs);
+        } else {
+            String statusPrefix = "RETRY".equals(executionType) ? "RETRY_" : "";
+            history.setStatus(statusPrefix + "ERROR");
+            history.setProcessedCount(0);
+            history.setErrorCount(1);
+            String errMsg = "HTTP " + responseCode + "\n" + responseBody;
+            if (errMsg.length() > 1500) errMsg = errMsg.substring(0, 1500) + "...";
+            history.setErrorMessage(errMsg);
+            log.error("[IF-EXEC-RFC] HTTP 실패: {} (HTTP {})",
+                    history.getInterfaceId(), responseCode);
+        }
+
+        history.setEndTime(endTime);
+        history.setDurationMs(durationMs);
     }
 
     /**

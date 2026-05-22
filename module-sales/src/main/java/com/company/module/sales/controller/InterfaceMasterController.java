@@ -73,33 +73,27 @@ public class InterfaceMasterController {
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_001").interfaceName("자재마스터")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/rfc/SNOP_RFC_001").rfcParam("{\"param\":\"A\"}")
-                .execCommand("/home/user/webapp/scripts/rfc/run_rfc_001.sh").build(),
+                .rfcUrl("/sales-api/sap/rfc/001?type=A").build(),
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_002").interfaceName("일자별재고")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/rfc/SNOP_RFC_002")
-                .execCommand("/home/user/webapp/scripts/rfc/run_rfc_002.sh").build(),
+                .rfcUrl("/sales-api/sap/rfc/002").build(),
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_003").interfaceName("생산실적")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/rfc/SNOP_RFC_003")
-                .execCommand("/home/user/webapp/scripts/rfc/run_rfc_003.sh").build(),
+                .rfcUrl("/sales-api/sap/rfc/003").build(),
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_004").interfaceName("판매실적")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/rfc/SNOP_RFC_004")
-                .execCommand("/home/user/webapp/scripts/rfc/run_rfc_004.sh").build(),
+                .rfcUrl("/sales-api/sap/rfc/004").build(),
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_005").interfaceName("월말마감실적")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/rfc/SNOP_RFC_005")
-                .execCommand("/home/user/webapp/scripts/rfc/run_rfc_005.sh").build(),
+                .rfcUrl("/sales-api/sap/rfc/005").build(),
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_006").interfaceName("리뉴얼자재연결")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/rfc/SNOP_RFC_006").rfcParam("{\"param\":\"A\"}")
-                .execCommand("/home/user/webapp/scripts/rfc/run_rfc_006.sh").build()
+                .rfcUrl("/sales-api/sap/rfc/006?type=A").build()
         );
         for (InterfaceMaster seed : seeds) {
             if (!repo.existsByInterfaceId(seed.getInterfaceId())) {

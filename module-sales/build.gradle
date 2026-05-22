@@ -31,8 +31,20 @@ dependencies {
 // standalone 실행 가능한 fat JAR 생성
 bootJar {
     enabled = true
+
+    // libsapjco3.so를 JAR 안에 포함 (실행 시 추출하여 사용)
+    from('libs') {
+        include 'libsapjco3.so'
+        into 'BOOT-INF/classes/native'
+    }
 }
 
 jar {
     enabled = false
+}
+
+// 개발 시 bootRun에서 네이티브 라이브러리 경로 설정
+bootRun {
+    def libsDir = file("${projectDir}/libs").absolutePath
+    jvmArgs = ["-Djava.library.path=${libsDir}"]
 }

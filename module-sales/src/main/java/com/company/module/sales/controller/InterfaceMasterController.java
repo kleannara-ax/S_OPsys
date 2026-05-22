@@ -73,7 +73,7 @@ public class InterfaceMasterController {
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_001").interfaceName("자재마스터")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/sap/rfc/001?type=A").build(),
+                .rfcUrl("/sales-api/sap/rfc/001").rfcParam("\"A\"").build(),
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_002").interfaceName("일자별재고")
                 .sender("SAP").receiver("S&OP")
@@ -93,7 +93,7 @@ public class InterfaceMasterController {
             InterfaceMaster.builder()
                 .interfaceId("SNOP_RFC_006").interfaceName("리뉴얼자재연결")
                 .sender("SAP").receiver("S&OP")
-                .rfcUrl("/sales-api/sap/rfc/006?type=A").build()
+                .rfcUrl("/sales-api/sap/rfc/006").rfcParam("\"A\"").build()
         );
         for (InterfaceMaster seed : seeds) {
             if (!repo.existsByInterfaceId(seed.getInterfaceId())) {

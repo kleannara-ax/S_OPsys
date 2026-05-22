@@ -6,8 +6,8 @@ import com.company.module.sales.entity.InterfaceMaster;
 import com.company.module.sales.repository.InterfaceExecutionRepository;
 import com.company.module.sales.repository.InterfaceHistoryRepository;
 import com.company.module.sales.repository.InterfaceMasterRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -32,13 +32,23 @@ import java.util.concurrent.TimeUnit;
  * - 인터페이스 이력을 기록
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class InterfaceSchedulerService {
 
     private final InterfaceExecutionRepository executionRepo;
     private final InterfaceHistoryRepository historyRepo;
     private final InterfaceMasterRepository masterRepo;
+
+    @Value("${server.port:8080}")
+    private int serverPort;
+
+    public InterfaceSchedulerService(InterfaceExecutionRepository executionRepo,
+                                      InterfaceHistoryRepository historyRepo,
+                                      InterfaceMasterRepository masterRepo) {
+        this.executionRepo = executionRepo;
+        this.historyRepo = historyRepo;
+        this.masterRepo = masterRepo;
+    }
 
     /**
      * 매 30초마다 수행 예정 시간이 도래한 인터페이스를 확인하고 실행
@@ -126,10 +136,10 @@ public class InterfaceSchedulerService {
         history = historyRepo.save(history);
 
         try {
-            // RFC URL이 상대경로인 경우 localhost로 변환
+            // RFC URL이 상대경로인 경우 localhost + 현재 서버 포트로 변환
             String fullUrl = rfcUrl.trim();
             if (fullUrl.startsWith("/")) {
-                fullUrl = "http://localhost:8080" + fullUrl;
+                fullUrl = "http://localhost:" + serverPort + fullUrl;
             }
 
             log.info("[IF-EXEC-RFC] 실행: {} - URL: {}", interfaceId, fullUrl);
@@ -149,7 +159,14 @@ public class InterfaceSchedulerService {
             StringBuilder bodyBuilder = new StringBuilder();
             bodyBuilder.append("{\"data\":[], \"execution_type\":\"").append(executionType).append("\"");
             if (rfcParam != null && !rfcParam.trim().isEmpty()) {
-                bodyBuilder.append(", \"rfc_param\":").append(rfcParam);
+                // rfc_param 값을 JSON 문자열로 안전하게 감싸기
+                // 이미 따옴표로 감싸져 있으면 그대로, 아니면 감싸기
+                String trimmed = rfcParam.trim();
+                if (trimmed.startsWith("\"") && trimmed.endsWith("\"")) {
+                    bodyBuilder.append(", \"rfc_param\":").append(trimmed);
+                } else {
+                    bodyBuilder.append(", \"rfc_param\":\"").append(trimmed).append("\"");
+                }
             }
             bodyBuilder.append("}");
             String requestBody = bodyBuilder.toString();

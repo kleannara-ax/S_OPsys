@@ -57,18 +57,49 @@ public class SapJCoConfig {
      */
     private void setupNativeLibraryPath() {
         // 1) 파일 시스템에서 libsapjco3.so 탐색
+        //    - 상대 경로: 현재 작업 디렉토리(WorkingDirectory) 기준
+        //    - 절대 경로: JAR 파일 위치 기준, 운영 서버 배포 경로
         String[] candidateDirs = {
-                "libs",                    // JAR 실행 위치 기준 ./libs/
-                "module-sales/libs",       // 프로젝트 루트 기준 ./module-sales/libs/
+                "libs",                    // WorkingDirectory 기준 ./libs/
+                "module-sales/libs",       // 프로젝트 루트에서 실행 시
                 "../libs",                 // 하위 디렉토리에서 실행 시
         };
 
         File nativeLib = null;
-        for (String dir : candidateDirs) {
-            File candidate = new File(dir, "libsapjco3.so");
-            if (candidate.exists()) {
-                nativeLib = candidate;
-                break;
+
+        // 1-a) JAR 파일 위치 기준으로 libs/ 탐색 (systemctl 실행 시 핵심)
+        //      예: /data/snop/app/snop.jar → /data/snop/app/libs/libsapjco3.so
+        try {
+            String jarPath = getClass().getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+            File jarFile = new File(jarPath);
+            // JAR 파일이면 부모 디렉토리에서 libs/ 탐색
+            // 클래스 디렉토리(개발 모드)면 상위로 올라가서 탐색
+            File baseDir = jarFile.isFile() ? jarFile.getParentFile() : jarFile;
+            File jarLibs = new File(baseDir, "libs/libsapjco3.so");
+            if (jarLibs.exists()) {
+                nativeLib = jarLibs;
+                log.info("[SAP-NATIVE] JAR 위치 기준 발견: {}", jarLibs.getAbsolutePath());
+            }
+            // JAR과 같은 디렉토리에 직접 있는 경우도 체크
+            if (nativeLib == null) {
+                File sameDir = new File(baseDir, "libsapjco3.so");
+                if (sameDir.exists()) {
+                    nativeLib = sameDir;
+                    log.info("[SAP-NATIVE] JAR 동일 디렉토리 발견: {}", sameDir.getAbsolutePath());
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[SAP-NATIVE] JAR 위치 기반 탐색 실패: {}", e.getMessage());
+        }
+
+        // 1-b) 상대 경로 기반 탐색 (WorkingDirectory 기준)
+        if (nativeLib == null) {
+            for (String dir : candidateDirs) {
+                File candidate = new File(dir, "libsapjco3.so");
+                if (candidate.exists()) {
+                    nativeLib = candidate;
+                    break;
+                }
             }
         }
 

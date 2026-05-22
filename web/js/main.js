@@ -19570,11 +19570,12 @@ function bindIfExecEvents() {
                 const res = await fetch(`/sales-api/interface-histories/manual-execute/${ifId}`, { method: 'POST' });
                 if (!res.ok) {
                     const err = await res.json();
-                    alert(err.message || '수동 실행 실패');
+                    alert(err.error || err.message || '수동 실행 실패');
                 } else {
                     const result = await res.json();
+                    const d = result.data || result;
                     const statusLabel = { SUCCESS:'성공', ERROR:'에러', RETRY_SUCCESS:'재수행성공', RETRY_ERROR:'재수행에러' };
-                    alert(`수동 실행 완료 - 상태: ${statusLabel[result.status] || result.status}`);
+                    alert(`수동 실행 완료 - 상태: ${statusLabel[d.status] || d.status}`);
                 }
                 await loadInterfaceExecutions();
             } catch (err) {
@@ -19597,11 +19598,12 @@ function bindIfExecEvents() {
                 const res = await fetch(`/sales-api/interface-histories/${histId}/retry`, { method: 'POST' });
                 if (!res.ok) {
                     const err = await res.json();
-                    alert(err.message || '재수행 실패');
+                    alert(err.error || err.message || '재수행 실패');
                 } else {
                     const result = await res.json();
+                    const d = result.data || result;
                     const statusLabel = { SUCCESS:'성공', ERROR:'에러', RETRY_SUCCESS:'재수행성공', RETRY_ERROR:'재수행에러' };
-                    alert(`재수행 완료 - 상태: ${statusLabel[result.status] || result.status}`);
+                    alert(`재수행 완료 - 상태: ${statusLabel[d.status] || d.status}`);
                 }
                 await loadInterfaceExecutions();
             } catch (err) {
@@ -19733,10 +19735,12 @@ function bindIfHistEvents() {
             const res = await fetch(`/sales-api/interface-histories/${id}/retry`, { method: 'POST' });
             if (!res.ok) {
                 const err = await res.json();
-                alert(err.message || '재수행 실패');
+                alert(err.error || err.message || '재수행 실패');
             } else {
                 const result = await res.json();
-                alert(`재수행 완료 - 상태: ${result.status}`);
+                const d = result.data || result;
+                const statusLabel = { SUCCESS:'성공', ERROR:'에러', RETRY_SUCCESS:'재수행성공', RETRY_ERROR:'재수행에러' };
+                alert(`재수행 완료 - 상태: ${statusLabel[d.status] || d.status}`);
             }
             await loadInterfaceHistories();
             populateIfHistFilters();
@@ -19797,11 +19801,12 @@ function showIfErrorModal(record) {
             const res = await fetch(`/sales-api/interface-histories/${histId}/retry`, { method: 'POST' });
             if (!res.ok) {
                 const err = await res.json();
-                alert(err.message || '재수행 실패');
+                alert(err.error || err.message || '재수행 실패');
             } else {
                 const result = await res.json();
+                const d = result.data || result;
                 const statusMap = { SUCCESS:'성공', ERROR:'에러', RETRY_SUCCESS:'재수행성공', RETRY_ERROR:'재수행에러' };
-                alert(`재수행 완료 - 상태: ${statusMap[result.status] || result.status}`);
+                alert(`재수행 완료 - 상태: ${statusMap[d.status] || d.status}`);
                 closeModal();
                 await loadInterfaceHistories();
                 populateIfHistFilters();

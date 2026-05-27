@@ -1,6 +1,7 @@
 package com.company.module.sales.entity;
 
 import com.company.module.sales.config.DataChangeHistoryListener;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,33 +41,43 @@ public class RenewalMaterialLinkage extends BaseAuditEntity {
     private String legacyItemName;
 
     @Column(name = "RENEWAL_ITEM_CODE_1", length = 50)
+    @JsonProperty("renewal_item_code_1")
     private String renewalItemCode1;
 
     @Column(name = "RENEWAL_ITEM_NAME_1", length = 200)
+    @JsonProperty("renewal_item_name_1")
     private String renewalItemName1;
 
     @Column(name = "RENEWAL_ITEM_CODE_2", length = 50)
+    @JsonProperty("renewal_item_code_2")
     private String renewalItemCode2;
 
     @Column(name = "RENEWAL_ITEM_NAME_2", length = 200)
+    @JsonProperty("renewal_item_name_2")
     private String renewalItemName2;
 
     @Column(name = "RENEWAL_ITEM_CODE_3", length = 50)
+    @JsonProperty("renewal_item_code_3")
     private String renewalItemCode3;
 
     @Column(name = "RENEWAL_ITEM_NAME_3", length = 200)
+    @JsonProperty("renewal_item_name_3")
     private String renewalItemName3;
 
     @Column(name = "RENEWAL_ITEM_CODE_4", length = 50)
+    @JsonProperty("renewal_item_code_4")
     private String renewalItemCode4;
 
     @Column(name = "RENEWAL_ITEM_NAME_4", length = 200)
+    @JsonProperty("renewal_item_name_4")
     private String renewalItemName4;
 
     @Column(name = "RENEWAL_ITEM_CODE_5", length = 50)
+    @JsonProperty("renewal_item_code_5")
     private String renewalItemCode5;
 
     @Column(name = "RENEWAL_ITEM_NAME_5", length = 200)
+    @JsonProperty("renewal_item_name_5")
     private String renewalItemName5;
 
     @Column(name = "EFFECTIVE_MONTH", length = 7)

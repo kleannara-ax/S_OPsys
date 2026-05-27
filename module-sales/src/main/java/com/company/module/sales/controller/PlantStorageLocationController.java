@@ -25,7 +25,8 @@ public class PlantStorageLocationController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAll() {
-        List<PlantStorageLocation> all = service.findAllSorted();
+        // 마스터 데이터(plan_month=null)만 조회 — RFC_002로 생성된 재고 데이터는 제외
+        List<PlantStorageLocation> all = repository.findByPlanMonthIsNullOrderByPlantCodeAscStorageLocationAsc();
         Map<String, List<PlantStorageLocation>> grouped = all.stream()
             .collect(Collectors.groupingBy(
                 PlantStorageLocation::getPlantCode,

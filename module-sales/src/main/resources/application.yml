@@ -8,10 +8,6 @@ server:
     context-path: /
 
 spring:
-  # SAP 연결 설정 파일 import
-  config:
-    import: optional:classpath:sap-connection.yml
-
   # ── 정적 리소스 (프론트엔드 HTML/JS/CSS) ──
   # JAR 실행 위치 기준 상대경로 ./web/ 또는 환경변수로 절대경로 지정 가능
   web:
@@ -59,6 +55,21 @@ spring:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
     date-format: yyyy-MM-dd'T'HH:mm:ss
+
+# ──────────────────────────────────────────────
+#  SAP RFC 연결 설정
+#  SAP 계정 정보를 환경변수 또는 여기에서 직접 수정하세요.
+# ──────────────────────────────────────────────
+sap:
+  jco:
+    host: ${SAP_HOST:10.2.14.210}
+    system-number: ${SAP_SYSNR:1}
+    client: ${SAP_CLIENT:100}
+    user: ${SAP_USER:SNOP001}
+    password: ${SAP_PASS:}
+    language: ${SAP_LANG:KO}
+    pool-capacity: 5
+    peak-limit: 10
 
 # ── 로깅 ──
 logging:

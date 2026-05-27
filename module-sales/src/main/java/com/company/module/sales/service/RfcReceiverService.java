@@ -259,14 +259,94 @@ public class RfcReceiverService {
             }
         }
 
+        // Step 3: SnopRecord에 재고 데이터 반영
+        // PlantStorageLocation은 저장위치별 상세 데이터이고,
+        // 생산계획현황 화면(SnopRecord)은 item_code + plan_month 단위로 합산된 재고를 표시한다.
+        // → 동일 item_code + plan_month의 모든 저장위치 재고를 합산하여 SnopRecord에 업데이트
+        int snopUpdateCount = 0;
+        int snopInsertCount = 0;
+        try {
+            // item_code + plan_month 별로 재고 합산
+            Map<String, Long> beginningInventorySum = new LinkedHashMap<>();
+            Map<String, Long> availableInventorySum = new LinkedHashMap<>();
+            Map<String, String> inventoryUnitMap = new LinkedHashMap<>();
+
+            for (Map<String, Object> row : dataList) {
+                String planMonthDay = getStr(row, "plan_month_day");
+                String itemCode = getStr(row, "item_code");
+                if (itemCode == null || itemCode.isEmpty()) continue;
+
+                String planMonth = convertPlanMonthDay(planMonthDay);
+                if (planMonth == null) continue;
+
+                String key = itemCode + "|" + planMonth;
+
+                Long beginInv = getLong(row, "beginning_inventory");
+                Long availInv = getLong(row, "available_inventory");
+                String unit = getStr(row, "unit");
+
+                if (beginInv != null) {
+                    beginningInventorySum.merge(key, beginInv, Long::sum);
+                }
+                if (availInv != null) {
+                    availableInventorySum.merge(key, availInv, Long::sum);
+                }
+                if (unit != null && !unit.isEmpty()) {
+                    inventoryUnitMap.putIfAbsent(key, unit);
+                }
+            }
+
+            // SnopRecord 업데이트
+            for (String key : beginningInventorySum.keySet()) {
+                String[] parts = key.split("\\|", 2);
+                String itemCode = parts[0];
+                String planMonth = parts[1];
+
+                Long totalBeginning = beginningInventorySum.get(key);
+                Long totalAvailable = availableInventorySum.get(key);
+                String unit = inventoryUnitMap.get(key);
+
+                // 기존 SnopRecord 조회 (item_code + plan_month)
+                List<SnopRecord> existingRecords = snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
+
+                if (!existingRecords.isEmpty()) {
+                    // 기존 레코드가 있으면 모두 업데이트
+                    for (SnopRecord record : existingRecords) {
+                        record.setBeginningInventory(totalBeginning);
+                        if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
+                        if (unit != null) record.setInventoryUnit(unit);
+                        snopRecordRepo.save(record);
+                    }
+                    snopUpdateCount += existingRecords.size();
+                } else {
+                    // SnopRecord가 없으면 신규 생성 (재고 데이터만 있는 레코드)
+                    SnopRecord record = new SnopRecord();
+                    record.setItemCode(itemCode);
+                    record.setPlanMonth(planMonth);
+                    record.setBeginningInventory(totalBeginning);
+                    if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
+                    if (unit != null) record.setInventoryUnit(unit);
+                    snopRecordRepo.save(record);
+                    snopInsertCount++;
+                }
+            }
+
+            log.info("[RFC-002] SnopRecord 재고 반영 완료: 업데이트={}, 신규={}, 품목수={}",
+                    snopUpdateCount, snopInsertCount, beginningInventorySum.size());
+
+        } catch (Exception e) {
+            log.error("[RFC-002] SnopRecord 재고 반영 중 오류: {}", e.getMessage(), e);
+            errors.add("SnopRecord 재고 반영 오류: " + e.getMessage());
+        }
+
         LocalDateTime endTime = LocalDateTime.now();
         long durationMs = java.time.Duration.between(startTime, endTime).toMillis();
 
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-002] 일자별재고 수신 완료: 삭제={}, 신규={}, 처리={}, 에러={}",
-                deleteCount, insertCount, processedCount, errorCount);
+        log.info("[RFC-002] 일자별재고 수신 완료: 삭제={}, 신규={}, 처리={}, 에러={}, SnopRecord(업데이트={}, 신규={})",
+                deleteCount, insertCount, processedCount, errorCount, snopUpdateCount, snopInsertCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -275,6 +355,8 @@ public class RfcReceiverService {
         result.put("processed_count", processedCount);
         result.put("insert_count", insertCount);
         result.put("delete_count", deleteCount);
+        result.put("snop_update_count", snopUpdateCount);
+        result.put("snop_insert_count", snopInsertCount);
         result.put("error_count", errorCount);
         result.put("errors", errors);
         result.put("duration_ms", durationMs);

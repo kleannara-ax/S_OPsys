@@ -60,8 +60,8 @@ public class SapRfcCallerService {
     private static final String TABLE_PARAM_006 = "O_TABLE";   // Z_MM_SNOP_RFC_006
 
     // ─── SAP IMPORT 파라미터 이름 ───
-    // RFC_001, RFC_006: I_TYPE (A=전체, B=변경분)
-    private static final String IMPORT_PARAM_TYPE = "I_TYPE";
+    // RFC_001, RFC_006: I_FLAG (A=전체, B=신규/수정)
+    private static final String IMPORT_PARAM_TYPE = "I_FLAG";
     // RFC_005: I_YYYYMM (마감 대상 년월)
     private static final String IMPORT_PARAM_YEARMONTH = "I_YYYYMM";
 

@@ -175,15 +175,19 @@ public class SapRfcService {
                 Object exportParameterList = function.getClass()
                         .getMethod("getExportParameterList").invoke(function);
                 if (exportParameterList != null) {
-                    int fieldCount = (int) exportParameterList.getClass()
-                            .getMethod("getFieldCount").invoke(exportParameterList);
+                    // JCo 3.0.6: 필드명은 MetaData에서 읽어야 함
+                    Object exportMeta = exportParameterList.getClass()
+                            .getMethod("getRecordMetaData").invoke(exportParameterList);
+                    int fieldCount = (int) exportMeta.getClass()
+                            .getMethod("getFieldCount").invoke(exportMeta);
+                    Method getExportName = exportMeta.getClass().getMethod("getName", int.class);
+                    Method getExportValue = exportParameterList.getClass()
+                            .getMethod("getString", int.class);
                     Map<String, Object> exports = new LinkedHashMap<>();
                     for (int i = 0; i < fieldCount; i++) {
-                        String name = (String) exportParameterList.getClass()
-                                .getMethod("getName", int.class).invoke(exportParameterList, i);
-                        Object value = exportParameterList.getClass()
-                                .getMethod("getValue", int.class).invoke(exportParameterList, i);
-                        exports.put(name, value != null ? value.toString() : null);
+                        String name = (String) getExportName.invoke(exportMeta, i);
+                        String value = (String) getExportValue.invoke(exportParameterList, i);
+                        exports.put(name, value);
                     }
                     result.put("exports", exports);
                 }
@@ -223,6 +227,12 @@ public class SapRfcService {
 
     /**
      * JCoTable 객체를 List<Map> 형태로 변환합니다.
+     * <p>JCo 버전별 API 차이를 Reflection으로 대응합니다:</p>
+     * <ul>
+     *   <li>JCo 3.1+: {@code table.getRecordMetaData().getName(int)}</li>
+     *   <li>JCo 3.0.x: {@code table.getMetaData().getName(int)}</li>
+     *   <li>Fallback: {@code getString(String)} 대신 인덱스 기반 읽기</li>
+     * </ul>
      */
     private List<Map<String, Object>> convertJCoTableToList(Object table) throws Exception {
         List<Map<String, Object>> list = new ArrayList<>();
@@ -230,21 +240,29 @@ public class SapRfcService {
         int numRows = (int) table.getClass().getMethod("getNumRows").invoke(table);
         if (numRows == 0) return list;
 
-        Method getFieldCount = table.getClass().getMethod("getFieldCount");
-        Method getName = table.getClass().getMethod("getName", int.class);
-        Method getValue = table.getClass().getMethod("getValue", int.class);
+        // 메타데이터 획득 — JCo 버전별 메서드명이 다름
+        Object metaData = getTableMetaData(table);
+        int fieldCount = (int) metaData.getClass().getMethod("getFieldCount").invoke(metaData);
+        Method getMetaName = metaData.getClass().getMethod("getName", int.class);
+
+        // 값 읽기 — getString(String columnName) 사용 (모든 JCo 버전 호환)
+        Method getStringByName = table.getClass().getMethod("getString", String.class);
         Method nextRow = table.getClass().getMethod("nextRow");
         Method firstRow = table.getClass().getMethod("firstRow");
 
-        int fieldCount = (int) getFieldCount.invoke(table);
+        // 필드명 목록 미리 추출
+        String[] fieldNames = new String[fieldCount];
+        for (int i = 0; i < fieldCount; i++) {
+            fieldNames[i] = (String) getMetaName.invoke(metaData, i);
+        }
+
         firstRow.invoke(table);
 
         for (int row = 0; row < numRows; row++) {
             Map<String, Object> rowMap = new LinkedHashMap<>();
             for (int col = 0; col < fieldCount; col++) {
-                String colName = (String) getName.invoke(table, col);
-                Object colValue = getValue.invoke(table, col);
-                rowMap.put(colName, colValue != null ? colValue.toString() : null);
+                String colValue = (String) getStringByName.invoke(table, fieldNames[col]);
+                rowMap.put(fieldNames[col], colValue);
             }
             list.add(rowMap);
             if (row < numRows - 1) {
@@ -252,6 +270,42 @@ public class SapRfcService {
             }
         }
         return list;
+    }
+
+    /**
+     * JCoTable에서 메타데이터 객체를 획득합니다.
+     * JCo 3.1+는 getRecordMetaData(), JCo 3.0.x는 getMetaData()를 사용합니다.
+     */
+    private Object getTableMetaData(Object table) throws Exception {
+        // 1차: getRecordMetaData() — JCo 3.1+
+        try {
+            return table.getClass().getMethod("getRecordMetaData").invoke(table);
+        } catch (NoSuchMethodException ignored) {}
+
+        // 2차: getMetaData() — JCo 3.0.x
+        try {
+            return table.getClass().getMethod("getMetaData").invoke(table);
+        } catch (NoSuchMethodException ignored) {}
+
+        // 3차: 인터페이스를 통해 탐색
+        for (Class<?> iface : table.getClass().getInterfaces()) {
+            try {
+                Method m = iface.getMethod("getRecordMetaData");
+                return m.invoke(table);
+            } catch (NoSuchMethodException ignored) {}
+            try {
+                Method m = iface.getMethod("getMetaData");
+                return m.invoke(table);
+            } catch (NoSuchMethodException ignored) {}
+        }
+
+        throw new RuntimeException("JCoTable에서 메타데이터를 가져올 수 없습니다. "
+                + "Table class: " + table.getClass().getName()
+                + ", Methods: " + Arrays.toString(
+                    Arrays.stream(table.getClass().getMethods())
+                        .map(Method::getName)
+                        .filter(n -> n.contains("eta") || n.contains("ield") || n.contains("ame"))
+                        .toArray()));
     }
 
     private String extractRootCause(Exception e) {

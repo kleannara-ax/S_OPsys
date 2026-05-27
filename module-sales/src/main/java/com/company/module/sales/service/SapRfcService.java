@@ -176,17 +176,16 @@ public class SapRfcService {
                         .getMethod("getExportParameterList").invoke(function);
                 if (exportParameterList != null) {
                     // JCo 3.0.6: 필드명은 MetaData에서 읽어야 함
-                    Object exportMeta = exportParameterList.getClass()
-                            .getMethod("getRecordMetaData").invoke(exportParameterList);
+                    Object exportMeta = getTableMetaData(exportParameterList);
                     int fieldCount = (int) exportMeta.getClass()
                             .getMethod("getFieldCount").invoke(exportMeta);
                     Method getExportName = exportMeta.getClass().getMethod("getName", int.class);
                     Method getExportValue = exportParameterList.getClass()
-                            .getMethod("getString", int.class);
+                            .getMethod("getString", String.class);
                     Map<String, Object> exports = new LinkedHashMap<>();
                     for (int i = 0; i < fieldCount; i++) {
                         String name = (String) getExportName.invoke(exportMeta, i);
-                        String value = (String) getExportValue.invoke(exportParameterList, i);
+                        String value = (String) getExportValue.invoke(exportParameterList, name);
                         exports.put(name, value);
                     }
                     result.put("exports", exports);

@@ -2,28 +2,31 @@
 #  S&OP 생산계획 관리 시스템 — 독립 실행 설정
 # ──────────────────────────────────────────────
 
-# SAP 연결 설정 파일 import
-spring.config.import: optional:classpath:sap-connection.yml
 server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: /
 
-# 정적 리소스 (프론트엔드 HTML/JS/CSS)
-# JAR 실행 위치 기준 상대경로 ./web/ 또는 환경변수로 절대경로 지정 가능
-spring.web.resources:
-  static-locations: file:${STATIC_PATH:./web/}
-  cache:
-    period: 0
-    cachecontrol:
-      no-cache: true
-      no-store: true
-  chain:
-    strategy:
-      content:
-        enabled: false
-
 spring:
+  # SAP 연결 설정 파일 import
+  config:
+    import: optional:classpath:sap-connection.yml
+
+  # ── 정적 리소스 (프론트엔드 HTML/JS/CSS) ──
+  # JAR 실행 위치 기준 상대경로 ./web/ 또는 환경변수로 절대경로 지정 가능
+  web:
+    resources:
+      static-locations: file:${STATIC_PATH:./web/}
+      cache:
+        period: 0
+        cachecontrol:
+          no-cache: true
+          no-store: true
+      chain:
+        strategy:
+          content:
+            enabled: false
+
   # ── 데이터소스 ──
   datasource:
     url: jdbc:mariadb://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:snop_db}?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Seoul

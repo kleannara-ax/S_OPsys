@@ -85,9 +85,9 @@ public class RfcReceiverService {
 
                 switch (updateType.trim()) {
                     case "1": // Insert (신규)
-                        List<BaseMaterialMaster> existingForInsert = baseMaterialMasterRepo.findByItemCode(itemCode);
+                        List<BaseMaterialMaster> existingForInsert = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);
                         if (!existingForInsert.isEmpty()) {
-                            // 이미 존재하면 update로 처리
+                            // 이미 존재하면 update로 처리 (대소문자 무관)
                             BaseMaterialMaster master = existingForInsert.get(0);
                             mapRfc001Fields(master, row);
                             baseMaterialMasterRepo.save(master);
@@ -103,7 +103,7 @@ public class RfcReceiverService {
                         break;
 
                     case "2": // Update (item_code 기준 수정)
-                        List<BaseMaterialMaster> existingForUpdate = baseMaterialMasterRepo.findByItemCode(itemCode);
+                        List<BaseMaterialMaster> existingForUpdate = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);
                         if (!existingForUpdate.isEmpty()) {
                             BaseMaterialMaster master = existingForUpdate.get(0);
                             mapRfc001Fields(master, row);

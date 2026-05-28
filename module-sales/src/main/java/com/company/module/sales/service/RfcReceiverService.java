@@ -396,6 +396,10 @@ public class RfcReceiverService {
     // RFC fields: plan_month_day → plan_month, item_code,
     //             plant_code, unit → inventory_unit,
     //             production_actual
+    // 처리 방식:
+    //   Step 1: item_code + plan_month 기준으로 plant_code별 production_actual 합산
+    //   Step 2: 합산된 값을 SnopRecord에 upsert (item_code + plan_month 키)
+    //   ※ 생산계획현황 화면은 자재+월 기준 한 행이므로 plant_code별 분리 불필요
     // ───────────────────────────────────────────────────────
     @Transactional
     public Map<String, Object> processRfc003(List<Map<String, Object>> dataList, String executionType) {
@@ -413,12 +417,16 @@ public class RfcReceiverService {
 
         log.info("[RFC-003] 생산실적 수신 시작: {}건", dataList.size());
 
+        // Step 1: item_code + plan_month 기준으로 production_actual 합산
+        // SAP에서 plant_code별로 나눠서 오지만, 화면에서는 자재+월 기준 한 행
+        Map<String, Long> actualSum = new LinkedHashMap<>();   // key: itemCode|planMonth → 합산값
+        Map<String, String> unitMap = new LinkedHashMap<>();    // key: itemCode|planMonth → unit
+
         for (int i = 0; i < dataList.size(); i++) {
             Map<String, Object> row = dataList.get(i);
             try {
                 String planMonthDay = getStr(row, "plan_month_day");
                 String itemCode = getStr(row, "item_code");
-                String plantCode = getStr(row, "plant_code");
 
                 if (itemCode == null || itemCode.isEmpty()) {
                     errors.add("Row " + (i + 1) + ": item_code 누락");
@@ -426,30 +434,18 @@ public class RfcReceiverService {
                     continue;
                 }
 
-                // plan_month_day (YYYYMMDD) → plan_month (YYYY-MM)
                 String planMonth = convertPlanMonthDay(planMonthDay);
+                String key = itemCode + "|" + planMonth;
 
-                // 키: item_code + plan_month + plant_code
-                Optional<SnopRecord> optExisting =
-                        snopRecordRepo.findByItemCodeAndPlanMonthAndPlantCode(itemCode, planMonth, plantCode);
-
-                SnopRecord record;
-                if (optExisting.isPresent()) {
-                    record = optExisting.get();
-                    updateCount++;
-                } else {
-                    record = new SnopRecord();
-                    record.setItemCode(itemCode);
-                    record.setPlanMonth(planMonth);
-                    record.setPlantCode(plantCode);
-                    insertCount++;
+                Long prodActual = getLong(row, "production_actual");
+                if (prodActual != null) {
+                    actualSum.merge(key, prodActual, Long::sum);
                 }
 
-                // 필드 매핑
-                if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
-                if (hasKey(row, "production_actual")) record.setProductionActual(getLong(row, "production_actual"));
+                if (hasKey(row, "unit")) {
+                    unitMap.putIfAbsent(key, getStr(row, "unit"));
+                }
 
-                snopRecordRepo.save(record);
                 processedCount++;
 
             } catch (Exception e) {
@@ -459,14 +455,54 @@ public class RfcReceiverService {
             }
         }
 
+        log.info("[RFC-003] 합산 완료: {}건 → {}개 자재+월 조합", dataList.size(), actualSum.size());
+
+        // Step 2: 합산된 값을 SnopRecord에 반영 (item_code + plan_month 키)
+        for (Map.Entry<String, Long> entry : actualSum.entrySet()) {
+            try {
+                String[] parts = entry.getKey().split("\\|", 2);
+                String itemCode = parts[0];
+                String planMonth = parts.length > 1 ? parts[1] : null;
+                Long totalActual = entry.getValue();
+                String unit = unitMap.get(entry.getKey());
+
+                // item_code + plan_month 기준 기존 레코드 조회
+                Optional<SnopRecord> optExisting =
+                        snopRecordRepo.findFirstByItemCodeAndPlanMonth(itemCode, planMonth);
+
+                SnopRecord record;
+                if (optExisting.isPresent()) {
+                    record = optExisting.get();
+                    updateCount++;
+                } else {
+                    record = new SnopRecord();
+                    record.setItemCode(itemCode);
+                    record.setPlanMonth(planMonth);
+                    // 신규 생성 시 자재마스터에서 정보 보충
+                    enrichFromMaterialMaster(record, itemCode);
+                    insertCount++;
+                }
+
+                record.setProductionActual(totalActual);
+                if (unit != null) record.setInventoryUnit(unit);
+
+                snopRecordRepo.save(record);
+
+            } catch (Exception e) {
+                errors.add("합산 반영 오류 [" + entry.getKey() + "]: " + e.getMessage());
+                errorCount++;
+                log.error("[RFC-003] 합산 반영 오류 [{}]: {}", entry.getKey(), e.getMessage());
+            }
+        }
+
         LocalDateTime endTime = LocalDateTime.now();
         long durationMs = java.time.Duration.between(startTime, endTime).toMillis();
 
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-003] 생산실적 수신 완료: 처리={}, 신규={}, 수정={}, 에러={}",
-                processedCount, insertCount, updateCount, errorCount);
+        log.info("[RFC-003] 생산실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, 에러={}",
+                processedCount, actualSum.size(), insertCount, updateCount, errorCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -738,6 +774,30 @@ public class RfcReceiverService {
      * - "2026-04-01" → "2026-04"
      * - "2026-04" → "2026-04" (이미 변환됨)
      */
+    /** 신규 SnopRecord 생성 시 자재마스터에서 자재명/카테고리 등 보충 */
+    private void enrichFromMaterialMaster(SnopRecord record, String itemCode) {
+        try {
+            List<BaseMaterialMaster> masters = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);
+            if (!masters.isEmpty()) {
+                BaseMaterialMaster master = masters.get(0);
+                if (record.getItemName() == null && master.getItemName() != null) {
+                    record.setItemName(master.getItemName());
+                }
+                if (record.getCategory() == null && master.getHierarchyName() != null) {
+                    record.setCategory(master.getHierarchyName());
+                }
+                if (record.getVendorName() == null && master.getVendorName() != null) {
+                    record.setVendorName(master.getVendorName());
+                }
+                if (record.getMoq() == null && master.getMoq() != null) {
+                    record.setMoq(master.getMoq());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[RFC] 자재마스터 조회 중 오류 (무시): {}", e.getMessage());
+        }
+    }
+
     private String convertPlanMonthDay(String planMonthDay) {
         if (planMonthDay == null || planMonthDay.isEmpty()) return null;
         String trimmed = planMonthDay.trim();

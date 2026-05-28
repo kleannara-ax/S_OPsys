@@ -194,7 +194,7 @@ public class RfcReceiverService {
         // 수신 데이터에 포함된 plan_month 목록 수집 (Step 2에서 사용)
         Set<String> affectedPlanMonths = new HashSet<>();
 
-        // Step 1: Upsert — plant_code + storage_location + plan_month 키로 기존 레코드 업데이트 또는 신규 생성
+        // Step 1: Upsert — item_code + plant_code + storage_location + plan_month 키로 기존 레코드 업데이트 또는 신규 생성
         // ※ 기존 삭제+재삽입 방식에서 변경: is_selected 속성을 보존하기 위해 upsert 방식 사용
         for (int i = 0; i < dataList.size(); i++) {
             Map<String, Object> row = dataList.get(i);
@@ -221,10 +221,12 @@ public class RfcReceiverService {
                     affectedPlanMonths.add(planMonth);
                 }
 
-                // 기존 레코드 조회: plant_code + storage_location + plan_month
+                // 기존 레코드 조회: item_code + plant_code + storage_location + plan_month
+                // ※ plant_code + storage_location + plan_month 만으로는 동일 저장위치에 여러 자재가 있어 다건 반환됨
+                //    → NonUniqueResultException 방지를 위해 item_code를 키에 포함
                 Optional<PlantStorageLocation> optExisting =
-                        plantStorageLocationRepo.findByPlantCodeAndStorageLocationAndPlanMonth(
-                                plantCode, storageLocation != null ? storageLocation : "", planMonth);
+                        plantStorageLocationRepo.findByItemCodeAndPlantCodeAndStorageLocationAndPlanMonth(
+                                itemCode, plantCode, storageLocation != null ? storageLocation : "", planMonth);
 
                 PlantStorageLocation psl;
                 if (optExisting.isPresent()) {
@@ -238,11 +240,12 @@ public class RfcReceiverService {
                     psl.setPlanMonth(planMonth);
 
                     // seed 데이터(plan_month=null)에서 is_selected 상속
-                    Optional<PlantStorageLocation> seedRecord =
+                    // ※ plant_code + storage_location 조합에 seed가 여러 건일 수 있으므로 List로 조회
+                    List<PlantStorageLocation> seedRecords =
                             plantStorageLocationRepo.findByPlantCodeAndStorageLocationAndPlanMonthIsNull(
                                     plantCode, storageLocation != null ? storageLocation : "");
-                    if (seedRecord.isPresent()) {
-                        psl.setIsSelected(seedRecord.get().getIsSelected());
+                    if (!seedRecords.isEmpty()) {
+                        psl.setIsSelected(seedRecords.get(0).getIsSelected());
                     }
 
                     insertCount++;

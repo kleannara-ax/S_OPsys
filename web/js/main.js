@@ -1359,7 +1359,12 @@ function getLineCompositeKey(line, category, month) {
 function getSalesAggregateKey(itemCode, month) {
     const code = sanitizeText(itemCode).trim().toLowerCase();
     if (!code) return null;
-    /* 자재코드 기준으로만 그룹핑 — 대소문자 무시, 같은 자재는 월이 달라도 합산 */
+    const cleanMonth = sanitizeText(month).trim();
+    /* 자재코드 + 월 기준으로 그룹핑 — 같은 자재라도 월이 다르면 별도 집계 */
+    if (cleanMonth) {
+        return `${code}__${cleanMonth}`;
+    }
+    /* month가 없는 경우 자재코드만으로 키 생성 (호환) */
     return code;
 }
 

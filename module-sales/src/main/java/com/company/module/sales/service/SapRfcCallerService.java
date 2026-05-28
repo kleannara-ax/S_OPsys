@@ -215,6 +215,9 @@ public class SapRfcCallerService {
 
         log.info("[RFC-001] SAP 수신 완료 — {}건", sapData.size());
 
+        // SAP 원본 필드명 로그 출력 (필드 매핑 디버깅용)
+        logSapFieldNames("RFC-001", sapData);
+
         // SAP 필드명 → S&OP 필드명 변환
         List<Map<String, Object>> mappedData = convertFieldNames(sapData, FIELD_MAP_001);
 
@@ -388,6 +391,26 @@ public class SapRfcCallerService {
             result.add(mappedRow);
         }
         return result;
+    }
+
+    /**
+     * SAP 원본 필드명을 로그에 출력합니다 (필드 매핑 디버깅용).
+     * 첫 번째 행의 필드명만 출력합니다.
+     */
+    private void logSapFieldNames(String rfcId, List<Map<String, Object>> sapData) {
+        if (sapData == null || sapData.isEmpty()) {
+            log.warn("[{}] SAP 데이터 0건 — 필드명 확인 불가", rfcId);
+            return;
+        }
+        Map<String, Object> firstRow = sapData.get(0);
+        log.info("[{}] ★ SAP 원본 필드명 (첫 번째 행): {}", rfcId, firstRow.keySet());
+        // 첫 번째 행의 값도 출력 (데이터 확인용)
+        for (Map.Entry<String, Object> entry : firstRow.entrySet()) {
+            Object val = entry.getValue();
+            String valStr = (val != null) ? val.toString() : "null";
+            if (valStr.length() > 100) valStr = valStr.substring(0, 100) + "...";
+            log.info("[{}]   {} = {}", rfcId, entry.getKey(), valStr);
+        }
     }
 
     /**

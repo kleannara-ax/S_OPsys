@@ -362,16 +362,23 @@ public class SapRfcCallerService {
     // ═══════════════════════════════════════════════════════
 
     /**
-     * SAP 필드명(대문자)을 S&OP 필드명(소문자)으로 변환합니다.
+     * SAP 필드명을 S&OP 필드명(소문자)으로 변환합니다.
+     * 대소문자를 구분하지 않고(case-insensitive) 매핑합니다.
      * 매핑 테이블에 없는 필드는 소문자 변환하여 그대로 포함합니다.
      *
      * @param sapData SAP에서 수신한 원본 데이터
-     * @param fieldMap SAP 필드명 → S&OP 필드명 매핑
+     * @param fieldMap SAP 필드명(대문자) → S&OP 필드명(소문자) 매핑
      * @return 변환된 데이터
      */
     private List<Map<String, Object>> convertFieldNames(
             List<Map<String, Object>> sapData,
             Map<String, String> fieldMap) {
+
+        // case-insensitive 룩업용 맵 생성 (대문자 키 → S&OP 필드명)
+        Map<String, String> upperMap = new HashMap<>();
+        for (Map.Entry<String, String> e : fieldMap.entrySet()) {
+            upperMap.put(e.getKey().toUpperCase(), e.getValue());
+        }
 
         List<Map<String, Object>> result = new ArrayList<>(sapData.size());
         for (Map<String, Object> sapRow : sapData) {
@@ -380,8 +387,8 @@ public class SapRfcCallerService {
                 String sapField = entry.getKey();
                 Object value = entry.getValue();
 
-                // 매핑 테이블에서 찾기 (대문자 키)
-                String snopField = fieldMap.get(sapField);
+                // 대소문자 무시하여 매핑 테이블에서 찾기
+                String snopField = upperMap.get(sapField.toUpperCase());
                 if (snopField == null) {
                     // 매핑 테이블에 없으면 소문자 변환하여 포함
                     snopField = sapField.toLowerCase();

@@ -94,6 +94,15 @@ public class PlantStorageLocationController {
         return ResponseEntity.ok(ApiResponse.ok(null, "삭제 완료"));
     }
 
+    /** 중복 seed 데이터 정리 — 동일 plant_code+storage_location의 중복 레코드 삭제 */
+    @PostMapping("/cleanup-duplicates")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> cleanupDuplicates() {
+        int deleted = service.cleanupDuplicateSeeds();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("deleted_count", deleted);
+        return ResponseEntity.ok(ApiResponse.ok(result, deleted + "건 중복 정리 완료"));
+    }
+
     @PostConstruct
     public void initSeedData() {
         if (repository.count() > 0) return;

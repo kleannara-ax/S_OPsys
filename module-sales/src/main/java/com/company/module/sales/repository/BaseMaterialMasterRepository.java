@@ -14,6 +14,10 @@ public interface BaseMaterialMasterRepository extends JpaRepository<BaseMaterial
 
     List<BaseMaterialMaster> findByItemCode(String itemCode);
 
+    /** 대소문자 무시하여 자재코드 조회 */
+    @Query("SELECT b FROM BaseMaterialMaster b WHERE UPPER(b.itemCode) = UPPER(:itemCode)")
+    List<BaseMaterialMaster> findByItemCodeIgnoreCase(String itemCode);
+
     @Query("SELECT DISTINCT b.scmArea FROM BaseMaterialMaster b WHERE b.scmArea IS NOT NULL ORDER BY b.scmArea")
     List<String> findDistinctScmAreas();
 

@@ -155,15 +155,15 @@ public class RfcReceiverService {
     }
 
     private void mapRfc001Fields(BaseMaterialMaster master, Map<String, Object> row) {
-        if (row.containsKey("scm_area")) master.setScmArea(getStr(row, "scm_area"));
-        if (row.containsKey("hierarchy_name")) master.setHierarchyName(getStr(row, "hierarchy_name"));
-        if (row.containsKey("production_unit")) master.setProductionUnit(getStr(row, "production_unit"));
-        if (row.containsKey("item_name")) master.setItemName(getStr(row, "item_name"));
-        if (row.containsKey("conversion1")) master.setConversion1(getDouble(row, "conversion1"));
-        if (row.containsKey("conversion2")) master.setConversion2(getDouble(row, "conversion2"));
-        if (row.containsKey("conversion3")) master.setConversion3(getDouble(row, "conversion3"));
-        if (row.containsKey("conversion5")) master.setConversion5(getDouble(row, "conversion5"));
-        if (row.containsKey("vendor_name")) master.setVendorName(getStr(row, "vendor_name"));
+        if (hasKey(row, "scm_area")) master.setScmArea(getStr(row, "scm_area"));
+        if (hasKey(row, "hierarchy_name")) master.setHierarchyName(getStr(row, "hierarchy_name"));
+        if (hasKey(row, "production_unit")) master.setProductionUnit(getStr(row, "production_unit"));
+        if (hasKey(row, "item_name")) master.setItemName(getStr(row, "item_name"));
+        if (hasKey(row, "conversion1")) master.setConversion1(getDouble(row, "conversion1"));
+        if (hasKey(row, "conversion2")) master.setConversion2(getDouble(row, "conversion2"));
+        if (hasKey(row, "conversion3")) master.setConversion3(getDouble(row, "conversion3"));
+        if (hasKey(row, "conversion5")) master.setConversion5(getDouble(row, "conversion5"));
+        if (hasKey(row, "vendor_name")) master.setVendorName(getStr(row, "vendor_name"));
     }
 
     // ───────────────────────────────────────────────────────
@@ -250,9 +250,9 @@ public class RfcReceiverService {
 
                 // 공통 필드 업데이트
                 psl.setItemCode(itemCode);
-                if (row.containsKey("unit")) psl.setStockUnit(getStr(row, "unit"));
-                if (row.containsKey("beginning_inventory")) psl.setBeginningInventory(getLong(row, "beginning_inventory"));
-                if (row.containsKey("available_inventory")) {
+                if (hasKey(row, "unit")) psl.setStockUnit(getStr(row, "unit"));
+                if (hasKey(row, "beginning_inventory")) psl.setBeginningInventory(getLong(row, "beginning_inventory"));
+                if (hasKey(row, "available_inventory")) {
                     Long avail = getLong(row, "available_inventory");
                     psl.setAvailableInventory(avail);
                     psl.setAvailableStock(avail); // 호환: available_stock 에도 반영
@@ -443,8 +443,8 @@ public class RfcReceiverService {
                 }
 
                 // 필드 매핑
-                if (row.containsKey("unit")) record.setInventoryUnit(getStr(row, "unit"));
-                if (row.containsKey("production_actual")) record.setProductionActual(getLong(row, "production_actual"));
+                if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
+                if (hasKey(row, "production_actual")) record.setProductionActual(getLong(row, "production_actual"));
 
                 snopRecordRepo.save(record);
                 processedCount++;
@@ -526,8 +526,8 @@ public class RfcReceiverService {
                 if (!existingList.isEmpty()) {
                     // 동일한 plan_month + item_code인 모든 레코드에 대해 update
                     for (SnopRecord record : existingList) {
-                        if (row.containsKey("unit")) record.setInventoryUnit(getStr(row, "unit"));
-                        if (row.containsKey("sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
+                        if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
+                        if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
                         snopRecordRepo.save(record);
                     }
                     updateCount += existingList.size();
@@ -536,8 +536,8 @@ public class RfcReceiverService {
                     SnopRecord record = new SnopRecord();
                     record.setItemCode(itemCode);
                     record.setPlanMonth(planMonth);
-                    if (row.containsKey("unit")) record.setInventoryUnit(getStr(row, "unit"));
-                    if (row.containsKey("sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
+                    if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
+                    if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
                     snopRecordRepo.save(record);
                     insertCount++;
                 }
@@ -699,23 +699,23 @@ public class RfcReceiverService {
      * RFC is_active: 1=활성화(true), 2=비활성화(false)
      */
     private void mapRfc006Fields(RenewalMaterialLinkage entity, Map<String, Object> row) {
-        if (row.containsKey("hierarchy_name")) entity.setHierarchyName(getStr(row, "hierarchy_name"));
-        if (row.containsKey("item_name")) entity.setLegacyItemName(getStr(row, "item_name"));
+        if (hasKey(row, "hierarchy_name")) entity.setHierarchyName(getStr(row, "hierarchy_name"));
+        if (hasKey(row, "item_name")) entity.setLegacyItemName(getStr(row, "item_name"));
 
         // 리뉴얼 자재 세트 1~5 매핑
-        if (row.containsKey("item_code_1")) entity.setRenewalItemCode1(getStr(row, "item_code_1"));
-        if (row.containsKey("item_name_1")) entity.setRenewalItemName1(getStr(row, "item_name_1"));
-        if (row.containsKey("item_code_2")) entity.setRenewalItemCode2(getStr(row, "item_code_2"));
-        if (row.containsKey("item_name_2")) entity.setRenewalItemName2(getStr(row, "item_name_2"));
-        if (row.containsKey("item_code_3")) entity.setRenewalItemCode3(getStr(row, "item_code_3"));
-        if (row.containsKey("item_name_3")) entity.setRenewalItemName3(getStr(row, "item_name_3"));
-        if (row.containsKey("item_code_4")) entity.setRenewalItemCode4(getStr(row, "item_code_4"));
-        if (row.containsKey("item_name_4")) entity.setRenewalItemName4(getStr(row, "item_name_4"));
-        if (row.containsKey("item_code_5")) entity.setRenewalItemCode5(getStr(row, "item_code_5"));
-        if (row.containsKey("item_name_5")) entity.setRenewalItemName5(getStr(row, "item_name_5"));
+        if (hasKey(row, "item_code_1")) entity.setRenewalItemCode1(getStr(row, "item_code_1"));
+        if (hasKey(row, "item_name_1")) entity.setRenewalItemName1(getStr(row, "item_name_1"));
+        if (hasKey(row, "item_code_2")) entity.setRenewalItemCode2(getStr(row, "item_code_2"));
+        if (hasKey(row, "item_name_2")) entity.setRenewalItemName2(getStr(row, "item_name_2"));
+        if (hasKey(row, "item_code_3")) entity.setRenewalItemCode3(getStr(row, "item_code_3"));
+        if (hasKey(row, "item_name_3")) entity.setRenewalItemName3(getStr(row, "item_name_3"));
+        if (hasKey(row, "item_code_4")) entity.setRenewalItemCode4(getStr(row, "item_code_4"));
+        if (hasKey(row, "item_name_4")) entity.setRenewalItemName4(getStr(row, "item_name_4"));
+        if (hasKey(row, "item_code_5")) entity.setRenewalItemCode5(getStr(row, "item_code_5"));
+        if (hasKey(row, "item_name_5")) entity.setRenewalItemName5(getStr(row, "item_name_5"));
 
         // is_active: 1=활성화, 2=비활성화
-        if (row.containsKey("is_active")) {
+        if (hasKey(row, "is_active")) {
             String isActiveVal = getStr(row, "is_active");
             if ("2".equals(isActiveVal)) {
                 entity.setIsActive(false);
@@ -909,13 +909,13 @@ public class RfcReceiverService {
                 record.setClosingMonth(closingMonth);
 
                 // 필드 매핑 (엑셀 B열 → D열)
-                if (row.containsKey("item_name")) record.setItemName(getStr(row, "item_name"));
-                if (row.containsKey("hierarchy_name")) record.setHierarchyName(getStr(row, "hierarchy_name"));
-                if (row.containsKey("unit")) record.setUnit(getStr(row, "unit"));
-                if (row.containsKey("ending_inventory")) record.setEndingInventory(getLong(row, "ending_inventory"));
-                if (row.containsKey("production_actual")) record.setProductionActual(getLong(row, "production_actual"));
-                if (row.containsKey("sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
-                if (row.containsKey("notes")) record.setNotes(getStr(row, "notes"));
+                if (hasKey(row, "item_name")) record.setItemName(getStr(row, "item_name"));
+                if (hasKey(row, "hierarchy_name")) record.setHierarchyName(getStr(row, "hierarchy_name"));
+                if (hasKey(row, "unit")) record.setUnit(getStr(row, "unit"));
+                if (hasKey(row, "ending_inventory")) record.setEndingInventory(getLong(row, "ending_inventory"));
+                if (hasKey(row, "production_actual")) record.setProductionActual(getLong(row, "production_actual"));
+                if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
+                if (hasKey(row, "notes")) record.setNotes(getStr(row, "notes"));
 
                 monthlyClosingRepo.save(record);
                 insertCount++;
@@ -999,15 +999,23 @@ public class RfcReceiverService {
         return yyyyMm;
     }
 
-    /** Map에서 String 값 추출 */
+    /** Map에서 String 값 추출 (case-insensitive) */
     private String getStr(Map<String, Object> row, String key) {
+        // 1차: 정확한 키 매칭
         Object val = row.get(key);
-        return val != null ? val.toString().trim() : null;
+        if (val != null) return val.toString().trim();
+        // 2차: 대소문자 무시 매칭 (SAP에서 대문자/소문자 혼용 대응)
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue() != null ? entry.getValue().toString().trim() : null;
+            }
+        }
+        return null;
     }
 
-    /** Map에서 Double 값 추출 */
+    /** Map에서 Double 값 추출 (case-insensitive) */
     private Double getDouble(Map<String, Object> row, String key) {
-        Object val = row.get(key);
+        Object val = getVal(row, key);
         if (val == null) return null;
         if (val instanceof Number) return ((Number) val).doubleValue();
         try {
@@ -1017,9 +1025,9 @@ public class RfcReceiverService {
         }
     }
 
-    /** Map에서 Long 값 추출 */
+    /** Map에서 Long 값 추출 (case-insensitive) */
     private Long getLong(Map<String, Object> row, String key) {
-        Object val = row.get(key);
+        Object val = getVal(row, key);
         if (val == null) return null;
         if (val instanceof Number) return ((Number) val).longValue();
         try {
@@ -1027,5 +1035,26 @@ public class RfcReceiverService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /** Map에서 값 추출 (case-insensitive) — 모든 getXxx 메서드의 공통 기반 */
+    private Object getVal(Map<String, Object> row, String key) {
+        Object val = row.get(key);
+        if (val != null) return val;
+        for (Map.Entry<String, Object> entry : row.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(key)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** Map에 키가 존재하는지 확인 (case-insensitive) */
+    private boolean hasKey(Map<String, Object> row, String key) {
+        if (row.containsKey(key)) return true;
+        for (String k : row.keySet()) {
+            if (k.equalsIgnoreCase(key)) return true;
+        }
+        return false;
     }
 }

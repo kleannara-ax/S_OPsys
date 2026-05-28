@@ -18,8 +18,8 @@ public interface PlantStorageLocationRepository extends JpaRepository<PlantStora
 
     Optional<PlantStorageLocation> findByPlantCodeAndStorageLocation(String plantCode, String storageLocation);
 
-    /** 마스터(seed) 데이터에서 plant_code + storage_location 조회 (plan_month=null) */
-    Optional<PlantStorageLocation> findByPlantCodeAndStorageLocationAndPlanMonthIsNull(
+    /** 마스터(seed) 데이터에서 plant_code + storage_location 조회 (plan_month=null) — 다건 가능 */
+    List<PlantStorageLocation> findByPlantCodeAndStorageLocationAndPlanMonthIsNull(
             String plantCode, String storageLocation);
 
     /** RFC_002: item_code + plant_code + storage_location + plan_month 키로 조회 */

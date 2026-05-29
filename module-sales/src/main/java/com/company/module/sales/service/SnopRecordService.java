@@ -1,24 +1,30 @@
 package com.company.module.sales.service;
 
 import com.company.module.sales.dto.SnopRecordDto;
+import com.company.module.sales.entity.BaseMaterialMaster;
 import com.company.module.sales.entity.SnopRecord;
+import com.company.module.sales.repository.BaseMaterialMasterRepository;
 import com.company.module.sales.repository.SnopRecordRepository;
 import javax.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SnopRecordService {
 
     private final SnopRecordRepository repository;
+    private final BaseMaterialMasterRepository baseMaterialMasterRepo;
 
     @Transactional(readOnly = true)
     public Page<SnopRecord> findAll(Pageable pageable) {
@@ -125,5 +131,93 @@ public class SnopRecordService {
             throw new EntityNotFoundException("S&OP 레코드를 찾을 수 없습니다: " + id);
         }
         repository.deleteById(id);
+    }
+
+    /**
+     * 기존 SnopRecord 중 item_name, category, production_line이 비어있는 레코드에
+     * BaseMaterialMaster 정보를 일괄 보충한다.
+     * RFC_002/004 등에서 SnopRecord를 자동 생성할 때 자재마스터 정보 없이
+     * 생성된 기존 데이터를 보정하기 위한 1회성 API.
+     */
+    @Transactional
+    public Map<String, Object> enrichAllFromMaterialMaster() {
+        List<SnopRecord> allRecords = repository.findAll();
+        int totalCount = allRecords.size();
+        int enrichedCount = 0;
+        int skippedCount = 0;
+        int noMasterCount = 0;
+
+        for (SnopRecord record : allRecords) {
+            String itemCode = record.getItemCode();
+            if (itemCode == null || itemCode.trim().isEmpty()) {
+                skippedCount++;
+                continue;
+            }
+
+            // item_name, category, production_line 중 하나라도 비어있으면 보충 대상
+            boolean needsEnrich = isBlank(record.getItemName())
+                    || isBlank(record.getCategory())
+                    || isBlank(record.getProductionLine());
+
+            if (!needsEnrich) {
+                skippedCount++;
+                continue;
+            }
+
+            try {
+                List<BaseMaterialMaster> masters = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode.trim());
+                if (masters.isEmpty()) {
+                    noMasterCount++;
+                    continue;
+                }
+
+                BaseMaterialMaster master = masters.get(0);
+                boolean changed = false;
+
+                if (isBlank(record.getItemName()) && master.getItemName() != null) {
+                    record.setItemName(master.getItemName());
+                    changed = true;
+                }
+                if (isBlank(record.getCategory()) && master.getHierarchyName() != null) {
+                    record.setCategory(master.getHierarchyName());
+                    changed = true;
+                }
+                if (isBlank(record.getProductionLine()) && master.getProductionUnit() != null) {
+                    record.setProductionLine(master.getProductionUnit());
+                    changed = true;
+                }
+                if (record.getVendorName() == null && master.getVendorName() != null) {
+                    record.setVendorName(master.getVendorName());
+                    changed = true;
+                }
+                if (record.getMoq() == null && master.getMoq() != null) {
+                    record.setMoq(master.getMoq());
+                    changed = true;
+                }
+
+                if (changed) {
+                    repository.save(record);
+                    enrichedCount++;
+                } else {
+                    skippedCount++;
+                }
+            } catch (Exception e) {
+                log.warn("[enrich] item_code={} 보충 중 오류 (무시): {}", itemCode, e.getMessage());
+            }
+        }
+
+        log.info("[enrich] SnopRecord 자재정보 일괄 보충 완료: 전체={}, 보충={}, 스킵={}, 자재마스터없음={}",
+                totalCount, enrichedCount, skippedCount, noMasterCount);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total_count", totalCount);
+        result.put("enriched_count", enrichedCount);
+        result.put("skipped_count", skippedCount);
+        result.put("no_master_count", noMasterCount);
+        return result;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 }

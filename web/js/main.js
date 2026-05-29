@@ -6614,7 +6614,7 @@ async function loadData() {
             baseMaterialMasterResponse,
             monthlyClosingResponse,
         ] = await Promise.all([
-            fetch('/sales-api/snop-records?limit=1000'),
+            fetch('/sales-api/snop-records?size=5000'),
             fetch('/sales-api/sales-plan-uploads?limit=1000'),
             fetch('/sales-api/sales-channels?limit=500'),
             fetch('/sales-api/line-capa-plans?limit=1000'),
@@ -7992,8 +7992,9 @@ async function handleRegisterProductionPlan() {
     let serverDuplicateCount = 0;
 
     for (const master of newMasters) {
+        const itemCode = (master.item_code || '').trim();
         const payload = {
-            item_code: (master.item_code || '').trim(),
+            item_code: itemCode,
             item_name: (master.item_name || '').trim(),
             category: (master.hierarchy_name || '').trim(),
             production_line: (master.production_unit || '').trim(),
@@ -8015,11 +8016,27 @@ async function handleRegisterProductionPlan() {
             await createRecord(payload);
             successCount++;
         } catch (error) {
-            if (error.code === 'DUPLICATE') {
+            if (error.code === 'DUPLICATE' && error.detail && error.detail.existing_id) {
+                /* RFC 등으로 자동 생성된 SnopRecord가 있으면 자재정보 보충 (item_name, category 등) */
+                try {
+                    await updateRecord(error.detail.existing_id, {
+                        item_name: payload.item_name,
+                        category: payload.category,
+                        production_line: payload.production_line,
+                        vendor_name: payload.vendor_name,
+                        moq: payload.moq,
+                    });
+                    successCount++;
+                    console.info(`자재 ${itemCode} 기존 SnopRecord에 자재정보 보충 완료 (id=${error.detail.existing_id})`);
+                } catch (updateError) {
+                    console.error(`자재 ${itemCode} 보충 실패:`, updateError);
+                    failCount++;
+                }
+            } else if (error.code === 'DUPLICATE') {
                 serverDuplicateCount++;
-                console.warn(`자재 ${master.item_code} 서버 중복 감지:`, error.message);
+                console.warn(`자재 ${itemCode} 서버 중복 감지:`, error.message);
             } else {
-                console.error(`자재 ${master.item_code} 등록 실패:`, error);
+                console.error(`자재 ${itemCode} 등록 실패:`, error);
                 failCount++;
             }
         }
@@ -13307,7 +13324,11 @@ async function createRecord(data) {
         const errorBody = await response.json();
         const err = new Error(errorBody.message || '이미 등록된 자재입니다.');
         err.code = 'DUPLICATE';
-        err.detail = errorBody;
+        /* data 안에 existing_id가 있으면 최상위로 올려서 접근 편의 제공 */
+        err.detail = errorBody.data || errorBody;
+        if (errorBody.data && errorBody.data.existing_id) {
+            err.detail.existing_id = errorBody.data.existing_id;
+        }
         throw err;
     }
     if (!response.ok) {
@@ -16830,7 +16851,7 @@ async function handleTargetInventoryUploadStart() {
         /* 현재 로드된 레코드 인덱스 구축 (item_code + month → record id) */
         const recordIndex = new Map();
         try {
-            const response = await fetch('/sales-api/snop-records?limit=5000');
+            const response = await fetch('/sales-api/snop-records?size=5000');
             if (response.ok) {
                 const allRecordsPayload = await response.json();
                 const allRecords = extractData(allRecordsPayload);

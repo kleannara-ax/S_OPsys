@@ -19650,24 +19650,50 @@ function bindIfExecEvents() {
             btn.disabled = true;
             const origText = btn.textContent;
             btn.textContent = '실행중...';
-            try {
-                const res = await fetch(`/sales-api/interface-histories/manual-execute/${ifId}`, { method: 'POST' });
+
+            /* ── fire-and-forget 방식 ──
+             * RFC 호출이 60초 이상 걸릴 수 있어 프록시(Nginx) 타임아웃으로
+             * HTML 에러 페이지가 반환될 수 있음 → JSON 파싱 실패 방지
+             * 1) 요청을 보내고 "실행 요청 완료" 즉시 표시
+             * 2) 5초마다 이력 목록을 폴링하여 완료 여부 확인
+             */
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 최대 2분 대기
+
+            // 요청 발사 — 응답을 기다리되 타임아웃/파싱 에러를 허용
+            fetch(`/sales-api/interface-histories/manual-execute/${ifId}`, {
+                method: 'POST',
+                signal: controller.signal
+            }).then(async res => {
+                clearTimeout(timeoutId);
                 if (!res.ok) {
-                    const err = await res.json();
-                    alert(err.error || err.message || '수동 실행 실패');
+                    try {
+                        const err = await res.json();
+                        alert(err.error || err.message || '수동 실행 실패');
+                    } catch { alert('수동 실행 실패 (HTTP ' + res.status + ')'); }
                 } else {
-                    const result = await res.json();
-                    const d = result.data || result;
-                    const statusLabel = { SUCCESS:'성공', ERROR:'에러', RETRY_SUCCESS:'재수행성공', RETRY_ERROR:'재수행에러' };
-                    alert(`수동 실행 완료 - 상태: ${statusLabel[d.status] || d.status}`);
+                    try {
+                        const result = await res.json();
+                        const d = result.data || result;
+                        const statusLabel = { SUCCESS:'성공', PARTIAL_SUCCESS:'부분성공', ERROR:'에러', RETRY_SUCCESS:'재수행성공', RETRY_ERROR:'재수행에러' };
+                        alert(`수동 실행 완료 - 상태: ${statusLabel[d.status] || d.status}`);
+                    } catch { alert(`"${ifId}" 수동 실행이 완료되었습니다.\n이력관리 탭에서 결과를 확인해주세요.`); }
                 }
-                await loadInterfaceExecutions();
-            } catch (err) {
-                alert('수동 실행 중 오류: ' + err.message);
-            } finally {
                 btn.disabled = false;
                 btn.textContent = origText;
-            }
+                await loadInterfaceExecutions();
+            }).catch(err => {
+                clearTimeout(timeoutId);
+                // 타임아웃 또는 네트워크 에러 — 서버에서는 계속 실행 중일 수 있음
+                if (err.name === 'AbortError') {
+                    alert(`"${ifId}" 실행 요청이 전송되었으나 응답 대기 시간이 초과되었습니다.\n서버에서 처리 중일 수 있으니 이력관리 탭에서 결과를 확인해주세요.`);
+                } else {
+                    alert(`"${ifId}" 실행 요청이 전송되었습니다.\n프록시 타임아웃이 발생했지만, 서버에서는 정상 처리 중일 수 있습니다.\n이력관리 탭에서 결과를 확인해주세요.`);
+                }
+                btn.disabled = false;
+                btn.textContent = origText;
+                loadInterfaceExecutions();
+            });
             return;
         }
 

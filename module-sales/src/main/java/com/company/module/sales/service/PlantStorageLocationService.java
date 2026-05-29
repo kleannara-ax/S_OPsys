@@ -153,4 +153,59 @@ public class PlantStorageLocationService {
         log.info("[Cleanup] 중복 seed 정리 완료: {}건 삭제", deletedCount);
         return deletedCount;
     }
+
+    /**
+     * DB 중복 RFC 데이터 정리 (plan_month ≠ null)
+     * 동일 item_code + plant_code + storage_location + plan_month 조합이 여러 건이면
+     * 최신(id가 큰 것)만 남기고 나머지 삭제
+     *
+     * 원인: RFC_002 동시 실행 시 race condition으로 중복 생성됨
+     * 증상: NonUniqueResultException (query did not return a unique result: N)
+     */
+    @Transactional
+    public Map<String, Object> cleanupDuplicateRfcData() {
+        List<PlantStorageLocation> all = repository.findAll();
+        int totalCount = all.size();
+
+        // item_code + plant_code + storage_location + plan_month 기준으로 그룹핑
+        Map<String, List<PlantStorageLocation>> grouped = all.stream()
+                .filter(psl -> psl.getPlanMonth() != null) // RFC 데이터만 대상
+                .collect(Collectors.groupingBy(
+                        psl -> (psl.getItemCode() != null ? psl.getItemCode() : "") + "|"
+                                + (psl.getPlantCode() != null ? psl.getPlantCode() : "") + "|"
+                                + (psl.getStorageLocation() != null ? psl.getStorageLocation() : "") + "|"
+                                + psl.getPlanMonth(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        int deletedCount = 0;
+        int duplicateGroupCount = 0;
+        for (Map.Entry<String, List<PlantStorageLocation>> entry : grouped.entrySet()) {
+            List<PlantStorageLocation> duplicates = entry.getValue();
+            if (duplicates.size() <= 1) continue;
+
+            duplicateGroupCount++;
+            // 최신(id가 큰 것)을 보존
+            duplicates.sort((a, b) -> Long.compare(b.getId(), a.getId()));
+
+            // 첫 번째(최신)만 남기고 나머지 삭제
+            for (int i = 1; i < duplicates.size(); i++) {
+                PlantStorageLocation dup = duplicates.get(i);
+                log.info("[Cleanup] 중복 RFC 데이터 삭제: id={}, item={}, plant={}, storage={}, month={}",
+                        dup.getId(), dup.getItemCode(), dup.getPlantCode(),
+                        dup.getStorageLocation(), dup.getPlanMonth());
+                repository.delete(dup);
+                deletedCount++;
+            }
+        }
+
+        log.info("[Cleanup] RFC 데이터 중복 정리 완료: 전체 {}건 중 {}그룹 중복 → {}건 삭제",
+                totalCount, duplicateGroupCount, deletedCount);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total_records", totalCount);
+        result.put("duplicate_groups", duplicateGroupCount);
+        result.put("deleted_count", deletedCount);
+        return result;
+    }
 }

@@ -97,10 +97,17 @@ public class PlantStorageLocationController {
     /** 중복 seed 데이터 정리 — 동일 plant_code+storage_location의 중복 레코드 삭제 */
     @PostMapping("/cleanup-duplicates")
     public ResponseEntity<ApiResponse<Map<String, Object>>> cleanupDuplicates() {
-        int deleted = service.cleanupDuplicateSeeds();
+        int seedDeleted = service.cleanupDuplicateSeeds();
+        Map<String, Object> rfcResult = service.cleanupDuplicateRfcData();
+        int rfcDeleted = (int) rfcResult.getOrDefault("deleted_count", 0);
+
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("deleted_count", deleted);
-        return ResponseEntity.ok(ApiResponse.ok(result, deleted + "건 중복 정리 완료"));
+        result.put("seed_deleted_count", seedDeleted);
+        result.put("rfc_deleted_count", rfcDeleted);
+        result.put("rfc_duplicate_groups", rfcResult.get("duplicate_groups"));
+        result.put("total_deleted", seedDeleted + rfcDeleted);
+        return ResponseEntity.ok(ApiResponse.ok(result,
+                (seedDeleted + rfcDeleted) + "건 중복 정리 완료 (seed=" + seedDeleted + ", RFC=" + rfcDeleted + ")"));
     }
 
     @PostConstruct

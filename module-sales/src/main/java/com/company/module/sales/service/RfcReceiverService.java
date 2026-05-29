@@ -175,8 +175,12 @@ public class RfcReceiverService {
     //   Step 1: plant_code + storage_location + plan_month 키로 upsert (is_selected 유지)
     //   Step 2: is_selected=true인 저장위치만 합산하여 SnopRecord에 반영
     // ───────────────────────────────────────────────────────
+    /** RFC_002 동시 실행 방지 락 — 동일 시점에 두 번 실행되면 중복 레코드 생성됨 */
+    private static final Object RFC_002_LOCK = new Object();
+
     @Transactional
     public Map<String, Object> processRfc002(List<Map<String, Object>> dataList, String executionType) {
+      synchronized (RFC_002_LOCK) {
         String rfcId = "SNOP_RFC_002";
         String rfcName = "일자별재고";
         LocalDateTime startTime = LocalDateTime.now();
@@ -222,15 +226,23 @@ public class RfcReceiverService {
                 }
 
                 // 기존 레코드 조회: item_code + plant_code + storage_location + plan_month
-                // ※ plant_code + storage_location + plan_month 만으로는 동일 저장위치에 여러 자재가 있어 다건 반환됨
-                //    → NonUniqueResultException 방지를 위해 item_code를 키에 포함
-                Optional<PlantStorageLocation> optExisting =
+                // ※ List로 조회하여 다건이어도 NonUniqueResultException 방지
+                //    → 다건이면 첫 번째만 사용하고 나머지 중복은 삭제
+                List<PlantStorageLocation> existingList =
                         plantStorageLocationRepo.findByItemCodeAndPlantCodeAndStorageLocationAndPlanMonth(
                                 itemCode, plantCode, storageLocation != null ? storageLocation : "", planMonth);
 
                 PlantStorageLocation psl;
-                if (optExisting.isPresent()) {
-                    psl = optExisting.get();
+                if (!existingList.isEmpty()) {
+                    psl = existingList.get(0);
+                    // 중복 레코드가 있으면 첫 번째만 남기고 나머지 삭제
+                    if (existingList.size() > 1) {
+                        for (int j = 1; j < existingList.size(); j++) {
+                            plantStorageLocationRepo.delete(existingList.get(j));
+                        }
+                        log.info("[RFC-002] 중복 레코드 {}건 자동 삭제: item={}, plant={}, storage={}, month={}",
+                                existingList.size() - 1, itemCode, plantCode, storageLocation, planMonth);
+                    }
                     updateCount++;
                 } else {
                     // 신규 생성 — seed 데이터(plan_month=null)의 is_selected를 상속
@@ -391,6 +403,7 @@ public class RfcReceiverService {
         result.put("errors", errors);
         result.put("duration_ms", durationMs);
         return result;
+      } // synchronized (RFC_002_LOCK)
     }
 
     // ───────────────────────────────────────────────────────

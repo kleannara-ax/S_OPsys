@@ -50,16 +50,16 @@ public class PlantStorageLocation extends BaseAuditEntity {
     private String stockUnit;
 
     @Column(name = "BEGINNING_INVENTORY")
-    private Long beginningInventory;
+    private Double beginningInventory;
 
     @Column(name = "AVAILABLE_INVENTORY")
-    private Long availableInventory;
+    private Double availableInventory;
 
     @Column(name = "AVAILABLE_STOCK")
-    private Long availableStock;
+    private Double availableStock;
 
     @Column(name = "CURRENT_STOCK")
-    private Long currentStock;
+    private Double currentStock;
 
     @Column(name = "SAP_SYNC_AT")
     private LocalDateTime sapSyncAt;

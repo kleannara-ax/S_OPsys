@@ -1055,6 +1055,10 @@ async function generateArrayBufferHash(arrayBuffer) {
 
 function formatNumber(value, fallback = '-') {
     if (!Number.isFinite(value)) return fallback;
+    /* 소수점이 있으면 소수점 2자리까지 표시, 정수이면 소수점 없이 표시 */
+    if (value % 1 !== 0) {
+        return value.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
     return value.toLocaleString('ko-KR');
 }
 

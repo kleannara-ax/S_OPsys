@@ -43,8 +43,8 @@ public class SnopRecordDto {
     private Long productionPlan;
     private Long productionActual;
     private Long productionRemaining;
-    private Long beginningInventory;
-    private Long availableInventory;
+    private Double beginningInventory;
+    private Double availableInventory;
 
     @Size(max = 10)
     private String inventoryUnit;

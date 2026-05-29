@@ -34,9 +34,9 @@ public class PlantStorageLocationDto {
     @Size(max = 10)
     private String stockUnit;
 
-    private Long beginningInventory;
-    private Long availableInventory;
-    private Long availableStock;
-    private Long currentStock;
+    private Double beginningInventory;
+    private Double availableInventory;
+    private Double availableStock;
+    private Double currentStock;
     private LocalDateTime sapSyncAt;
 }

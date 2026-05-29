@@ -266,9 +266,9 @@ public class RfcReceiverService {
                 // 공통 필드 업데이트
                 psl.setItemCode(itemCode);
                 if (hasKey(row, "unit")) psl.setStockUnit(getStr(row, "unit"));
-                if (hasKey(row, "beginning_inventory")) psl.setBeginningInventory(getLong(row, "beginning_inventory"));
+                if (hasKey(row, "beginning_inventory")) psl.setBeginningInventory(getDouble(row, "beginning_inventory"));
                 if (hasKey(row, "available_inventory")) {
-                    Long avail = getLong(row, "available_inventory");
+                    Double avail = getDouble(row, "available_inventory");
                     psl.setAvailableInventory(avail);
                     psl.setAvailableStock(avail); // 호환: available_stock 에도 반영
                 }
@@ -312,8 +312,8 @@ public class RfcReceiverService {
                             plantStorageLocationRepo.findByPlanMonth(planMonth);
 
                     // 선택된 저장위치에 해당하는 데이터만 필터링하여 item_code별 합산
-                    Map<String, Long> beginningSum = new LinkedHashMap<>();
-                    Map<String, Long> availableSum = new LinkedHashMap<>();
+                    Map<String, Double> beginningSum = new LinkedHashMap<>();
+                    Map<String, Double> availableSum = new LinkedHashMap<>();
                     Map<String, String> unitMap = new LinkedHashMap<>();
                     int filteredCount = 0;
 
@@ -326,10 +326,10 @@ public class RfcReceiverService {
                         if (itemCode == null || itemCode.isEmpty()) continue;
 
                         if (loc.getBeginningInventory() != null) {
-                            beginningSum.merge(itemCode, loc.getBeginningInventory(), Long::sum);
+                            beginningSum.merge(itemCode, loc.getBeginningInventory(), Double::sum);
                         }
                         if (loc.getAvailableInventory() != null) {
-                            availableSum.merge(itemCode, loc.getAvailableInventory(), Long::sum);
+                            availableSum.merge(itemCode, loc.getAvailableInventory(), Double::sum);
                         }
                         if (loc.getStockUnit() != null && !loc.getStockUnit().isEmpty()) {
                             unitMap.putIfAbsent(itemCode, loc.getStockUnit());
@@ -340,10 +340,10 @@ public class RfcReceiverService {
                             planMonth, monthData.size(), filteredCount, beginningSum.size());
 
                     // SnopRecord 업데이트
-                    for (Map.Entry<String, Long> entry : beginningSum.entrySet()) {
+                    for (Map.Entry<String, Double> entry : beginningSum.entrySet()) {
                         String itemCode = entry.getKey();
-                        Long totalBeginning = entry.getValue();
-                        Long totalAvailable = availableSum.get(itemCode);
+                        Double totalBeginning = entry.getValue();
+                        Double totalAvailable = availableSum.get(itemCode);
                         String unit = unitMap.get(itemCode);
 
                         List<SnopRecord> existingRecords =

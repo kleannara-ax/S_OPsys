@@ -60,10 +60,10 @@ public class SnopRecord extends BaseAuditEntity {
     private Long productionRemaining;
 
     @Column(name = "BEGINNING_INVENTORY")
-    private Long beginningInventory;
+    private Double beginningInventory;
 
     @Column(name = "AVAILABLE_INVENTORY")
-    private Long availableInventory;
+    private Double availableInventory;
 
     @Column(name = "INVENTORY_UNIT", length = 10)
     private String inventoryUnit;

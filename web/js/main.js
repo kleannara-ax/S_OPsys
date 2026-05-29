@@ -773,6 +773,20 @@ if (dom.category) {
     dom.category.dataset.manual = 'auto';
 }
 
+// -------------------- 카테고리 필터 debounce --------------------
+/**
+ * 카테고리 체크박스 변경 시 applyFilters()를 즉시 호출하지 않고,
+ * 300ms 대기 후 마지막 변경만 반영하여 성능을 개선합니다.
+ */
+let _categoryFilterTimer = null;
+function debouncedApplyFilters() {
+    if (_categoryFilterTimer) clearTimeout(_categoryFilterTimer);
+    _categoryFilterTimer = setTimeout(() => {
+        _categoryFilterTimer = null;
+        applyFilters();
+    }, 300);
+}
+
 // -------------------- 카테고리 멀티셀렉트 드롭다운 --------------------
 /**
  * 카테고리 멀티셀렉트 드롭다운에서 현재 선택된 값들을 반환합니다.
@@ -830,10 +844,9 @@ function syncCategoryAllCheckbox() {
         allCb.checked = true;
         allCb.indeterminate = false;
     } else if (noneChecked) {
-        /* 모두 해제 → 전체 선택 상태로 복귀 (전부 체크) */
-        allCb.checked = true;
+        /* 모두 해제 → '전체' 체크박스도 해제 상태 (전체=ALL 필터링으로 처리) */
+        allCb.checked = false;
         allCb.indeterminate = false;
-        checkboxes.forEach(cb => { cb.checked = true; });
     } else {
         allCb.checked = false;
         allCb.indeterminate = true;
@@ -891,7 +904,7 @@ function populateCategoryFilterOptions(categories, previousSelections) {
         checkbox.addEventListener('change', () => {
             syncCategoryAllCheckbox();
             updateCategoryFilterDisplay();
-            applyFilters();
+            debouncedApplyFilters();
         });
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(' ' + category));
@@ -17808,7 +17821,7 @@ function bindEvents() {
                 e.target.indeterminate = false;
             }
             updateCategoryFilterDisplay();
-            applyFilters();
+            debouncedApplyFilters();
         });
     }
     /* 외부 클릭 시 카테고리 드롭다운 닫기 */

@@ -87,4 +87,16 @@ public class SnopRecordController {
         service.delete(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "삭제 완료"));
     }
+
+    /**
+     * 기존 SnopRecord 중 자재명/카테고리/생산라인이 비어있는 레코드에
+     * BaseMaterialMaster 정보를 일괄 보충한다.
+     * 배포 후 1회 호출하면 기존 데이터가 보정된다.
+     */
+    @PostMapping("/enrich-from-master")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> enrichFromMaster() {
+        Map<String, Object> result = service.enrichAllFromMaterialMaster();
+        int enrichedCount = (int) result.getOrDefault("enriched_count", 0);
+        return ResponseEntity.ok(ApiResponse.ok(result, enrichedCount + "건 자재정보 보충 완료"));
+    }
 }

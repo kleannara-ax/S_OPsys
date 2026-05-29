@@ -7958,26 +7958,51 @@ async function handleRegisterProductionPlan() {
     const now = new Date();
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    /* 이미 등록된 자재코드 확인 */
-    const existingCodes = new Set(
-        (state.rawData || []).map(r => (r.item_code || '').trim().toUpperCase())
-    );
-
-    const newMasters = selectedMasters.filter(m => {
-        const code = (m.item_code || '').trim().toUpperCase();
-        return !existingCodes.has(code);
+    /* 이미 등록된 자재코드 확인 + 자재정보 비어있는 레코드 감지 */
+    const existingRecordMap = new Map();
+    (state.rawData || []).forEach(r => {
+        const code = (r.item_code || '').trim().toUpperCase();
+        if (code) existingRecordMap.set(code, r);
     });
 
-    const duplicateCount = selectedMasters.length - newMasters.length;
+    const newMasters = [];
+    const enrichTargets = []; /* 이미 등록되었지만 자재정보가 비어있는 레코드 */
+    let alreadyCompleteCount = 0;
 
-    if (newMasters.length === 0) {
+    for (const m of selectedMasters) {
+        const code = (m.item_code || '').trim().toUpperCase();
+        const existingRecord = existingRecordMap.get(code);
+        if (!existingRecord) {
+            newMasters.push(m);
+        } else {
+            /* 기존 레코드에 자재정보가 비어있으면 보충 대상 */
+            const hasName = existingRecord.item_name && existingRecord.item_name.trim();
+            const hasCat = existingRecord.category && existingRecord.category.trim();
+            const hasLine = existingRecord.production_line && existingRecord.production_line.trim();
+            if (!hasName || !hasCat || !hasLine) {
+                enrichTargets.push({ master: m, record: existingRecord });
+            } else {
+                alreadyCompleteCount++;
+            }
+        }
+    }
+
+    if (newMasters.length === 0 && enrichTargets.length === 0) {
         alert(`선택한 ${selectedMasters.length}건 모두 이미 생산계획에 등록되어 있습니다.`);
         return;
     }
 
-    let confirmMsg = `선택한 ${newMasters.length}건을 생산계획 대상자재로 등록하시겠습니까?`;
-    if (duplicateCount > 0) {
-        confirmMsg += `\n(이미 등록된 ${duplicateCount}건은 제외됩니다.)`;
+    let confirmMsg = '';
+    if (newMasters.length > 0) {
+        confirmMsg += `신규 ${newMasters.length}건을 생산계획 대상자재로 등록`;
+    }
+    if (enrichTargets.length > 0) {
+        if (confirmMsg) confirmMsg += ', ';
+        confirmMsg += `자재정보 누락 ${enrichTargets.length}건을 보충`;
+    }
+    confirmMsg += '하시겠습니까?';
+    if (alreadyCompleteCount > 0) {
+        confirmMsg += `\n(이미 완전 등록된 ${alreadyCompleteCount}건은 제외됩니다.)`;
     }
     if (!confirm(confirmMsg)) return;
 
@@ -8042,6 +8067,26 @@ async function handleRegisterProductionPlan() {
         }
     }
 
+    /* 기존 레코드 자재정보 보충 (enrichTargets) */
+    let enrichCount = 0;
+    let enrichFailCount = 0;
+    for (const { master, record } of enrichTargets) {
+        try {
+            await updateRecord(record.id, {
+                item_name: (master.item_name || '').trim() || null,
+                category: (master.hierarchy_name || '').trim() || null,
+                production_line: (master.production_unit || '').trim() || null,
+                vendor_name: (master.vendor_name || '').trim() || null,
+                moq: master.moq != null ? master.moq : null,
+            });
+            enrichCount++;
+            console.info(`자재 ${master.item_code} 기존 SnopRecord 자재정보 보충 완료 (id=${record.id})`);
+        } catch (enrichError) {
+            console.error(`자재 ${master.item_code} 자재정보 보충 실패:`, enrichError);
+            enrichFailCount++;
+        }
+    }
+
     /* 체크박스 초기화 */
     document.querySelectorAll('.base-material-row-check').forEach(cb => { cb.checked = false; });
     if (dom.baseMaterialMaster?.selectAll) dom.baseMaterialMaster.selectAll.checked = false;
@@ -8054,9 +8099,9 @@ async function handleRegisterProductionPlan() {
     renderBaseMaterialMasterTable();
 
     let resultMsg = `생산계획 등록 완료: ${successCount}건 성공`;
-    if (failCount > 0) resultMsg += `, ${failCount}건 실패`;
-    const totalDuplicates = duplicateCount + serverDuplicateCount;
-    if (totalDuplicates > 0) resultMsg += `, ${totalDuplicates}건 중복 제외`;
+    if (enrichCount > 0) resultMsg += `, ${enrichCount}건 자재정보 보충`;
+    if (failCount + enrichFailCount > 0) resultMsg += `, ${failCount + enrichFailCount}건 실패`;
+    if (alreadyCompleteCount + serverDuplicateCount > 0) resultMsg += `, ${alreadyCompleteCount + serverDuplicateCount}건 중복 제외`;
     alert(resultMsg);
 }
 

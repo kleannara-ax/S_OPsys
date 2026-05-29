@@ -352,6 +352,8 @@ public class RfcReceiverService {
                             record.setBeginningInventory(totalBeginning);
                             if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
                             if (unit != null) record.setInventoryUnit(unit);
+                            // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
+                            enrichFromMaterialMaster(record, itemCode);
                             snopRecordRepo.save(record);
                             snopInsertCount++;
                         }
@@ -577,6 +579,8 @@ public class RfcReceiverService {
                     record.setPlanMonth(planMonth);
                     if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
                     if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
+                    // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
+                    enrichFromMaterialMaster(record, itemCode);
                     snopRecordRepo.save(record);
                     insertCount++;
                 }
@@ -791,6 +795,9 @@ public class RfcReceiverService {
                 }
                 if (record.getMoq() == null && master.getMoq() != null) {
                     record.setMoq(master.getMoq());
+                }
+                if (record.getProductionLine() == null && master.getProductionUnit() != null) {
+                    record.setProductionLine(master.getProductionUnit());
                 }
             }
         } catch (Exception e) {

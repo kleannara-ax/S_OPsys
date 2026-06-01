@@ -170,7 +170,7 @@ public class RfcReceiverService {
     // SNOP_RFC_002: 일자별재고 동기화
     // RFC fields: plan_month_day → plan_month, item_code,
     //             plant_code, storage_location, unit → stock_unit,
-    //             beginning_inventory(총 가용재고→화면 "가용재고"), available_inventory(총재고→화면 "현재고")
+    //             beginning_inventory→화면 "현재고", available_inventory→화면 "가용재고"
     // 처리 방식:
     //   Step 1: plant_code + storage_location + plan_month 키로 upsert (is_selected 유지)
     //   Step 2: is_selected=true인 저장위치만 합산하여 SnopRecord에 반영
@@ -266,17 +266,26 @@ public class RfcReceiverService {
                 // 공통 필드 업데이트
                 psl.setItemCode(itemCode);
                 if (hasKey(row, "unit")) psl.setStockUnit(getStr(row, "unit"));
-                // SAP 필드 → PlantStorageLocation 교차 매핑:
-                //   SAP BEGINNING_INV(총 가용재고) → psl.availableInventory → Step2 합산 → SnopRecord.availableInventory → 화면 "가용재고"
-                //   SAP AVAILABLE_INV(총재고)      → psl.beginningInventory → Step2 합산 → SnopRecord.beginningInventory → 화면 "현재고"
-                if (hasKey(row, "beginning_inventory")) {
-                    Double beginVal = getDouble(row, "beginning_inventory");
-                    psl.setAvailableInventory(beginVal);
-                    psl.setAvailableStock(beginVal);
+                // SAP 필드 → PlantStorageLocation 정방향 매핑 (1:1):
+                //   SAP BEGINNING_INVENTORY → psl.beginningInventory → SnopRecord.beginningInventory → 화면 "현재고"
+                //   SAP AVAILABLE_INVENTORY → psl.availableInventory → SnopRecord.availableInventory → 화면 "가용재고"
+                Double sapBeginningInv = hasKey(row, "beginning_inventory") ? getDouble(row, "beginning_inventory") : null;
+                Double sapAvailableInv = hasKey(row, "available_inventory") ? getDouble(row, "available_inventory") : null;
+
+                if (sapBeginningInv != null) {
+                    psl.setBeginningInventory(sapBeginningInv);
                 }
-                if (hasKey(row, "available_inventory")) {
-                    psl.setBeginningInventory(getDouble(row, "available_inventory"));
+                if (sapAvailableInv != null) {
+                    psl.setAvailableInventory(sapAvailableInv);
+                    psl.setAvailableStock(sapAvailableInv);
                 }
+
+                // 디버그 로그: 처음 3건만 상세 출력 (배포 후 값 확인용)
+                if (i < 3) {
+                    log.info("[RFC-002] DEBUG Row {}: item={}, SAP beginning_inv={} → PSL.beginningInventory(현재고), SAP available_inv={} → PSL.availableInventory(가용재고)",
+                            i + 1, itemCode, sapBeginningInv, sapAvailableInv);
+                }
+
                 psl.setSapSyncAt(LocalDateTime.now());
 
                 plantStorageLocationRepo.save(psl);
@@ -345,18 +354,26 @@ public class RfcReceiverService {
                             planMonth, monthData.size(), filteredCount, beginningSum.size());
 
                     // SnopRecord 업데이트
+                    int debugCounter = 0;
                     for (Map.Entry<String, Double> entry : beginningSum.entrySet()) {
                         String itemCode = entry.getKey();
                         Double totalBeginning = entry.getValue();
                         Double totalAvailable = availableSum.get(itemCode);
                         String unit = unitMap.get(itemCode);
 
+                        // 디버그 로그: 처음 3건만 상세 출력
+                        if (debugCounter < 3) {
+                            log.info("[RFC-002] DEBUG Step2: item={}, month={}, beginningSum(현재고)={}, availableSum(가용재고)={}",
+                                    itemCode, planMonth, totalBeginning, totalAvailable);
+                            debugCounter++;
+                        }
+
                         List<SnopRecord> existingRecords =
                                 snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
 
-                        // SnopRecord 필드 매핑:
-                        //   Step1에서 이미 교차 저장됨 → beginningSum = SAP AVAILABLE_INV(총재고) = 화면 "현재고"
-                        //   Step1에서 이미 교차 저장됨 → availableSum = SAP BEGINNING_INV(총 가용재고) = 화면 "가용재고"
+                        // SnopRecord 필드 매핑 (정방향 1:1):
+                        //   beginningSum = SAP BEGINNING_INVENTORY → SnopRecord.beginningInventory → 화면 "현재고"
+                        //   availableSum = SAP AVAILABLE_INVENTORY → SnopRecord.availableInventory → 화면 "가용재고"
                         if (!existingRecords.isEmpty()) {
                             for (SnopRecord record : existingRecords) {
                                 record.setBeginningInventory(totalBeginning);

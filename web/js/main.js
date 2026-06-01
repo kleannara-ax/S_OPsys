@@ -16911,25 +16911,43 @@ async function handleTargetInventoryUploadStart() {
         const failDetails = [];
 
         /* 현재 로드된 레코드 인덱스 구축 (item_code + month → record id) */
+        /* 전체 레코드를 페이지네이션으로 가져옴 — Spring 기본 max-page-size(2000)에 걸리지 않도록 */
         const recordIndex = new Map();
         try {
-            const response = await fetch('/sales-api/snop-records?size=5000');
-            if (response.ok) {
-                const allRecordsPayload = await response.json();
-                const allRecords = extractData(allRecordsPayload);
-                (allRecords || []).forEach((rec) => {
-                    const code = getNormalizedItemCode(rec.item_code);
-                    const month = sanitizeText(rec.month || rec.plan_month || '').trim();
-                    if (code && month) {
-                        const key = `${code}__${month}`;
-                        /* 동일 키가 여러 개인 경우 배열로 관리 */
-                        if (!recordIndex.has(key)) {
-                            recordIndex.set(key, []);
-                        }
-                        recordIndex.get(key).push(rec);
-                    }
-                });
+            let page = 0;
+            let allRecords = [];
+            let hasMore = true;
+            const PAGE_SIZE = 5000;
+            while (hasMore) {
+                const response = await fetch(`/sales-api/snop-records?size=${PAGE_SIZE}&page=${page}`);
+                if (!response.ok) break;
+                const payload = await response.json();
+                const records = extractData(payload);
+                if (!records || records.length === 0) break;
+                allRecords = allRecords.concat(records);
+                /* 페이지네이션 응답에서 마지막 페이지 여부 확인 */
+                const pageData = payload.data || payload;
+                if (pageData.last === true || records.length < PAGE_SIZE) {
+                    hasMore = false;
+                } else {
+                    page++;
+                }
+                /* 안전장치: 최대 20페이지(100,000건)까지만 */
+                if (page > 20) break;
             }
+            console.log(`[적정재고 업로드] 전체 SnopRecord ${allRecords.length}건 로드 완료 (${page + 1}페이지)`);
+            (allRecords || []).forEach((rec) => {
+                const code = getNormalizedItemCode(rec.item_code);
+                const month = sanitizeText(rec.month || rec.plan_month || '').trim();
+                if (code && month) {
+                    const key = `${code}__${month}`;
+                    /* 동일 키가 여러 개인 경우 배열로 관리 */
+                    if (!recordIndex.has(key)) {
+                        recordIndex.set(key, []);
+                    }
+                    recordIndex.get(key).push(rec);
+                }
+            });
         } catch (e) {
             console.error('레코드 인덱스 구축 실패:', e);
         }

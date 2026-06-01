@@ -710,6 +710,7 @@ const dom = {
         tableBody: document.querySelector('#base-material-master-table tbody'),
         empty: document.querySelector('#base-material-master-empty'),
         filterScm: document.querySelector('#base-material-filter-scm'),
+        filterCategory: document.querySelector('#base-material-filter-category'),
         filterProdUnit: document.querySelector('#base-material-filter-prod-unit'),
         selectAll: document.querySelector('#base-material-select-all'),
         btnRegisterPlan: document.querySelector('#btn-register-production-plan'),
@@ -7719,10 +7720,13 @@ async function refreshLineItemMasters() {
 
 function ensureBaseMaterialMasterFilters() {
     if (!state.baseMaterialMasterFilters) {
-        state.baseMaterialMasterFilters = { scm: 'all', prodUnit: 'all' };
+        state.baseMaterialMasterFilters = { scm: 'all', category: 'all', prodUnit: 'all' };
     }
     if (!state.baseMaterialMasterFilters.scm) {
         state.baseMaterialMasterFilters.scm = 'all';
+    }
+    if (!state.baseMaterialMasterFilters.category) {
+        state.baseMaterialMasterFilters.category = 'all';
     }
     if (!state.baseMaterialMasterFilters.prodUnit) {
         state.baseMaterialMasterFilters.prodUnit = 'all';
@@ -7733,7 +7737,7 @@ function ensureBaseMaterialMasterFilters() {
 function populateBaseMaterialMasterFilters() {
     if (!dom.baseMaterialMaster) return;
     const filters = ensureBaseMaterialMasterFilters();
-    const { filterScm, filterProdUnit } = dom.baseMaterialMaster;
+    const { filterScm, filterCategory, filterProdUnit } = dom.baseMaterialMaster;
 
     const masters = state.baseMaterialMasters || [];
 
@@ -7755,6 +7759,26 @@ function populateBaseMaterialMasterFilters() {
             filters.scm = 'all';
         }
         filterScm.value = filters.scm;
+    }
+
+    /* 카테고리 필터 */
+    if (filterCategory) {
+        const categories = [...new Set(
+            masters.map(m => (m.hierarchy_name || '').trim()).filter(Boolean)
+        )].sort();
+
+        const prevCat = filters.category;
+        filterCategory.innerHTML = '<option value="all">전체</option>';
+        categories.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            option.textContent = cat;
+            filterCategory.appendChild(option);
+        });
+        if (prevCat !== 'all' && !categories.includes(prevCat)) {
+            filters.category = 'all';
+        }
+        filterCategory.value = filters.category;
     }
 
     /* 생산라인 필터 */
@@ -7800,14 +7824,17 @@ function renderBaseMaterialMasterTable() {
         return;
     }
 
+    const categoryFilter = (filters.category || 'all').trim().toLowerCase();
     const prodUnitFilter = (filters.prodUnit || 'all').trim().toLowerCase();
 
     const filtered = masters.filter(m => {
         const area = (m.scm_area ?? '').trim().toLowerCase();
+        const cat = (m.hierarchy_name ?? '').trim().toLowerCase();
         const unit = (m.production_unit ?? '').trim().toLowerCase();
         const scmOk = scmFilter === '' || scmFilter === 'all' || area === scmFilter;
+        const catOk = categoryFilter === '' || categoryFilter === 'all' || cat === categoryFilter;
         const prodOk = prodUnitFilter === '' || prodUnitFilter === 'all' || unit === prodUnitFilter;
-        return scmOk && prodOk;
+        return scmOk && catOk && prodOk;
     });
 
     if (!filtered.length) {
@@ -8128,6 +8155,8 @@ function setBaseMaterialMasterFilter(type, value) {
     const normalized = !trimmed || trimmed.toLowerCase() === 'all' ? 'all' : trimmed;
     if (type === 'scm') {
         filters.scm = normalized;
+    } else if (type === 'category') {
+        filters.category = normalized;
     } else if (type === 'prodUnit') {
         filters.prodUnit = normalized;
     }
@@ -18135,6 +18164,7 @@ function bindEvents() {
             btnReset: bmBtnReset,
             tableBody: bmTableBody,
             filterScm: bmFilterScm,
+            filterCategory: bmFilterCategory,
             filterProdUnit: bmFilterProdUnit,
             itemCode: bmItemCode,
             conv3: bmConv3,
@@ -18156,6 +18186,11 @@ function bindEvents() {
         if (bmFilterScm) {
             bmFilterScm.addEventListener('change', (event) => {
                 setBaseMaterialMasterFilter('scm', event.target.value);
+            });
+        }
+        if (bmFilterCategory) {
+            bmFilterCategory.addEventListener('change', (event) => {
+                setBaseMaterialMasterFilter('category', event.target.value);
             });
         }
         if (bmFilterProdUnit) {

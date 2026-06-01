@@ -51,10 +51,10 @@ const BULK_COLUMN_MAP = {
     '잔여생산': 'production_remaining',
     beginning_inventory: 'beginning_inventory',
     'beginning inventory': 'beginning_inventory',
-    '현재고': 'beginning_inventory',
+    '가용재고': 'beginning_inventory',
     available_inventory: 'available_inventory',
     'available inventory': 'available_inventory',
-    '가용재고': 'available_inventory',
+    '현재고': 'available_inventory',
     target_ending_inventory: 'target_ending_inventory',
     'target ending inventory': 'target_ending_inventory',
     '목표월말재고': 'target_ending_inventory',
@@ -6472,7 +6472,7 @@ function exportChangeHistoryCsv() {
         '변경후생산계획(BOX)',
         '증감(BOX)',
         '판매계획(BOX)',
-        '현재고(BOX)',
+        '가용재고(BOX)',
         '적정재고(BOX)',
         '예상월말재고(BOX)',
         '생산라인',
@@ -6500,7 +6500,7 @@ function exportChangeHistoryCsv() {
             Number.isFinite(record.new_production_plan) ? formatNumber(record.new_production_plan) : '',
             diffValue === null ? '' : diffText,
             Number.isFinite(record.sales_plan) ? formatNumber(record.sales_plan) : '',
-            Number.isFinite(record.beginning_inventory) ? formatNumber(record.beginning_inventory) : '',
+            Number.isFinite(record.available_inventory) ? formatNumber(record.available_inventory) : '',
             Number.isFinite(record.target_ending_inventory) ? formatNumber(record.target_ending_inventory) : '',
             Number.isFinite(record.ending_inventory) ? formatNumber(record.ending_inventory) : '',
             record.production_line || '',
@@ -8653,7 +8653,7 @@ function renderTable() {
             vendorCell.style.display = state.activeProductType === 'oem' ? '' : 'none';
         }
 
-        /* 가용재고: SAP API 또는 전월 예상월말재고에서 연동 */
+        /* 현재고: SAP API 또는 전월 예상월말재고에서 연동 */
         const availableInvCell = row.querySelector('[data-field="available_inventory"]');
         if (availableInvCell) {
             availableInvCell.classList.remove('alert');
@@ -8961,12 +8961,12 @@ function renderTable() {
         beginningCell.textContent = Number.isFinite(record.beginning_inventory) ? formatNumber(record.beginning_inventory) : '-';
 
         /* ── 재고일수(현재고기준) 셀 렌더링 ──
-           산식: 현재고 / 최근3개월 판매실적평균 × 30.42 */
+           산식: 현재고(available_inventory) / 최근3개월 판매실적평균 × 30.42 */
         const currentInvDaysCell = row.querySelector('[data-field="current_inventory_days"]');
         if (currentInvDaysCell) {
             currentInvDaysCell.textContent = '';
             currentInvDaysCell.classList.remove('days-high', 'days-low');
-            const curInv = Number.isFinite(record.beginning_inventory) ? record.beginning_inventory : null;
+            const curInv = Number.isFinite(record.available_inventory) ? record.available_inventory : null;
             const avgSalesCur = Number.isFinite(record.salesActualAvg3m) ? record.salesActualAvg3m : null;
             if (curInv !== null && avgSalesCur && avgSalesCur > 0) {
                 const curDays = (curInv / avgSalesCur) * 30.42;
@@ -8986,7 +8986,7 @@ function renderTable() {
         const currentDepletionDateCell = row.querySelector('[data-field="current_depletion_date"]');
         if (currentDepletionDateCell) {
             currentDepletionDateCell.textContent = '-';
-            const curInv2 = Number.isFinite(record.beginning_inventory) ? record.beginning_inventory : null;
+            const curInv2 = Number.isFinite(record.available_inventory) ? record.available_inventory : null;
             const avgSalesCur2 = Number.isFinite(record.salesActualAvg3m) ? record.salesActualAvg3m : null;
             if (curInv2 !== null && avgSalesCur2 && avgSalesCur2 > 0) {
                 const curInvDays = (curInv2 / avgSalesCur2) * 30.42;
@@ -17339,8 +17339,8 @@ function exportProductionTableXlsx() {
         '자재 명칭',
         '생산 라인',
         '협력업체명',
-        '가용재고(EA)',
         '현재고(EA)',
+        '가용재고(EA)',
         '재고일수(현재고기준)',
         '소진일자(현재고기준)',
         '판매 계획(EA)',
@@ -17399,14 +17399,14 @@ function exportProductionTableXlsx() {
             '자재 명칭': sanitizeText(record.item_name),
             '생산 라인': sanitizeText(record.production_line),
             '협력업체명': sanitizeText(record.vendor_name),
-            '가용재고(EA)': Number.isFinite(record.available_inventory) ? record.available_inventory : null,
-            '현재고(EA)': Number.isFinite(record.beginning_inventory) ? record.beginning_inventory : null,
-            '재고일수(현재고기준)': (Number.isFinite(record.beginning_inventory) && Number.isFinite(record.salesActualAvg3m) && record.salesActualAvg3m > 0)
-                ? Number(((record.beginning_inventory / record.salesActualAvg3m) * 30.42).toFixed(1))
+            '현재고(EA)': Number.isFinite(record.available_inventory) ? record.available_inventory : null,
+            '가용재고(EA)': Number.isFinite(record.beginning_inventory) ? record.beginning_inventory : null,
+            '재고일수(현재고기준)': (Number.isFinite(record.available_inventory) && Number.isFinite(record.salesActualAvg3m) && record.salesActualAvg3m > 0)
+                ? Number(((record.available_inventory / record.salesActualAvg3m) * 30.42).toFixed(1))
                 : null,
             '소진일자(현재고기준)': (() => {
-                if (Number.isFinite(record.beginning_inventory) && Number.isFinite(record.salesActualAvg3m) && record.salesActualAvg3m > 0) {
-                    const d = (record.beginning_inventory / record.salesActualAvg3m) * 30.42;
+                if (Number.isFinite(record.available_inventory) && Number.isFinite(record.salesActualAvg3m) && record.salesActualAvg3m > 0) {
+                    const d = (record.available_inventory / record.salesActualAvg3m) * 30.42;
                     const dt = new Date(Date.now() + d * 86400000);
                     return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
                 }

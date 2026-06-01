@@ -266,11 +266,16 @@ public class RfcReceiverService {
                 // 공통 필드 업데이트
                 psl.setItemCode(itemCode);
                 if (hasKey(row, "unit")) psl.setStockUnit(getStr(row, "unit"));
-                if (hasKey(row, "beginning_inventory")) psl.setBeginningInventory(getDouble(row, "beginning_inventory"));
+                // SAP 필드 → PlantStorageLocation 교차 매핑:
+                //   SAP BEGINNING_INV(총 가용재고) → psl.availableInventory → Step2 합산 → SnopRecord.availableInventory → 화면 "가용재고"
+                //   SAP AVAILABLE_INV(총재고)      → psl.beginningInventory → Step2 합산 → SnopRecord.beginningInventory → 화면 "현재고"
+                if (hasKey(row, "beginning_inventory")) {
+                    Double beginVal = getDouble(row, "beginning_inventory");
+                    psl.setAvailableInventory(beginVal);
+                    psl.setAvailableStock(beginVal);
+                }
                 if (hasKey(row, "available_inventory")) {
-                    Double avail = getDouble(row, "available_inventory");
-                    psl.setAvailableInventory(avail);
-                    psl.setAvailableStock(avail); // 호환: available_stock 에도 반영
+                    psl.setBeginningInventory(getDouble(row, "available_inventory"));
                 }
                 psl.setSapSyncAt(LocalDateTime.now());
 
@@ -349,13 +354,13 @@ public class RfcReceiverService {
                         List<SnopRecord> existingRecords =
                                 snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
 
-                        // SnopRecord 필드 매핑 (SAP → 화면):
-                        //   SAP BEGINNING_INV(총 가용재고) → beginningSum → SnopRecord.availableInventory → 화면 "가용재고"
-                        //   SAP AVAILABLE_INV(총재고)      → availableSum → SnopRecord.beginningInventory → 화면 "현재고"
+                        // SnopRecord 필드 매핑:
+                        //   Step1에서 이미 교차 저장됨 → beginningSum = SAP AVAILABLE_INV(총재고) = 화면 "현재고"
+                        //   Step1에서 이미 교차 저장됨 → availableSum = SAP BEGINNING_INV(총 가용재고) = 화면 "가용재고"
                         if (!existingRecords.isEmpty()) {
                             for (SnopRecord record : existingRecords) {
-                                record.setBeginningInventory(totalAvailable);
-                                record.setAvailableInventory(totalBeginning);
+                                record.setBeginningInventory(totalBeginning);
+                                if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
                                 if (unit != null) record.setInventoryUnit(unit);
                                 snopRecordRepo.save(record);
                             }
@@ -364,8 +369,8 @@ public class RfcReceiverService {
                             SnopRecord record = new SnopRecord();
                             record.setItemCode(itemCode);
                             record.setPlanMonth(planMonth);
-                            record.setBeginningInventory(totalAvailable);
-                            record.setAvailableInventory(totalBeginning);
+                            record.setBeginningInventory(totalBeginning);
+                            if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
                             if (unit != null) record.setInventoryUnit(unit);
                             // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
                             enrichFromMaterialMaster(record, itemCode);

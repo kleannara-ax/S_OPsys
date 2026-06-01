@@ -170,7 +170,7 @@ public class RfcReceiverService {
     // SNOP_RFC_002: 일자별재고 동기화
     // RFC fields: plan_month_day → plan_month, item_code,
     //             plant_code, storage_location, unit → stock_unit,
-    //             beginning_inventory(총 가용재고), available_inventory(총재고)
+    //             beginning_inventory(총 가용재고→화면 "가용재고"), available_inventory(총재고→화면 "현재고")
     // 처리 방식:
     //   Step 1: plant_code + storage_location + plan_month 키로 upsert (is_selected 유지)
     //   Step 2: is_selected=true인 저장위치만 합산하여 SnopRecord에 반영
@@ -349,10 +349,13 @@ public class RfcReceiverService {
                         List<SnopRecord> existingRecords =
                                 snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
 
+                        // SnopRecord 필드 매핑 (SAP → 화면):
+                        //   SAP BEGINNING_INV(총 가용재고) → beginningSum → SnopRecord.availableInventory → 화면 "가용재고"
+                        //   SAP AVAILABLE_INV(총재고)      → availableSum → SnopRecord.beginningInventory → 화면 "현재고"
                         if (!existingRecords.isEmpty()) {
                             for (SnopRecord record : existingRecords) {
-                                record.setBeginningInventory(totalBeginning);
-                                if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
+                                record.setBeginningInventory(totalAvailable);
+                                record.setAvailableInventory(totalBeginning);
                                 if (unit != null) record.setInventoryUnit(unit);
                                 snopRecordRepo.save(record);
                             }
@@ -361,8 +364,8 @@ public class RfcReceiverService {
                             SnopRecord record = new SnopRecord();
                             record.setItemCode(itemCode);
                             record.setPlanMonth(planMonth);
-                            record.setBeginningInventory(totalBeginning);
-                            if (totalAvailable != null) record.setAvailableInventory(totalAvailable);
+                            record.setBeginningInventory(totalAvailable);
+                            record.setAvailableInventory(totalBeginning);
                             if (unit != null) record.setInventoryUnit(unit);
                             // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
                             enrichFromMaterialMaster(record, itemCode);

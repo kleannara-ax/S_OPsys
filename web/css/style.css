@@ -1671,28 +1671,33 @@ textarea:focus {
     border-left: none;
 }
 
-/* 판매계획 합계 테이블 — 스크롤 시 헤더 틀고정 */
-.sales-summary-panel .table-wrapper.compact {
+/* 판매계획 합계 + 업로드 원천 데이터 테이블 — 스크롤 시 헤더 틀고정 */
+.sales-summary-panel .table-wrapper.compact,
+.sales-upload-list .table-wrapper.compact {
     max-height: 60vh;
     overflow-y: auto;
     overflow-x: auto;
 }
 
-.sales-summary-panel .table-wrapper.compact::-webkit-scrollbar {
+.sales-summary-panel .table-wrapper.compact::-webkit-scrollbar,
+.sales-upload-list .table-wrapper.compact::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
-.sales-summary-panel .table-wrapper.compact::-webkit-scrollbar-thumb {
+.sales-summary-panel .table-wrapper.compact::-webkit-scrollbar-thumb,
+.sales-upload-list .table-wrapper.compact::-webkit-scrollbar-thumb {
     background: rgba(100, 116, 139, 0.35);
     border-radius: 999px;
 }
 
-.sales-summary-panel .table-wrapper.compact::-webkit-scrollbar-track {
+.sales-summary-panel .table-wrapper.compact::-webkit-scrollbar-track,
+.sales-upload-list .table-wrapper.compact::-webkit-scrollbar-track {
     background: rgba(203, 213, 225, 0.2);
 }
 
-#sales-summary-table thead th {
+#sales-summary-table thead th,
+#sales-upload-table thead th {
     position: sticky;
     top: 0;
     z-index: 2;

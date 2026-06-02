@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260602b">
+    <link rel="stylesheet" href="css/style.css?v=20260602c">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -494,6 +494,23 @@
                         <datalist id="material-code-options"></datalist>
                         <div class="material-renewal-table-wrapper table-wrapper compact">
                             <table id="material-renewal-table" aria-live="polite">
+                                <colgroup>
+                                    <col class="col-category">
+                                    <col class="col-legacy-code">
+                                    <col class="col-legacy-name">
+                                    <col class="col-renewal-code"><!-- 리뉴얼1 코드 -->
+                                    <col class="col-renewal-name"><!-- 리뉴얼1 명칭 -->
+                                    <col class="col-renewal-code"><!-- 리뉴얼2 코드 -->
+                                    <col class="col-renewal-name"><!-- 리뉴얼2 명칭 -->
+                                    <col class="col-renewal-code"><!-- 리뉴얼3 코드 -->
+                                    <col class="col-renewal-name"><!-- 리뉴얼3 명칭 -->
+                                    <col class="col-renewal-code"><!-- 리뉴얼4 코드 -->
+                                    <col class="col-renewal-name"><!-- 리뉴얼4 명칭 -->
+                                    <col class="col-renewal-code"><!-- 리뉴얼5 코드 -->
+                                    <col class="col-renewal-name"><!-- 리뉴얼5 명칭 -->
+                                    <col class="col-date">
+                                    <col class="col-time">
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <th rowspan="2">카테고리</th>
@@ -504,12 +521,8 @@
                                         <th colspan="2">리뉴얼 자재 3</th>
                                         <th colspan="2">리뉴얼 자재 4</th>
                                         <th colspan="2">리뉴얼 자재 5</th>
-                                        <th rowspan="2">적용 시작 월</th>
-                                        <th rowspan="2">메모</th>
-                                        <th rowspan="2">활성화여부</th>
                                         <th rowspan="2">생성(변경)일자</th>
                                         <th rowspan="2">생성(변경)시간</th>
-                                        <th rowspan="2">생성(변경)자</th>
                                     </tr>
                                     <tr>
                                         <th>코드</th>
@@ -1829,6 +1842,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260602f" defer></script>
+    <script src="js/main.js?v=20260602g" defer></script>
 </body>
 </html>

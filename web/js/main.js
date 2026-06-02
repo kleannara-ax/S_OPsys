@@ -18485,6 +18485,32 @@ function bindEvents() {
         }
     }
 
+    /* 자재마스터 동기화 버튼 */
+    const btnSyncFromMaster = document.getElementById('btn-sync-from-master');
+    if (btnSyncFromMaster) {
+        btnSyncFromMaster.addEventListener('click', async () => {
+            if (!confirm('자재마스터 기준으로 생산계획 데이터의 카테고리/자재명/생산라인을 동기화합니다.\n계속하시겠습니까?')) return;
+            btnSyncFromMaster.disabled = true;
+            btnSyncFromMaster.textContent = '동기화 중...';
+            try {
+                const res = await fetch('/sales-api/snop-records/sync-from-master', { method: 'POST' });
+                const json = await res.json();
+                if (res.ok && json.success !== false) {
+                    const d = json.data || {};
+                    alert(`동기화 완료!\n\n전체: ${d.total_count || 0}건\n동기화: ${d.synced_count || 0}건\n변경없음: ${d.skipped_count || 0}건\n마스터없음: ${d.no_master_count || 0}건`);
+                    await loadAllData();
+                } else {
+                    alert('동기화 실패: ' + (json.message || '알 수 없는 오류'));
+                }
+            } catch (e) {
+                alert('동기화 요청 실패: ' + e.message);
+            } finally {
+                btnSyncFromMaster.disabled = false;
+                btnSyncFromMaster.textContent = '자재마스터 동기화';
+            }
+        });
+    }
+
     if (dom.salesUpload) {
         if (dom.salesUpload.uploadButton) {
             dom.salesUpload.uploadButton.addEventListener('click', handleSalesUploadStart);

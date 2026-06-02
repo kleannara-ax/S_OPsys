@@ -6315,20 +6315,23 @@ td.number {
 }
 
 /* ── 리뉴얼 자재 연결 마스터 (SAP) ── */
-#material-renewal-table tr.row-inactive {
-    opacity: 0.5;
-    background-color: rgba(148, 163, 184, 0.08);
+#material-renewal-table {
+    table-layout: fixed;
+    width: 100%;
 }
 
-#material-renewal-table tr.row-inactive td {
-    color: #94a3b8;
-    text-decoration: line-through;
-}
+/* 리뉴얼 자재 코드/명칭 컬럼 너비 균일화 */
+#material-renewal-table colgroup col.col-category      { width: 80px; }
+#material-renewal-table colgroup col.col-legacy-code    { width: 130px; }
+#material-renewal-table colgroup col.col-legacy-name    { width: 200px; }
+#material-renewal-table colgroup col.col-renewal-code   { width: 130px; }
+#material-renewal-table colgroup col.col-renewal-name   { width: 180px; }
+#material-renewal-table colgroup col.col-date           { width: 100px; }
+#material-renewal-table colgroup col.col-time           { width: 80px; }
 
-#material-renewal-table tr.row-inactive td.actions,
-#material-renewal-table tr.row-inactive td.actions button {
-    text-decoration: none;
-    opacity: 1;
+#material-renewal-table td,
+#material-renewal-table th {
+    word-break: break-all;
 }
 
 #material-renewal-table thead tr:first-child th[colspan] {
@@ -6339,37 +6342,4 @@ td.number {
 #material-renewal-table thead tr:nth-child(2) th {
     font-size: 0.75rem;
     font-weight: 500;
-}
-
-/* 적용 시작 월 인라인 입력 */
-.inline-month-input {
-    width: 140px;
-    padding: 3px 6px;
-    font-size: 0.8rem;
-    border: 1px solid rgba(148, 163, 184, 0.4);
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.06);
-    color: inherit;
-    cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.inline-month-input:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-}
-
-.inline-month-input.save-success {
-    border-color: #22c55e;
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
-}
-
-#material-renewal-table tr.row-inactive .inline-month-input {
-    text-decoration: none;
-    opacity: 0.6;
-}
-
-#material-renewal-table tr.row-inactive .effective-month-cell {
-    text-decoration: none;
 }

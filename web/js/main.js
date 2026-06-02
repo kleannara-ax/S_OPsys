@@ -2445,11 +2445,6 @@ function renderMaterialRenewalTable() {
             row.dataset.linkageId = entry.id;
         }
 
-        /* 비활성 행 시각적 표시 */
-        if (entry.is_active === false) {
-            row.classList.add('row-inactive');
-        }
-
         const hierarchyName = sanitizeText(entry.hierarchy_name ?? '').trim();
         const legacyCode = sanitizeText(entry.legacy_item_code).trim();
         const legacyName = sanitizeText(entry.legacy_item_name).trim() || getMaterialNameFromState(legacyCode) || '-';
@@ -2465,10 +2460,7 @@ function renderMaterialRenewalTable() {
         const renewalCode5 = sanitizeText(entry.renewal_item_code_5 ?? '').trim();
         const renewalName5 = sanitizeText(entry.renewal_item_name_5 ?? '').trim() || (renewalCode5 ? getMaterialNameFromState(renewalCode5) : '') || '-';
 
-        const effectiveMonth = sanitizeText(entry.effective_month).trim();
-        const note = sanitizeText(entry.note ?? '').trim() || '-';
-
-        /* 생성(변경) 일자·시간·자 계산: updated_at 우선, 없으면 created_at */
+        /* 생성(변경) 일자·시간 계산: updated_at 우선, 없으면 created_at */
         const changeTimestamp = entry.updated_at || entry.created_at || null;
         let changeDate = '-';
         let changeTime = '-';
@@ -2481,7 +2473,6 @@ function renderMaterialRenewalTable() {
                 }
             } catch (e) { /* ignore */ }
         }
-        const changeBy = sanitizeText(entry.updated_by || entry.created_by || '').trim() || '-';
 
         const textCells = [
             hierarchyName || '-',
@@ -2505,41 +2496,8 @@ function renderMaterialRenewalTable() {
             row.appendChild(cell);
         });
 
-        /* 적용 시작 월 — 사용자 직접 입력 가능한 인라인 편집 셀 */
-        const effectiveMonthCell = document.createElement('td');
-        effectiveMonthCell.className = 'effective-month-cell';
-        const monthInput = document.createElement('input');
-        monthInput.type = 'month';
-        monthInput.className = 'inline-month-input';
-        monthInput.value = effectiveMonth || '';
-        if (entry.id) {
-            monthInput.dataset.linkageId = entry.id;
-        }
-        monthInput.addEventListener('change', handleEffectiveMonthChange);
-        effectiveMonthCell.appendChild(monthInput);
-        row.appendChild(effectiveMonthCell);
-
-        /* 메모 */
-        const noteCell = document.createElement('td');
-        noteCell.textContent = note;
-        row.appendChild(noteCell);
-
-        /* 활성화여부 토글 셀 */
-        const activeCell = document.createElement('td');
-        activeCell.className = 'actions';
-        const toggleBtn = document.createElement('button');
-        toggleBtn.type = 'button';
-        toggleBtn.className = entry.is_active !== false ? 'primary small' : 'ghost small';
-        toggleBtn.textContent = entry.is_active !== false ? '활성' : '비활성';
-        toggleBtn.dataset.action = 'toggle-active';
-        if (entry.id) {
-            toggleBtn.dataset.linkageId = entry.id;
-        }
-        activeCell.appendChild(toggleBtn);
-        row.appendChild(activeCell);
-
-        /* 생성(변경)일자, 생성(변경)시간, 생성(변경)자 */
-        [changeDate, changeTime, changeBy].forEach((value) => {
+        /* 생성(변경)일자, 생성(변경)시간 */
+        [changeDate, changeTime].forEach((value) => {
             const cell = document.createElement('td');
             cell.textContent = value;
             row.appendChild(cell);

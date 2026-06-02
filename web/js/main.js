@@ -8431,7 +8431,19 @@ function renderItemSearchList(query) {
     const list = dom.filters.itemList;
     if (!list) return;
     list.innerHTML = '';
-    const options = state.itemFilterOptions || [];
+
+    /* ── 현재 활성화된 필터(카테고리, 생산라인)에 맞는 자재만 표시 ── */
+    const categoryFilter = getCategoryFilterValues();
+    const lineFilter = dom.filters.line ? dom.filters.line.value : 'all';
+
+    let baseRecords = state.rawData || [];
+    if (categoryFilter !== 'all') {
+        baseRecords = baseRecords.filter((r) => matchesCategoryFilter(categoryFilter, r.category));
+    }
+    if (lineFilter !== 'all') {
+        baseRecords = baseRecords.filter((r) => sanitizeText(r.production_line).trim() === lineFilter);
+    }
+    const options = getUniqueItems(baseRecords);
     const q = (query || '').trim().toUpperCase();
 
     /* '전체' 옵션 항상 표시 */

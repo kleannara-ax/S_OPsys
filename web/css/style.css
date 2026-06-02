@@ -792,13 +792,16 @@ textarea:focus {
     margin-bottom: 24px;
 }
 
-.base-material-master-layout {
-    grid-template-columns: minmax(360px, 1.1fr) minmax(480px, 1.6fr);
+/* 기본자재 마스터 — 세로 배치 (form → OEM 버튼 → 테이블) */
+.base-material-master-vertical-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
 }
 
 .form-grid.base-material-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr) !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     gap: 14px;
 }
 
@@ -892,41 +895,41 @@ textarea:focus {
     cursor: not-allowed;
 }
 
-.base-material-master-layout .col-checkbox {
+.base-material-master-vertical-layout .col-checkbox {
     width: 40px;
     text-align: center;
     padding: 6px 4px !important;
 }
 
-.base-material-master-layout .col-checkbox input[type="checkbox"] {
+.base-material-master-vertical-layout .col-checkbox input[type="checkbox"] {
     width: 16px;
     height: 16px;
     cursor: pointer;
     accent-color: #2563eb;
 }
 
-.base-material-master-layout .table-wrapper.compact {
+.base-material-master-vertical-layout .table-wrapper.compact {
     max-height: 60vh;
     overflow-y: auto;
     overflow-x: auto;
     position: relative;
 }
 
-.base-material-master-layout .table-wrapper.compact::-webkit-scrollbar {
+.base-material-master-vertical-layout .table-wrapper.compact::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
-.base-material-master-layout .table-wrapper.compact::-webkit-scrollbar-thumb {
+.base-material-master-vertical-layout .table-wrapper.compact::-webkit-scrollbar-thumb {
     background: rgba(100, 116, 139, 0.35);
     border-radius: 999px;
 }
 
-.base-material-master-layout .table-wrapper.compact::-webkit-scrollbar-track {
+.base-material-master-vertical-layout .table-wrapper.compact::-webkit-scrollbar-track {
     background: rgba(203, 213, 225, 0.2);
 }
 
-.base-material-master-layout .table-wrapper.compact table thead th {
+.base-material-master-vertical-layout .table-wrapper.compact table thead th {
     position: sticky;
     top: 0;
     z-index: 2;
@@ -934,26 +937,26 @@ textarea:focus {
     box-shadow: inset 0 -2px 0 rgba(148, 163, 184, 0.25);
 }
 
-.base-material-master-layout .table-wrapper.compact table th,
-.base-material-master-layout .table-wrapper.compact table td {
+.base-material-master-vertical-layout .table-wrapper.compact table th,
+.base-material-master-vertical-layout .table-wrapper.compact table td {
     padding: 8px 10px;
     font-size: 0.84rem;
     white-space: nowrap;
 }
 
-.base-material-master-layout .table-wrapper.compact table td.number {
+.base-material-master-vertical-layout .table-wrapper.compact table td.number {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
 
-.base-material-master-layout .table-wrapper.compact table td.actions {
+.base-material-master-vertical-layout .table-wrapper.compact table td.actions {
     display: flex;
     gap: 6px;
     justify-content: center;
 }
 
 /* 기본자재마스터 테이블 단위 라벨 — 밝은 배경에 맞게 색상 조정 */
-.base-material-master-layout .unit-label.base-mat-unit {
+.base-material-master-vertical-layout .unit-label.base-mat-unit {
     color: var(--text-secondary, #64748b);
     font-weight: 500;
     margin-top: 0;
@@ -1059,11 +1062,14 @@ textarea:focus {
 }
 
 @media (max-width: 1200px) {
-    .base-material-master-layout {
-        grid-template-columns: 1fr;
-    }
     .base-material-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .base-material-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
     }
 }
 

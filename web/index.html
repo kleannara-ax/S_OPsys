@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260601d">
+    <link rel="stylesheet" href="css/style.css?v=20260602a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -109,22 +109,7 @@
                         <p>SCM 운영구분, 카테고리, 생산라인, 자재코드 등 기본 자재 정보를 등록하고 관리합니다.</p>
                     </div>
                 </div>
-                <div class="bulk-upload-toolbar">
-                    <button type="button" class="secondary bulk-upload-button" id="btn-oem-vendor-moq-upload">OEM 협력업체/MOQ 일괄 업로드</button>
-                    <button type="button" class="ghost small" id="btn-oem-vendor-moq-template">템플릿 다운로드</button>
-                </div>
-                <div id="oem-vendor-moq-upload-area" class="oem-upload-area hidden">
-                    <div class="oem-upload-card">
-                        <p class="oem-upload-desc">OEM 상품(생산라인에 'OEM' 포함) 자재의 <strong>협력업체명</strong>과 <strong>MOQ(BOX 단위)</strong>를 엑셀로 일괄 업로드합니다.</p>
-                        <div class="oem-upload-actions">
-                            <input type="file" id="oem-vendor-moq-file" accept=".xlsx,.xls,.csv" />
-                            <button type="button" class="primary small" id="btn-oem-vendor-moq-start" disabled>업로드 실행</button>
-                            <button type="button" class="ghost small" id="btn-oem-vendor-moq-cancel">닫기</button>
-                        </div>
-                        <div id="oem-vendor-moq-status" class="oem-upload-status"></div>
-                    </div>
-                </div>
-                <div class="line-capa-layout base-material-master-layout">
+                <div class="base-material-master-vertical-layout">
                     <form id="base-material-master-form" class="base-material-master-form line-capa-form" novalidate>
                         <input type="hidden" id="base-material-master-record-id">
                         <div class="form-grid condensed base-material-grid">
@@ -182,6 +167,21 @@
                             <button type="button" class="ghost" id="btn-base-material-reset">초기화</button>
                         </div>
                     </form>
+                    <div class="bulk-upload-toolbar">
+                        <button type="button" class="secondary bulk-upload-button" id="btn-oem-vendor-moq-upload">OEM 협력업체/MOQ 일괄 업로드</button>
+                        <button type="button" class="ghost small" id="btn-oem-vendor-moq-template">템플릿 다운로드</button>
+                    </div>
+                    <div id="oem-vendor-moq-upload-area" class="oem-upload-area hidden">
+                        <div class="oem-upload-card">
+                            <p class="oem-upload-desc">OEM 상품(생산라인에 'OEM' 포함) 자재의 <strong>협력업체명</strong>과 <strong>MOQ(BOX 단위)</strong>를 엑셀로 일괄 업로드합니다.</p>
+                            <div class="oem-upload-actions">
+                                <input type="file" id="oem-vendor-moq-file" accept=".xlsx,.xls,.csv" />
+                                <button type="button" class="primary small" id="btn-oem-vendor-moq-start" disabled>업로드 실행</button>
+                                <button type="button" class="ghost small" id="btn-oem-vendor-moq-cancel">닫기</button>
+                            </div>
+                            <div id="oem-vendor-moq-status" class="oem-upload-status"></div>
+                        </div>
+                    </div>
                     <div class="line-capa-table-wrapper base-material-table-wrapper">
                         <div class="line-capa-table-header base-material-table-header">
                             <h4>등록된 기본 자재마스터</h4>
@@ -1827,6 +1827,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260601c" defer></script>
+    <script src="js/main.js?v=20260602a" defer></script>
 </body>
 </html>

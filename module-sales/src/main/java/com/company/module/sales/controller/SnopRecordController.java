@@ -99,4 +99,15 @@ public class SnopRecordController {
         int enrichedCount = (int) result.getOrDefault("enriched_count", 0);
         return ResponseEntity.ok(ApiResponse.ok(result, enrichedCount + "건 자재정보 보충 완료"));
     }
+
+    /**
+     * 자재마스터 기준으로 SnopRecord의 카테고리/자재명/생산라인 등을 강제 동기화.
+     * 기존 값이 있어도 마스터 값으로 덮어씀.
+     */
+    @PostMapping("/sync-from-master")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> syncFromMaster() {
+        Map<String, Object> result = service.syncAllFromMaterialMaster();
+        int syncedCount = (int) result.getOrDefault("synced_count", 0);
+        return ResponseEntity.ok(ApiResponse.ok(result, syncedCount + "건 자재정보 동기화 완료"));
+    }
 }

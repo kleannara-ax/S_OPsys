@@ -217,6 +217,89 @@ public class SnopRecordService {
         return result;
     }
 
+    /**
+     * 자재마스터 기준으로 SnopRecord의 카테고리/자재명/생산라인 등을 강제 동기화.
+     * enrichAllFromMaterialMaster()와 달리, 기존 값이 있어도 마스터 값으로 덮어씀.
+     */
+    @Transactional
+    public Map<String, Object> syncAllFromMaterialMaster() {
+        List<SnopRecord> allRecords = repository.findAll();
+        int totalCount = allRecords.size();
+        int syncedCount = 0;
+        int skippedCount = 0;
+        int noMasterCount = 0;
+
+        for (SnopRecord record : allRecords) {
+            String itemCode = record.getItemCode();
+            if (itemCode == null || itemCode.trim().isEmpty()) {
+                skippedCount++;
+                continue;
+            }
+
+            try {
+                List<BaseMaterialMaster> masters = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode.trim());
+                if (masters.isEmpty()) {
+                    noMasterCount++;
+                    continue;
+                }
+
+                BaseMaterialMaster master = masters.get(0);
+                boolean changed = false;
+
+                // 마스터 값이 존재하면 무조건 덮어쓰기
+                if (master.getHierarchyName() != null && !master.getHierarchyName().trim().isEmpty()) {
+                    if (!master.getHierarchyName().equals(record.getCategory())) {
+                        record.setCategory(master.getHierarchyName());
+                        changed = true;
+                    }
+                }
+                if (master.getItemName() != null && !master.getItemName().trim().isEmpty()) {
+                    if (!master.getItemName().equals(record.getItemName())) {
+                        record.setItemName(master.getItemName());
+                        changed = true;
+                    }
+                }
+                if (master.getProductionUnit() != null && !master.getProductionUnit().trim().isEmpty()) {
+                    if (!master.getProductionUnit().equals(record.getProductionLine())) {
+                        record.setProductionLine(master.getProductionUnit());
+                        changed = true;
+                    }
+                }
+                if (master.getVendorName() != null) {
+                    if (!master.getVendorName().equals(record.getVendorName())) {
+                        record.setVendorName(master.getVendorName());
+                        changed = true;
+                    }
+                }
+                if (master.getMoq() != null) {
+                    if (!master.getMoq().equals(record.getMoq())) {
+                        record.setMoq(master.getMoq());
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    repository.save(record);
+                    syncedCount++;
+                } else {
+                    skippedCount++;
+                }
+            } catch (Exception e) {
+                log.warn("[sync] item_code={} 동기화 중 오류 (무시): {}", itemCode, e.getMessage());
+            }
+        }
+
+        log.info("[sync] SnopRecord 자재정보 동기화 완료: 전체={}, 동기화={}, 변경없음={}, 자재마스터없음={}",
+                totalCount, syncedCount, skippedCount, noMasterCount);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total_count", totalCount);
+        result.put("synced_count", syncedCount);
+        result.put("skipped_count", skippedCount);
+        result.put("no_master_count", noMasterCount);
+        return result;
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

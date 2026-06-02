@@ -99,4 +99,21 @@ public class SnopRecordController {
         int enrichedCount = (int) result.getOrDefault("enriched_count", 0);
         return ResponseEntity.ok(ApiResponse.ok(result, enrichedCount + "건 자재정보 보충 완료"));
     }
+
+    /**
+     * SnopRecord 중복 데이터 정리 (Task 46)
+     * 동일 item_code(대소문자 무시) + plan_month 조합에 2건 이상 존재하는 경우,
+     * 데이터가 더 풍부한 레코드 1건을 남기고 나머지를 병합 후 삭제한다.
+     * 배포 후 1회 호출하면 기존 중복 데이터가 정리된다.
+     */
+    @PostMapping("/cleanup-duplicates")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> cleanupDuplicates() {
+        Map<String, Object> result = service.cleanupDuplicateRecords();
+        int deletedCount = (int) result.getOrDefault("deleted_count", 0);
+        int groupCount = (int) result.getOrDefault("duplicate_group_count", 0);
+        String message = groupCount > 0
+                ? groupCount + "개 중복 그룹에서 " + deletedCount + "건 삭제 완료"
+                : "중복 데이터가 없습니다.";
+        return ResponseEntity.ok(ApiResponse.ok(result, message));
+    }
 }

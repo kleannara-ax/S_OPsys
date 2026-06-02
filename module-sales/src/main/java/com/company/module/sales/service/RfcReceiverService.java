@@ -368,8 +368,9 @@ public class RfcReceiverService {
                             debugCounter++;
                         }
 
+                        // case-insensitive 조회로 중복 방지 (Task 46)
                         List<SnopRecord> existingRecords =
-                                snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
+                                snopRecordRepo.findByItemCodeIgnoreCaseAndPlanMonth(itemCode, planMonth);
 
                         // SnopRecord 필드 매핑 (정방향 1:1):
                         //   beginningSum = SAP BEGINNING_INVENTORY → SnopRecord.beginningInventory → 화면 "현재고"
@@ -506,13 +507,21 @@ public class RfcReceiverService {
                 Long totalActual = entry.getValue();
                 String unit = unitMap.get(entry.getKey());
 
-                // item_code + plan_month 기준 기존 레코드 조회
-                Optional<SnopRecord> optExisting =
-                        snopRecordRepo.findFirstByItemCodeAndPlanMonth(itemCode, planMonth);
+                // item_code + plan_month 기준 기존 레코드 조회 — case-insensitive (Task 46)
+                List<SnopRecord> existingList =
+                        snopRecordRepo.findByItemCodeIgnoreCaseAndPlanMonth(itemCode, planMonth);
 
                 SnopRecord record;
-                if (optExisting.isPresent()) {
-                    record = optExisting.get();
+                if (!existingList.isEmpty()) {
+                    record = existingList.get(0);
+                    // 중복 레코드가 있으면 첫 번째만 남기고 나머지 삭제
+                    if (existingList.size() > 1) {
+                        for (int j = 1; j < existingList.size(); j++) {
+                            snopRecordRepo.delete(existingList.get(j));
+                        }
+                        log.info("[RFC-003] SnopRecord 중복 {}건 자동 삭제: item={}, month={}",
+                                existingList.size() - 1, itemCode, planMonth);
+                    }
                     updateCount++;
                 } else {
                     record = new SnopRecord();
@@ -598,18 +607,25 @@ public class RfcReceiverService {
                 // plan_month_day (YYYYMMDD) → plan_month (YYYY-MM)
                 String planMonth = convertPlanMonthDay(planMonthDay);
 
-                // 키: plan_month + item_code 두개가 동일한 건에 대해서 update
+                // 키: plan_month + item_code 두개가 동일한 건에 대해서 update — case-insensitive (Task 46)
                 List<SnopRecord> existingList =
-                        snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
+                        snopRecordRepo.findByItemCodeIgnoreCaseAndPlanMonth(itemCode, planMonth);
 
                 if (!existingList.isEmpty()) {
-                    // 동일한 plan_month + item_code인 모든 레코드에 대해 update
-                    for (SnopRecord record : existingList) {
-                        if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
-                        if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
-                        snopRecordRepo.save(record);
+                    // 중복 레코드가 있으면 첫 번째만 사용하고 나머지 삭제 (Task 46)
+                    SnopRecord primary = existingList.get(0);
+                    if (hasKey(row, "unit")) primary.setInventoryUnit(getStr(row, "unit"));
+                    if (hasKey(row, "sales_actual")) primary.setSalesActual(getLong(row, "sales_actual"));
+                    snopRecordRepo.save(primary);
+
+                    if (existingList.size() > 1) {
+                        for (int j = 1; j < existingList.size(); j++) {
+                            snopRecordRepo.delete(existingList.get(j));
+                        }
+                        log.info("[RFC-004] SnopRecord 중복 {}건 자동 삭제: item={}, month={}",
+                                existingList.size() - 1, itemCode, planMonth);
                     }
-                    updateCount += existingList.size();
+                    updateCount++;
                 } else {
                     // 매칭 레코드 없으면 신규 생성
                     SnopRecord record = new SnopRecord();

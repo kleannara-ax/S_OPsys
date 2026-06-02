@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260602a">
+    <link rel="stylesheet" href="css/style.css?v=20260602b">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -769,11 +769,13 @@
             </div>
             <div class="table-filters">
                 <div class="filters">
-                    <label>
+                    <label class="item-search-label">
                         자재 코드
-                        <select id="filter-item">
-                            <option value="all">전체</option>
-                        </select>
+                        <div class="item-search-dropdown" id="filter-item-dropdown">
+                            <input type="text" class="item-search-input" id="filter-item-input" placeholder="전체" autocomplete="off">
+                            <input type="hidden" id="filter-item" value="all">
+                            <div class="item-search-list hidden" id="filter-item-list"></div>
+                        </div>
                     </label>
                     <label class="multi-select-label">
                         카테고리
@@ -1827,6 +1829,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260602a" defer></script>
+    <script src="js/main.js?v=20260602b" defer></script>
 </body>
 </html>

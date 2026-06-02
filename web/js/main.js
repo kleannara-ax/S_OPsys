@@ -8575,6 +8575,19 @@ function applyFilters() {
 
     let filtered = enriched;
 
+    /* ── 현재월 이전 데이터 필터링 ──
+     * 계획월(YYYY-MM)이 시스템 날짜 기준 현재월보다 이전이면 제외.
+     * 단, 월 필터에서 특정 과거월을 명시적으로 선택한 경우에는 해당 월 데이터를 보여줌. */
+    if (monthFilter === 'all') {
+        const now = new Date();
+        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        filtered = filtered.filter((record) => {
+            const m = (record.month || '').trim();
+            if (!m) return true; // 월 정보 없으면 표시
+            return m >= currentMonth;
+        });
+    }
+
     if (itemFilter !== 'all') {
         filtered = filtered.filter((record) => getRecordCanonicalCode(record) === itemFilter);
     }

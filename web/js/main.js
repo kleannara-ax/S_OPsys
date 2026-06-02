@@ -6787,12 +6787,12 @@ async function loadData() {
         } else if (renewalMaterialLinkageResponse && !renewalMaterialLinkageResponse.ok) {
             console.warn('리뉴얼 자재 연결(SAP) 데이터를 불러오는 중 문제가 발생했습니다. 빈 목록을 사용합니다.');
         }
-        state.renewalMaterialLinkages = renewalMaterialLinkageData.map(normalizeMaterialLinkage);
+        state.renewalMaterialLinkages = renewalMaterialLinkageData
+            .map(normalizeMaterialLinkage)
+            .filter((entry) => entry.is_active !== false); /* SAP 비활성(is_active=2) 데이터 제외 */
         state.renewalMaterialLinkages.sort((a, b) => {
             return sanitizeText(a.legacy_item_code).localeCompare(sanitizeText(b.legacy_item_code));
         });
-        console.log('[리뉴얼자재] API 응답 원본:', renewalMaterialLinkageData.length, '건',
-            renewalMaterialLinkageData.length > 0 ? '첫 건 키: ' + Object.keys(renewalMaterialLinkageData[0]).join(', ') : '(빈 배열)');
 
         populateLineCapaFilters();
         populateLineItemMasterFilters();

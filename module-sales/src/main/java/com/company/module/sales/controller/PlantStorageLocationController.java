@@ -8,6 +8,7 @@ import com.company.module.sales.service.PlantStorageLocationService;
 import javax.annotation.PostConstruct;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestController
 @RequestMapping("/sales-api/plant-storage")
 @RequiredArgsConstructor
@@ -27,15 +29,29 @@ public class PlantStorageLocationController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getAll() {
         // 마스터 데이터(plan_month=null)만 조회 — RFC_002로 생성된 재고 데이터는 제외
         List<PlantStorageLocation> all = repository.findByPlanMonthIsNullOrderByPlantCodeAscStorageLocationAsc();
-        Map<String, List<PlantStorageLocation>> grouped = all.stream()
+
+        // plant_code + storage_location 기준 중복 제거 (is_selected=true 우선 보존)
+        Map<String, PlantStorageLocation> uniqueMap = new LinkedHashMap<>();
+        for (PlantStorageLocation psl : all) {
+            String key = psl.getPlantCode() + "|" + psl.getStorageLocation();
+            PlantStorageLocation existing = uniqueMap.get(key);
+            if (existing == null) {
+                uniqueMap.put(key, psl);
+            } else if (Boolean.TRUE.equals(psl.getIsSelected()) && !Boolean.TRUE.equals(existing.getIsSelected())) {
+                uniqueMap.put(key, psl); // 선택된 것 우선
+            }
+        }
+        List<PlantStorageLocation> unique = new ArrayList<>(uniqueMap.values());
+
+        Map<String, List<PlantStorageLocation>> grouped = unique.stream()
             .collect(Collectors.groupingBy(
                 PlantStorageLocation::getPlantCode,
                 LinkedHashMap::new,
                 Collectors.toList()
             ));
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("total_count", all.size());
-        result.put("selected_count", all.stream().filter(p -> Boolean.TRUE.equals(p.getIsSelected())).count());
+        result.put("total_count", unique.size());
+        result.put("selected_count", unique.stream().filter(p -> Boolean.TRUE.equals(p.getIsSelected())).count());
         result.put("plants", grouped);
         return ResponseEntity.ok(ApiResponse.ok(result));
     }
@@ -112,7 +128,14 @@ public class PlantStorageLocationController {
 
     @PostConstruct
     public void initSeedData() {
-        if (repository.count() > 0) return;
+        if (repository.count() > 0) {
+            // 기존 데이터가 있으면 중복 seed 자동 정리
+            int cleaned = service.cleanupDuplicateSeeds();
+            if (cleaned > 0) {
+                log.info("[PostConstruct] 서버 시작 시 중복 seed {}건 자동 정리 완료", cleaned);
+            }
+            return;
+        }
         Map<String, List<String>> plantData = new LinkedHashMap<>();
         plantData.put("P200", Arrays.asList("1100","1110","2000","2100","2999","3000","3100","3500","3800","3900","5100","6000","7300","7600"));
         plantData.put("P300", Arrays.asList("1200","1500","1600","1700","1900","2000","2300","2400","2500","2600","3000","3100","3900","5100"));

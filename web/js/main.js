@@ -533,6 +533,9 @@ const dom = {
     },
     filters: {
         item: document.querySelector('#filter-item'),
+        itemInput: document.querySelector('#filter-item-input'),
+        itemList: document.querySelector('#filter-item-list'),
+        itemDropdown: document.querySelector('#filter-item-dropdown'),
         category: null, // replaced by multi-select dropdown
         categoryDropdown: document.querySelector('#filter-category-dropdown'),
         categoryToggle: document.querySelector('#filter-category-toggle'),
@@ -7000,15 +7003,17 @@ function populateFilterOptions() {
     const previousLine = dom.filters.line.value;
 
     const itemOptions = getUniqueItems(state.rawData);
-    dom.filters.item.innerHTML = '<option value="all">전체</option>';
-    itemOptions.forEach(({ code, name }) => {
-        const option = document.createElement('option');
-        option.value = code || '';
-        option.textContent = code ? `${name} (${code})` : name;
-        dom.filters.item.appendChild(option);
-    });
-    if (itemOptions.some(({ code }) => code === previousItem)) {
-        dom.filters.item.value = previousItem;
+    /* 자재코드 검색 드롭다운 데이터 저장 */
+    state.itemFilterOptions = itemOptions;
+    /* 기존 선택값 유지 */
+    if (previousItem && previousItem !== 'all') {
+        const matched = itemOptions.find(({ code }) => code === previousItem);
+        if (matched && dom.filters.itemInput) {
+            dom.filters.itemInput.value = matched.code;
+        }
+    } else {
+        if (dom.filters.itemInput) dom.filters.itemInput.value = '';
+        dom.filters.item.value = 'all';
     }
 
     if (dom.filters.categoryOptions) {
@@ -8419,6 +8424,128 @@ function syncPlanMonthInputWithFilter() {
     if (selected && selected !== 'all' && dom.planMonth) {
         dom.planMonth.value = selected;
     }
+}
+
+// -------------------- 자재코드 검색 필터 --------------------
+function renderItemSearchList(query) {
+    const list = dom.filters.itemList;
+    if (!list) return;
+    list.innerHTML = '';
+    const options = state.itemFilterOptions || [];
+    const q = (query || '').trim().toUpperCase();
+
+    /* '전체' 옵션 항상 표시 */
+    const allDiv = document.createElement('div');
+    allDiv.className = 'item-search-option option-all';
+    allDiv.textContent = '전체';
+    allDiv.dataset.value = 'all';
+    allDiv.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        selectItemFilter('all', '');
+    });
+    list.appendChild(allDiv);
+
+    /* 필터된 옵션 */
+    const filtered = q
+        ? options.filter(({ code, name }) => {
+            const upperCode = (code || '').toUpperCase();
+            const upperName = (name || '').toUpperCase();
+            return upperCode.includes(q) || upperName.includes(q);
+        })
+        : options;
+
+    /* 자재코드 정렬 */
+    filtered.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+
+    const maxDisplay = 100; /* 성능 제한 */
+    filtered.slice(0, maxDisplay).forEach(({ code, name }) => {
+        const div = document.createElement('div');
+        div.className = 'item-search-option';
+        div.dataset.value = code;
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'item-code';
+        codeSpan.textContent = code;
+        div.appendChild(codeSpan);
+        if (name && name !== code && name !== '-') {
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'item-name';
+            nameSpan.textContent = name;
+            div.appendChild(nameSpan);
+        }
+        div.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            selectItemFilter(code, code);
+        });
+        list.appendChild(div);
+    });
+
+    if (filtered.length > maxDisplay) {
+        const moreDiv = document.createElement('div');
+        moreDiv.className = 'item-search-option';
+        moreDiv.style.color = '#94a3b8';
+        moreDiv.style.fontStyle = 'italic';
+        moreDiv.style.cursor = 'default';
+        moreDiv.textContent = `... 외 ${filtered.length - maxDisplay}건 (더 입력하여 검색)`;
+        list.appendChild(moreDiv);
+    }
+
+    list.classList.remove('hidden');
+}
+
+function selectItemFilter(value, displayText) {
+    dom.filters.item.value = value;
+    if (dom.filters.itemInput) {
+        dom.filters.itemInput.value = value === 'all' ? '' : displayText;
+    }
+    if (dom.filters.itemList) {
+        dom.filters.itemList.classList.add('hidden');
+    }
+    applyFilters();
+}
+
+function initItemSearchFilter() {
+    const input = dom.filters.itemInput;
+    const list = dom.filters.itemList;
+    if (!input || !list) return;
+
+    input.addEventListener('focus', () => {
+        renderItemSearchList(input.value);
+    });
+
+    input.addEventListener('input', () => {
+        renderItemSearchList(input.value);
+    });
+
+    input.addEventListener('blur', () => {
+        /* 약간의 딜레이로 mousedown 이벤트 먼저 처리 */
+        setTimeout(() => {
+            list.classList.add('hidden');
+            /* 입력값이 비어있으면 '전체'로 리셋 */
+            if (!input.value.trim()) {
+                dom.filters.item.value = 'all';
+                input.value = '';
+                applyFilters();
+            } else {
+                /* 입력값과 정확히 매칭되는 자재코드가 있으면 선택, 없으면 리셋 */
+                const q = input.value.trim().toUpperCase();
+                const matched = (state.itemFilterOptions || []).find(({ code }) => (code || '').toUpperCase() === q);
+                if (matched) {
+                    dom.filters.item.value = matched.code;
+                    input.value = matched.code;
+                } else if (dom.filters.item.value === 'all') {
+                    input.value = '';
+                }
+            }
+        }, 200);
+    });
+
+    /* Escape 키로 닫기 */
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            list.classList.add('hidden');
+            input.blur();
+        }
+    });
 }
 
 // -------------------- 필터 및 렌더링 --------------------
@@ -17840,7 +17967,9 @@ function bindEvents() {
             }
         });
     }
+    /* 자재코드 검색 필터 초기화 (hidden input change 시에도 applyFilters 호출) */
     dom.filters.item.addEventListener('change', applyFilters);
+    initItemSearchFilter();
     if (dom.itemName) {
         dom.itemName.addEventListener('input', autoFillCategoryFromItemName);
     }
@@ -18022,6 +18151,7 @@ function bindEvents() {
     }
     dom.filters.clear.addEventListener('click', () => {
         dom.filters.item.value = 'all';
+        if (dom.filters.itemInput) dom.filters.itemInput.value = '';
         resetCategoryFilter();
         dom.filters.month.value = 'all';
         dom.filters.line.value = 'all';

@@ -476,6 +476,100 @@ button.danger:hover {
     height: 40px;
 }
 
+/* ── Item Code Search Dropdown (자재코드 검색 필터) ── */
+.item-search-label {
+    position: relative;
+}
+
+.item-search-dropdown {
+    position: relative;
+    min-width: 260px;
+}
+
+.item-search-input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.92rem;
+    color: var(--text-color);
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    border-radius: var(--radius-md);
+    outline: none;
+    box-sizing: border-box;
+}
+
+.item-search-input:focus {
+    border-color: rgba(37, 99, 235, 0.55);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.item-search-input::placeholder {
+    color: #94a3b8;
+}
+
+.item-search-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 320px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.item-search-list.hidden {
+    display: none;
+}
+
+.item-search-option {
+    padding: 8px 14px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.item-search-option:last-child {
+    border-bottom: none;
+}
+
+.item-search-option:hover,
+.item-search-option.active {
+    background: rgba(37, 99, 235, 0.08);
+    color: #1d4ed8;
+}
+
+.item-search-option .item-code {
+    font-weight: 600;
+}
+
+.item-search-option .item-name {
+    color: #64748b;
+    margin-left: 6px;
+    font-size: 0.82rem;
+}
+
+.item-search-option.option-all {
+    font-weight: 600;
+    color: #334155;
+}
+
+.item-search-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.item-search-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 999px;
+}
+
 /* ── Multi-Select Dropdown (카테고리 필터) ── */
 .multi-select-label {
     position: relative;

@@ -2421,6 +2421,8 @@ function renderMaterialRenewalTable() {
     const legacyLinkages = Array.isArray(state.materialLinkages) ? state.materialLinkages : [];
     const linkages = renewalLinkages.length > 0 ? renewalLinkages : legacyLinkages;
 
+    console.log('[리뉴얼자재] renewalLinkages:', renewalLinkages.length, '건, legacyLinkages:', legacyLinkages.length, '건, 표시:', linkages.length, '건');
+
     tbody.innerHTML = '';
 
     if (!linkages || linkages.length === 0) {
@@ -6789,6 +6791,8 @@ async function loadData() {
         state.renewalMaterialLinkages.sort((a, b) => {
             return sanitizeText(a.legacy_item_code).localeCompare(sanitizeText(b.legacy_item_code));
         });
+        console.log('[리뉴얼자재] API 응답 원본:', renewalMaterialLinkageData.length, '건',
+            renewalMaterialLinkageData.length > 0 ? '첫 건 키: ' + Object.keys(renewalMaterialLinkageData[0]).join(', ') : '(빈 배열)');
 
         populateLineCapaFilters();
         populateLineItemMasterFilters();

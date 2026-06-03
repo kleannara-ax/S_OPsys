@@ -6357,7 +6357,7 @@ td.number {
     position: sticky;
     top: 0;
     z-index: 3;
-    background: var(--surface-color, #fff);
+    background: #f1f5f9;
     text-align: center;
     padding: 4px 6px;
     font-size: 0.78rem;
@@ -6369,9 +6369,10 @@ td.number {
     position: sticky;
     top: 27px;
     z-index: 3;
-    background: var(--surface-color, #fff);
+    background: #f1f5f9;
     box-shadow: inset 0 -2px 0 rgba(148, 163, 184, 0.25);
     font-size: 0.78rem;
     font-weight: 600;
     padding: 6px;
+    color: var(--text-secondary, #475569);
 }

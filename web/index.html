@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260602d">
+    <link rel="stylesheet" href="css/style.css?v=20260603a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -512,19 +512,22 @@
                                     <col class="col-time">
                                 </colgroup>
                                 <thead>
-                                    <tr>
-                                        <th rowspan="2">카테고리</th>
-                                        <th rowspan="2">기존 자재 코드</th>
-                                        <th rowspan="2">기존 자재 명칭</th>
+                                    <tr class="header-group">
+                                        <th></th><!-- 카테고리 -->
+                                        <th></th><!-- 기존 자재 코드 -->
+                                        <th></th><!-- 기존 자재 명칭 -->
                                         <th colspan="2">리뉴얼 자재 1</th>
                                         <th colspan="2">리뉴얼 자재 2</th>
                                         <th colspan="2">리뉴얼 자재 3</th>
                                         <th colspan="2">리뉴얼 자재 4</th>
                                         <th colspan="2">리뉴얼 자재 5</th>
-                                        <th rowspan="2">생성(변경)일자</th>
-                                        <th rowspan="2">생성(변경)시간</th>
+                                        <th></th><!-- 생성(변경)일자 -->
+                                        <th></th><!-- 생성(변경)시간 -->
                                     </tr>
-                                    <tr>
+                                    <tr class="header-columns">
+                                        <th>카테고리</th>
+                                        <th>기존 자재 코드</th>
+                                        <th>기존 자재 명칭</th>
                                         <th>코드</th>
                                         <th>명칭</th>
                                         <th>코드</th>
@@ -535,6 +538,8 @@
                                         <th>명칭</th>
                                         <th>코드</th>
                                         <th>명칭</th>
+                                        <th>생성(변경)일자</th>
+                                        <th>생성(변경)시간</th>
                                     </tr>
                                 </thead>
                                 <tbody></tbody>
@@ -1843,6 +1848,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260602h" defer></script>
+    <script src="js/main.js?v=20260603a" defer></script>
 </body>
 </html>

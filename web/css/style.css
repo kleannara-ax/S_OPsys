@@ -5043,7 +5043,7 @@ td.number {
 
 #inventory-forecast-table .col-category {
     width: auto;
-    min-width: 96px;
+    min-width: 120px;
     white-space: nowrap;
 }
 
@@ -5077,8 +5077,9 @@ td.number {
 
 .category-toggle {
     display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px 8px;
     padding: 4px 0;
     border: none;
     background: transparent;
@@ -5086,6 +5087,16 @@ td.number {
     font-weight: 700;
     font-size: 0.95rem;
     cursor: pointer;
+    white-space: normal;
+}
+
+.category-toggle .category-count {
+    display: block;
+    width: 100%;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted-text);
+    padding-left: 20px;
 }
 
 .category-toggle:focus-visible {
@@ -5106,6 +5117,7 @@ td.number {
 .category-summary-meta {
     color: var(--muted-text);
     font-weight: 500;
+    min-width: 90px;
 }
 
 .category-summary-name {

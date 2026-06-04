@@ -598,6 +598,12 @@ public class RfcReceiverService {
                 // plan_month_day (YYYYMMDD) → plan_month (YYYY-MM)
                 String planMonth = convertPlanMonthDay(planMonthDay);
 
+                Long salesActualValue = hasKey(row, "sales_actual") ? getLong(row, "sales_actual") : null;
+                log.debug("[RFC-004] Row {}: item_code={}, plan_month_day={} → plan_month={}, sales_actual_raw={}, sales_actual_parsed={}",
+                        i + 1, itemCode, planMonthDay, planMonth,
+                        hasKey(row, "sales_actual") ? row.get("sales_actual") : "N/A",
+                        salesActualValue);
+
                 // 키: plan_month + item_code 두개가 동일한 건에 대해서 update
                 List<SnopRecord> existingList =
                         snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
@@ -606,8 +612,10 @@ public class RfcReceiverService {
                     // 동일한 plan_month + item_code인 모든 레코드에 대해 update
                     for (SnopRecord record : existingList) {
                         if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
-                        if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
+                        if (hasKey(row, "sales_actual")) record.setSalesActual(salesActualValue);
                         snopRecordRepo.save(record);
+                        log.debug("[RFC-004] UPDATE: id={}, item_code={}, plan_month={}, sales_actual={}",
+                                record.getId(), itemCode, planMonth, salesActualValue);
                     }
                     updateCount += existingList.size();
                 } else {
@@ -616,11 +624,13 @@ public class RfcReceiverService {
                     record.setItemCode(itemCode);
                     record.setPlanMonth(planMonth);
                     if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
-                    if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
+                    if (hasKey(row, "sales_actual")) record.setSalesActual(salesActualValue);
                     // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
                     enrichFromMaterialMaster(record, itemCode);
                     snopRecordRepo.save(record);
                     insertCount++;
+                    log.debug("[RFC-004] INSERT: item_code={}, plan_month={}, sales_actual={}",
+                            itemCode, planMonth, salesActualValue);
                 }
                 processedCount++;
 
@@ -1139,8 +1149,14 @@ public class RfcReceiverService {
         if (val == null) return null;
         if (val instanceof Number) return ((Number) val).longValue();
         try {
-            return Long.parseLong(val.toString().trim().replaceAll("[^\\d-]", ""));
+            String str = val.toString().trim();
+            // 소수점이 포함된 문자열(예: "200.0")은 Double로 먼저 파싱 후 Long 변환
+            if (str.contains(".")) {
+                return (long) Double.parseDouble(str);
+            }
+            return Long.parseLong(str.replaceAll("[^\\d-]", ""));
         } catch (NumberFormatException e) {
+            log.warn("[getLong] 숫자 변환 실패 — key={}, value={}", key, val);
             return null;
         }
     }

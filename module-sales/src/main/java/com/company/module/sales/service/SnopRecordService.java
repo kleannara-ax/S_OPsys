@@ -300,6 +300,101 @@ public class SnopRecordService {
         return result;
     }
 
+    /**
+     * plan_month가 잘못된 형식(YYYYMM, YYYYMMDD 등)인 레코드를 YYYY-MM으로 변환.
+     * 동일 item_code + YYYY-MM 레코드가 이미 존재하면 sales_actual 등 실적값을 병합하고
+     * 잘못된 레코드를 삭제한다.
+     * 서버 시작 시 @PostConstruct에서 자동 실행.
+     */
+    @Transactional
+    public Map<String, Object> cleanupMalformedPlanMonth() {
+        List<SnopRecord> allRecords = repository.findAll();
+        int fixedCount = 0;
+        int mergedCount = 0;
+        int deletedCount = 0;
+
+        for (SnopRecord record : allRecords) {
+            String pm = record.getPlanMonth();
+            if (pm == null || pm.trim().isEmpty()) continue;
+            String trimmed = pm.trim();
+
+            // 이미 YYYY-MM 형식이면 스킵
+            if (trimmed.length() == 7 && trimmed.charAt(4) == '-') continue;
+
+            // YYYYMM(6자리) 또는 YYYYMMDD(8자리)를 YYYY-MM으로 변환
+            String corrected = convertToYearMonth(trimmed);
+            if (corrected == null || corrected.equals(trimmed)) continue;
+
+            String itemCode = record.getItemCode();
+            log.info("[cleanup] plan_month 형식 수정: id={}, item_code={}, '{}' → '{}'",
+                    record.getId(), itemCode, trimmed, corrected);
+
+            // 동일 item_code + 올바른 plan_month 레코드가 이미 있는지 확인
+            List<SnopRecord> existing = repository.findByItemCodeAndPlanMonth(itemCode, corrected);
+            if (!existing.isEmpty()) {
+                // 기존 레코드에 실적값 병합
+                SnopRecord target = existing.get(0);
+                if (record.getSalesActual() != null && target.getSalesActual() == null) {
+                    target.setSalesActual(record.getSalesActual());
+                }
+                if (record.getProductionActual() != null && target.getProductionActual() == null) {
+                    target.setProductionActual(record.getProductionActual());
+                }
+                if (record.getInventoryUnit() != null && target.getInventoryUnit() == null) {
+                    target.setInventoryUnit(record.getInventoryUnit());
+                }
+                repository.save(target);
+                repository.delete(record);
+                mergedCount++;
+                deletedCount++;
+                log.info("[cleanup] 기존 레코드(id={})에 병합 후 잘못된 레코드(id={}) 삭제",
+                        target.getId(), record.getId());
+            } else {
+                // 해당 month 레코드가 없으면 plan_month만 수정
+                record.setPlanMonth(corrected);
+                repository.save(record);
+                fixedCount++;
+            }
+        }
+
+        log.info("[cleanup] plan_month 형식 정리 완료: 수정={}, 병합={}, 삭제={}",
+                fixedCount, mergedCount, deletedCount);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("fixed_count", fixedCount);
+        result.put("merged_count", mergedCount);
+        result.put("deleted_count", deletedCount);
+        return result;
+    }
+
+    /**
+     * 다양한 날짜 형식을 YYYY-MM으로 변환.
+     * YYYYMM → YYYY-MM, YYYYMMDD → YYYY-MM
+     */
+    private String convertToYearMonth(String value) {
+        if (value == null) return null;
+        String t = value.trim();
+        // YYYYMM (6자리, 하이픈/슬래시 없음)
+        if (t.length() == 6 && !t.contains("-") && !t.contains("/")) {
+            try {
+                Integer.parseInt(t); // 숫자만인지 확인
+                return t.substring(0, 4) + "-" + t.substring(4, 6);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        // YYYYMMDD (8자리)
+        if (t.length() == 8 && !t.contains("-") && !t.contains("/")) {
+            try {
+                Integer.parseInt(t);
+                return t.substring(0, 4) + "-" + t.substring(4, 6);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

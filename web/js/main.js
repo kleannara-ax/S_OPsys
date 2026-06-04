@@ -4025,9 +4025,8 @@ function enrichRecord(record, lineStats, overrides = {}) {
         ? parseNumberOrNull(overrideSalesActualRaw)
         : null;
     const parsedRecordSalesActual = parseNumberOrNull(record.sales_actual);
-    const normalizedRecordSalesActual = (parsedRecordSalesActual !== null && !(salesPlan > 0 && parsedRecordSalesActual <= 0))
-        ? parsedRecordSalesActual
-        : null;
+    /* 판매실적 0은 유효한 데이터 — null/undefined만 제외 */
+    const normalizedRecordSalesActual = parsedRecordSalesActual;
     let salesActualSource = 'record';
     let salesActual;
     if (parsedOverrideSalesActual !== null) {
@@ -4054,9 +4053,8 @@ function enrichRecord(record, lineStats, overrides = {}) {
         ? parseNumberOrNull(overrides.production_actual)
         : null;
     const recordActual = parseNumberOrNull(record.production_actual);
-    const normalizedRecordActual = (recordActual !== null && !(productionPlan > 0 && recordActual <= 0))
-        ? recordActual
-        : null;
+    /* 생산실적 0은 유효한 데이터 — null/undefined만 제외 */
+    const normalizedRecordActual = recordActual;
     let productionActualSource = 'record';
     let productionActual;
     if (overrideActual !== null) {

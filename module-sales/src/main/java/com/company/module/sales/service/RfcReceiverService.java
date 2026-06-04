@@ -561,6 +561,8 @@ public class RfcReceiverService {
     // SNOP_RFC_004: 판매실적 동기화
     // RFC fields: plan_month_day → plan_month (앞 6자리 YYYY-MM 변환),
     //             item_code, unit → inventory_unit, sales_actual
+    // SAP에서 일별 데이터가 여러 건 올 수 있으므로
+    // RFC_003(생산실적)과 동일하게 item_code+plan_month 기준 합산 처리
     // ───────────────────────────────────────────────────────
     @Transactional
     public Map<String, Object> processRfc004(List<Map<String, Object>> dataList, String executionType) {
@@ -577,6 +579,11 @@ public class RfcReceiverService {
         setAuditUser();
 
         log.info("[RFC-004] 판매실적 수신 시작: {}건", dataList.size());
+
+        // Step 1: item_code + plan_month 기준으로 sales_actual 합산
+        // SAP에서 일별로 나눠서 오지만, 화면에서는 자재+월 기준 한 행
+        Map<String, Long> actualSum = new LinkedHashMap<>();   // key: itemCode|planMonth → 합산값
+        Map<String, String> unitMap = new LinkedHashMap<>();    // key: itemCode|planMonth → unit
 
         for (int i = 0; i < dataList.size(); i++) {
             Map<String, Object> row = dataList.get(i);
@@ -597,31 +604,20 @@ public class RfcReceiverService {
 
                 // plan_month_day (YYYYMMDD) → plan_month (YYYY-MM)
                 String planMonth = convertPlanMonthDay(planMonthDay);
+                String key = itemCode + "|" + planMonth;
 
-                // 키: plan_month + item_code 두개가 동일한 건에 대해서 update
-                List<SnopRecord> existingList =
-                        snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
+                Long salesActual = getLong(row, "sales_actual");
+                log.debug("[RFC-004] Row {}: item_code={}, plan_month_day={} → plan_month={}, sales_actual={}",
+                        i + 1, itemCode, planMonthDay, planMonth, salesActual);
 
-                if (!existingList.isEmpty()) {
-                    // 동일한 plan_month + item_code인 모든 레코드에 대해 update
-                    for (SnopRecord record : existingList) {
-                        if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
-                        if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
-                        snopRecordRepo.save(record);
-                    }
-                    updateCount += existingList.size();
-                } else {
-                    // 매칭 레코드 없으면 신규 생성
-                    SnopRecord record = new SnopRecord();
-                    record.setItemCode(itemCode);
-                    record.setPlanMonth(planMonth);
-                    if (hasKey(row, "unit")) record.setInventoryUnit(getStr(row, "unit"));
-                    if (hasKey(row, "sales_actual")) record.setSalesActual(getLong(row, "sales_actual"));
-                    // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
-                    enrichFromMaterialMaster(record, itemCode);
-                    snopRecordRepo.save(record);
-                    insertCount++;
+                if (salesActual != null) {
+                    actualSum.merge(key, salesActual, Long::sum);
                 }
+
+                if (hasKey(row, "unit")) {
+                    unitMap.putIfAbsent(key, getStr(row, "unit"));
+                }
+
                 processedCount++;
 
             } catch (Exception e) {
@@ -631,20 +627,68 @@ public class RfcReceiverService {
             }
         }
 
+        log.info("[RFC-004] 합산 완료: {}건 → {}개 자재+월 조합", dataList.size(), actualSum.size());
+
+        // Step 2: 합산된 값을 SnopRecord에 반영 (item_code + plan_month 키)
+        for (Map.Entry<String, Long> entry : actualSum.entrySet()) {
+            try {
+                String[] parts = entry.getKey().split("\\|", 2);
+                String itemCode = parts[0];
+                String planMonth = parts.length > 1 ? parts[1] : null;
+                Long totalActual = entry.getValue();
+                String unit = unitMap.get(entry.getKey());
+
+                // item_code + plan_month 기준 기존 레코드 조회
+                List<SnopRecord> existingList =
+                        snopRecordRepo.findByItemCodeAndPlanMonth(itemCode, planMonth);
+
+                if (!existingList.isEmpty()) {
+                    // 동일한 plan_month + item_code인 모든 레코드에 대해 update
+                    for (SnopRecord record : existingList) {
+                        record.setSalesActual(totalActual);
+                        if (unit != null) record.setInventoryUnit(unit);
+                        snopRecordRepo.save(record);
+                        log.debug("[RFC-004] UPDATE: id={}, item_code={}, plan_month={}, sales_actual={}",
+                                record.getId(), itemCode, planMonth, totalActual);
+                    }
+                    updateCount += existingList.size();
+                } else {
+                    // 매칭 레코드 없으면 신규 생성
+                    SnopRecord record = new SnopRecord();
+                    record.setItemCode(itemCode);
+                    record.setPlanMonth(planMonth);
+                    record.setSalesActual(totalActual);
+                    if (unit != null) record.setInventoryUnit(unit);
+                    // 신규 생성 시 자재마스터에서 자재명/카테고리/생산라인 등 보충
+                    enrichFromMaterialMaster(record, itemCode);
+                    snopRecordRepo.save(record);
+                    insertCount++;
+                    log.debug("[RFC-004] INSERT: item_code={}, plan_month={}, sales_actual={}",
+                            itemCode, planMonth, totalActual);
+                }
+
+            } catch (Exception e) {
+                errors.add("합산 반영 오류 [" + entry.getKey() + "]: " + e.getMessage());
+                errorCount++;
+                log.error("[RFC-004] 합산 반영 오류 [{}]: {}", entry.getKey(), e.getMessage());
+            }
+        }
+
         LocalDateTime endTime = LocalDateTime.now();
         long durationMs = java.time.Duration.between(startTime, endTime).toMillis();
 
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-004] 판매실적 수신 완료: 처리={}, 신규={}, 수정={}, 에러={}",
-                processedCount, insertCount, updateCount, errorCount);
+        log.info("[RFC-004] 판매실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, 에러={}",
+                processedCount, actualSum.size(), insertCount, updateCount, errorCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
         result.put("status", errorCount == 0 ? "SUCCESS" : "PARTIAL_SUCCESS");
         result.put("total_received", dataList.size());
         result.put("processed_count", processedCount);
+        result.put("aggregated_count", actualSum.size());
         result.put("insert_count", insertCount);
         result.put("update_count", updateCount);
         result.put("error_count", errorCount);
@@ -1139,8 +1183,14 @@ public class RfcReceiverService {
         if (val == null) return null;
         if (val instanceof Number) return ((Number) val).longValue();
         try {
-            return Long.parseLong(val.toString().trim().replaceAll("[^\\d-]", ""));
+            String str = val.toString().trim();
+            // 소수점이 포함된 문자열(예: "200.0")은 Double로 먼저 파싱 후 Long 변환
+            if (str.contains(".")) {
+                return (long) Double.parseDouble(str);
+            }
+            return Long.parseLong(str.replaceAll("[^\\d-]", ""));
         } catch (NumberFormatException e) {
+            log.warn("[getLong] 숫자 변환 실패 — key={}, value={}", key, val);
             return null;
         }
     }

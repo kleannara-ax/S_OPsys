@@ -3518,7 +3518,7 @@ function generateProjectedRawRecords(rawRecords, monthsAhead = PROJECTED_MONTH_E
                 moq: referenceRecord.moq ?? null,
                 month: nextMonth,
                 sales_plan: toNumber(referenceRecord.sales_plan),
-                sales_actual: parseNumberOrNull(referenceRecord.sales_actual),
+                sales_actual: null, // 미래 projected 레코드는 판매실적 없음
                 production_plan: toNumber(referenceRecord.production_plan),
                 production_actual: 0,
                 production_remaining: toNumber(referenceRecord.production_plan),

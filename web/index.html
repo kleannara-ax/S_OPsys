@@ -680,6 +680,14 @@
                                 <p>채널별 업로드 데이터를 합산한 총 판매 계획이며 생산계획 현황의 판매 계획 값에 자동 반영됩니다.</p>
                             </div>
                             <div class="sales-summary-filters" aria-label="판매 계획 합계 필터">
+                                <label class="item-search-label">
+                                    자재 코드
+                                    <div class="item-search-dropdown" id="sales-summary-filter-item-dropdown">
+                                        <input type="text" class="item-search-input" id="sales-summary-filter-item-input" placeholder="전체" autocomplete="off">
+                                        <input type="hidden" id="sales-summary-filter-item" value="all">
+                                        <div class="item-search-list hidden" id="sales-summary-filter-item-list"></div>
+                                    </div>
+                                </label>
                                 <label>
                                     계획 월
                                     <select id="sales-summary-filter-month">
@@ -1848,6 +1856,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260603a" defer></script>
+    <script src="js/main.js?v=20260603b" defer></script>
 </body>
 </html>

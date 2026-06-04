@@ -5043,7 +5043,7 @@ td.number {
 
 #inventory-forecast-table .col-category {
     width: auto;
-    min-width: 120px;
+    min-width: 150px;
     white-space: nowrap;
 }
 

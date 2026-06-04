@@ -15236,6 +15236,10 @@ function renderSalesSummaryTable() {
         ? dom.salesUpload.summaryCategoryFilter.value
         : 'all';
 
+    /* 현재월 이전 데이터 자동 제외 (월 필터가 '전체'일 때) */
+    const now = new Date();
+    const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
     const filteredAggregates = aggregates.filter((entry) => {
         const itemValue = sanitizeText(entry.item_code).trim().toUpperCase();
         const monthValue = sanitizeText(entry.month).trim();
@@ -15243,6 +15247,8 @@ function renderSalesSummaryTable() {
         const matchesItem = itemFilter === 'all' || itemValue === itemFilter.toUpperCase();
         const matchesMonth = monthFilter === 'all' || monthValue === monthFilter;
         const matchesCategory = categoryFilter === 'all' || categoryValue === categoryFilter;
+        /* 월 필터 '전체'일 때 현재월 이전 데이터 제외 */
+        if (monthFilter === 'all' && monthValue && monthValue < currentMonth) return false;
         return matchesItem && matchesMonth && matchesCategory;
     });
 

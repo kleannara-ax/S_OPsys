@@ -738,6 +738,9 @@ const dom = {
         channelDescription: document.querySelector('#channel-description'),
         channelList: document.querySelector('#sales-channel-list'),
         channelEmpty: document.querySelector('#sales-channel-empty'),
+        summaryItemFilter: document.querySelector('#sales-summary-filter-item'),
+        summaryItemInput: document.querySelector('#sales-summary-filter-item-input'),
+        summaryItemList: document.querySelector('#sales-summary-filter-item-list'),
         summaryMonthFilter: document.querySelector('#sales-summary-filter-month'),
         summaryCategoryFilter: document.querySelector('#sales-summary-filter-category'),
         summaryTable: document.querySelector('#sales-summary-table'),
@@ -15113,6 +15116,108 @@ function populateSalesSummaryFilters() {
     }
 }
 
+/* ── 판매 합계 자재코드 검색 드롭다운 ── */
+function renderSalesSummaryItemList(query) {
+    const list = dom.salesUpload.summaryItemList;
+    if (!list) return;
+    list.innerHTML = '';
+
+    const aggregates = state.salesAggregates && Array.isArray(state.salesAggregates.list)
+        ? state.salesAggregates.list : [];
+
+    /* 고유 자재코드+명칭 추출 */
+    const seen = new Set();
+    const options = [];
+    aggregates.forEach((entry) => {
+        const code = sanitizeText(entry.item_code).trim();
+        if (!code || seen.has(code.toUpperCase())) return;
+        seen.add(code.toUpperCase());
+        options.push({ code, name: sanitizeText(entry.item_name || '').trim() });
+    });
+    options.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+
+    const q = (query || '').trim().toUpperCase();
+
+    /* '전체' 옵션 */
+    const allDiv = document.createElement('div');
+    allDiv.className = 'item-search-option option-all';
+    allDiv.textContent = '전체';
+    allDiv.dataset.value = 'all';
+    allDiv.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        selectSalesSummaryItemFilter('all', '');
+    });
+    list.appendChild(allDiv);
+
+    const filtered = q
+        ? options.filter(({ code, name }) =>
+            (code || '').toUpperCase().includes(q) || (name || '').toUpperCase().includes(q))
+        : options;
+
+    const maxDisplay = 100;
+    filtered.slice(0, maxDisplay).forEach(({ code, name }) => {
+        const div = document.createElement('div');
+        div.className = 'item-search-option';
+        div.dataset.value = code;
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'item-code';
+        codeSpan.textContent = code;
+        div.appendChild(codeSpan);
+        if (name && name !== code && name !== '-') {
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'item-name';
+            nameSpan.textContent = name;
+            div.appendChild(nameSpan);
+        }
+        div.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            selectSalesSummaryItemFilter(code, code);
+        });
+        list.appendChild(div);
+    });
+
+    if (filtered.length > maxDisplay) {
+        const moreDiv = document.createElement('div');
+        moreDiv.className = 'item-search-option';
+        moreDiv.style.color = '#94a3b8';
+        moreDiv.style.fontStyle = 'italic';
+        moreDiv.style.cursor = 'default';
+        moreDiv.textContent = `... 외 ${filtered.length - maxDisplay}건 (더 입력하여 검색)`;
+        list.appendChild(moreDiv);
+    }
+
+    list.classList.remove('hidden');
+}
+
+function selectSalesSummaryItemFilter(value, displayText) {
+    if (dom.salesUpload.summaryItemFilter) dom.salesUpload.summaryItemFilter.value = value;
+    if (dom.salesUpload.summaryItemInput) dom.salesUpload.summaryItemInput.value = value === 'all' ? '' : displayText;
+    if (dom.salesUpload.summaryItemList) dom.salesUpload.summaryItemList.classList.add('hidden');
+    renderSalesSummaryTable();
+}
+
+function initSalesSummaryItemFilter() {
+    const input = dom.salesUpload.summaryItemInput;
+    const list = dom.salesUpload.summaryItemList;
+    if (!input || !list) return;
+
+    input.addEventListener('focus', () => { renderSalesSummaryItemList(input.value); });
+    input.addEventListener('input', () => { renderSalesSummaryItemList(input.value); });
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            list.classList.add('hidden');
+            if (!input.value.trim()) {
+                if (dom.salesUpload.summaryItemFilter) dom.salesUpload.summaryItemFilter.value = 'all';
+                input.value = '';
+                renderSalesSummaryTable();
+            }
+        }, 200);
+    });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { list.classList.add('hidden'); input.blur(); }
+    });
+}
+
 function renderSalesSummaryTable() {
     if (!dom.salesUpload || !dom.salesUpload.summaryBody) return;
     const tbody = dom.salesUpload.summaryBody;
@@ -15123,6 +15228,9 @@ function renderSalesSummaryTable() {
         ? state.salesAggregates.list
         : [];
 
+    const itemFilter = dom.salesUpload.summaryItemFilter
+        ? dom.salesUpload.summaryItemFilter.value
+        : 'all';
     const monthFilter = dom.salesUpload.summaryMonthFilter
         ? dom.salesUpload.summaryMonthFilter.value
         : 'all';
@@ -15131,11 +15239,13 @@ function renderSalesSummaryTable() {
         : 'all';
 
     const filteredAggregates = aggregates.filter((entry) => {
+        const itemValue = sanitizeText(entry.item_code).trim().toUpperCase();
         const monthValue = sanitizeText(entry.month).trim();
         const categoryValue = sanitizeText(entry.category).trim();
+        const matchesItem = itemFilter === 'all' || itemValue === itemFilter.toUpperCase();
         const matchesMonth = monthFilter === 'all' || monthValue === monthFilter;
         const matchesCategory = categoryFilter === 'all' || categoryValue === categoryFilter;
-        return matchesMonth && matchesCategory;
+        return matchesItem && matchesMonth && matchesCategory;
     });
 
     if (filteredAggregates.length === 0) {
@@ -18130,6 +18240,9 @@ function bindEvents() {
             updateChart();
         });
     }
+    /* 판매 합계 — 자재코드 검색 드롭다운 초기화 */
+    initSalesSummaryItemFilter();
+
     if (dom.salesUpload.summaryMonthFilter) {
         dom.salesUpload.summaryMonthFilter.addEventListener('change', renderSalesSummaryTable);
     }

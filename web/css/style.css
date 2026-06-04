@@ -6248,6 +6248,36 @@ td.number {
     align-items: center;
 }
 
+/* 2-3 인터페이스 이력관리 - 헤더 틀고정 */
+.if-hist-table-wrapper {
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.if-hist-table-wrapper::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.if-hist-table-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+    border-radius: 999px;
+}
+
+.if-hist-table-wrapper::-webkit-scrollbar-track {
+    background: rgba(203, 213, 225, 0.2);
+}
+
+#if-hist-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: rgba(241, 245, 249, 0.98);
+    backdrop-filter: blur(4px);
+    box-shadow: inset 0 -2px 0 rgba(148, 163, 184, 0.25);
+}
+
 /* 2-2 수행관리 - 컬럼별 최소 너비 지정 */
 #if-exec-table th:nth-child(1),
 #if-exec-table td:nth-child(1) { min-width: 120px; }   /* 인터페이스 ID */

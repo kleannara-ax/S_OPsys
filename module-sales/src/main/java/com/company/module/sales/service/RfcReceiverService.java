@@ -890,6 +890,10 @@ public class RfcReceiverService {
     private String convertPlanMonthDay(String planMonthDay) {
         if (planMonthDay == null || planMonthDay.isEmpty()) return null;
         String trimmed = planMonthDay.trim();
+        // YYYYMM 형식 (SAP PLAN_MON — 6자리)
+        if (trimmed.length() == 6 && !trimmed.contains("-") && !trimmed.contains("/")) {
+            return trimmed.substring(0, 4) + "-" + trimmed.substring(4, 6);
+        }
         // YYYYMMDD 형식
         if (trimmed.length() == 8 && !trimmed.contains("-")) {
             return trimmed.substring(0, 4) + "-" + trimmed.substring(4, 6);

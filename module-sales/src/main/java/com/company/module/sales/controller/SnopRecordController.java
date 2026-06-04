@@ -5,8 +5,10 @@ import com.company.module.sales.dto.PageResponse;
 import com.company.module.sales.dto.SnopRecordDto;
 import com.company.module.sales.entity.SnopRecord;
 import com.company.module.sales.service.SnopRecordService;
+import javax.annotation.PostConstruct;
 import javax.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -20,9 +22,24 @@ import java.util.Map;
 @RestController
 @RequestMapping("/sales-api/snop-records")
 @RequiredArgsConstructor
+@Slf4j
 public class SnopRecordController {
 
     private final SnopRecordService service;
+
+    @PostConstruct
+    public void init() {
+        try {
+            Map<String, Object> result = service.cleanupMalformedPlanMonth();
+            int fixed = (int) result.getOrDefault("fixed_count", 0);
+            int merged = (int) result.getOrDefault("merged_count", 0);
+            if (fixed > 0 || merged > 0) {
+                log.info("[SnopRecord] plan_month 형식 자동 정리: 수정={}, 병합={}", fixed, merged);
+            }
+        } catch (Exception e) {
+            log.warn("[SnopRecord] plan_month 정리 중 오류 (무시): {}", e.getMessage());
+        }
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<SnopRecord>>> list(

@@ -4812,8 +4812,13 @@ function renderInventoryForecastTable(baseMonth, filteredRecords) {
 
         const label = document.createElement('span');
         label.className = 'category-label';
-        label.textContent = `${categoryName} (${items.length}개 자재)`;
+        label.textContent = categoryName;
         toggleButton.appendChild(label);
+
+        const countBadge = document.createElement('span');
+        countBadge.className = 'category-count';
+        countBadge.textContent = `(${items.length}개 자재)`;
+        toggleButton.appendChild(countBadge);
 
         categoryCell.appendChild(toggleButton);
         row.appendChild(categoryCell);

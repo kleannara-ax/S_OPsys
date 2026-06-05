@@ -170,11 +170,12 @@ public class InterfaceSchedulerService {
 
                 // 결과에서 처리건수 추출
                 int processedCount = 0;
-                if (result.containsKey("inserted_count")) {
-                    processedCount += toInt(result.get("inserted_count"));
+                // processRfc*()은 "insert_count"/"update_count" 키 사용
+                if (result.containsKey("insert_count")) {
+                    processedCount += toInt(result.get("insert_count"));
                 }
-                if (result.containsKey("updated_count")) {
-                    processedCount += toInt(result.get("updated_count"));
+                if (result.containsKey("update_count")) {
+                    processedCount += toInt(result.get("update_count"));
                 }
                 if (result.containsKey("total_received")) {
                     processedCount = Math.max(processedCount, toInt(result.get("total_received")));
@@ -183,15 +184,27 @@ public class InterfaceSchedulerService {
                     processedCount = "SUCCESS".equals(result.get("status")) ? 1 : 0;
                 }
 
+                int rfcErrorCount = toInt(result.get("error_count"));
                 String statusPrefix = "RETRY".equals(executionType) ? "RETRY_" : "";
-                history.setStatus(statusPrefix + "SUCCESS");
+                String statusSuffix = rfcErrorCount > 0 ? "PARTIAL_SUCCESS" : "SUCCESS";
+                history.setStatus(statusPrefix + statusSuffix);
                 history.setProcessedCount(processedCount);
-                history.setErrorCount(0);
+                history.setErrorCount(rfcErrorCount);
                 history.setEndTime(endTime);
                 history.setDurationMs(durationMs);
 
-                log.info("[IF-EXEC-RFC] 내부 호출 성공: {} (RFC_{}, {}건, {}ms)",
-                        interfaceId, rfcNumber, processedCount, durationMs);
+                // 에러 메시지가 있으면 이력에 기록
+                if (result.containsKey("errors")) {
+                    Object errorsObj = result.get("errors");
+                    if (errorsObj instanceof java.util.List && !((java.util.List<?>) errorsObj).isEmpty()) {
+                        String errMsg = errorsObj.toString();
+                        if (errMsg.length() > 1500) errMsg = errMsg.substring(0, 1500) + "...";
+                        history.setErrorMessage(errMsg);
+                    }
+                }
+
+                log.info("[IF-EXEC-RFC] 내부 호출 완료: {} (RFC_{}, 처리={}건, 에러={}건, {}ms)",
+                        interfaceId, rfcNumber, processedCount, rfcErrorCount, durationMs);
 
             } else {
                 // ── 외부 HTTP POST 호출 ──

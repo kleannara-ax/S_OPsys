@@ -20004,6 +20004,8 @@ function bindIfExecEvents() {
                 btn.disabled = false;
                 btn.textContent = origText;
                 await loadInterfaceExecutions();
+                /* 수동실행 완료 후 전체 데이터 갱신 (새로고침 없이 반영) */
+                await loadData();
             }).catch(err => {
                 clearTimeout(timeoutId);
                 // 타임아웃 또는 네트워크 에러 — 서버에서는 계속 실행 중일 수 있음
@@ -20015,6 +20017,8 @@ function bindIfExecEvents() {
                 btn.disabled = false;
                 btn.textContent = origText;
                 loadInterfaceExecutions();
+                /* 타임아웃 후에도 데이터 갱신 시도 (서버에서 처리 완료되었을 수 있음) */
+                loadData();
             });
             return;
         }

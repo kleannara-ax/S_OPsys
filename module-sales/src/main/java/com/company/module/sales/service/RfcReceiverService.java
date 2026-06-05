@@ -726,6 +726,19 @@ public class RfcReceiverService {
 
         log.info("[RFC-006] 리뉴얼자재연결 수신 시작: {}건", dataList.size());
 
+        // 첫 번째 행의 변환된 필드명 로그 (디버깅용)
+        if (!dataList.isEmpty()) {
+            Map<String, Object> firstRow = dataList.get(0);
+            log.info("[RFC-006] ★ 변환 후 필드명 (첫 번째 행): {}", firstRow.keySet());
+            for (Map.Entry<String, Object> entry : firstRow.entrySet()) {
+                Object val = entry.getValue();
+                String valStr = (val != null) ? val.toString() : "null";
+                if (valStr.length() > 100) valStr = valStr.substring(0, 100) + "...";
+                log.info("[RFC-006]   {} = {} (type={})", entry.getKey(), valStr,
+                        val != null ? val.getClass().getSimpleName() : "null");
+            }
+        }
+
         for (int i = 0; i < dataList.size(); i++) {
             Map<String, Object> row = dataList.get(i);
             try {
@@ -736,7 +749,12 @@ public class RfcReceiverService {
                     updateType = "1"; // 기본값: Insert
                 }
 
+                log.debug("[RFC-006] Row {}: item_code={}, new_update_type={}, item_code_1={}, is_active={}",
+                        i + 1, itemCode, updateType,
+                        getStr(row, "item_code_1"), getStr(row, "is_active"));
+
                 if (itemCode == null || itemCode.isEmpty()) {
+                    log.warn("[RFC-006] Row {}: item_code 누락 — 전체 필드: {}", i + 1, row);
                     errors.add("Row " + (i + 1) + ": item_code(legacy_item_code) 누락");
                     errorCount++;
                     continue;

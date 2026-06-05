@@ -356,6 +356,9 @@ public class SapRfcCallerService {
 
         log.info("[RFC-006] SAP 수신 완료 — {}건", sapData.size());
 
+        // SAP 원본 필드명 로그 출력 (필드 매핑 디버깅용)
+        logSapFieldNames("RFC-006", sapData);
+
         List<Map<String, Object>> mappedData = convertFieldNames(sapData, FIELD_MAP_006);
         return rfcReceiverService.processRfc006(mappedData, executionType);
     }

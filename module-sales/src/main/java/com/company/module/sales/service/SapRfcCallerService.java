@@ -103,14 +103,11 @@ public class SapRfcCallerService {
     private static final Map<String, String> FIELD_MAP_003 = new LinkedHashMap<>();
     static {
         FIELD_MAP_003.put("PLAN_MONTH_DAY", "plan_month_day");
-        FIELD_MAP_003.put("PLAN_MON", "plan_month_day");            // SAP 실제 필드명 (YYYYMM 6자리)
         FIELD_MAP_003.put("ITEM_CODE", "item_code");
         FIELD_MAP_003.put("PLANT_CODE", "plant_code");
-        FIELD_MAP_003.put("PLAN", "plant_code");                    // SAP 실제 필드명
         FIELD_MAP_003.put("UNIT", "unit");
-        FIELD_MAP_003.put("UNI", "unit");                           // SAP 실제 필드명
         FIELD_MAP_003.put("PRODUCTION_ACTUAL", "production_actual");
-        FIELD_MAP_003.put("PRODUCT_ACTUA", "production_actual");    // SAP 실제 필드명
+        FIELD_MAP_003.put("PRODUCT_ACTUAL", "production_actual");   // SAP 실제 필드명 (PRODUCTION→PRODUCT)
     }
 
     /** RFC_004 판매실적: SAP 필드 → S&OP 필드 */

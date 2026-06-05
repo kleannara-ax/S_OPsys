@@ -6755,11 +6755,30 @@ async function loadData() {
         });
 
         /* ── 리뉴얼 자재 연결 resolver 생성 ──
-         * 수동 등록(materialLinkages) + SAP RFC_006(renewalMaterialLinkages) 통합
-         * → legacy_item_code → renewal_item_code_1 연결로 canonical 코드 결정
-         * → 기존자재의 현재고/판매실적/생산실적/가용재고가 리뉴얼자재1 기준으로 합산됨
-         * SAP 데이터 우선: 동일 legacy_item_code가 양쪽에 있으면 SAP 데이터가 덮어씀 */
-        const combinedLinkages = [...state.materialLinkages, ...state.renewalMaterialLinkages];
+         * SAP RFC_006 데이터 구조:
+         *   legacy_item_code = 신규코드 (ITEM_CODE)
+         *   renewal_item_code_1~5 = 기존코드1~5 (ITEM_CODE_1~5)
+         * resolver 방향: 기존코드 → 신규코드 (기존자재 데이터를 신규자재에 합산)
+         * 기존코드1~5 각각을 forward 맵에 등록하여 신규코드로 resolve */
+        const reversedRenewalLinkages = [];
+        state.renewalMaterialLinkages.forEach((entry) => {
+            const newCode = sanitizeText(entry.legacy_item_code).trim(); // 신규코드
+            const newName = sanitizeText(entry.legacy_item_name).trim();
+            if (!newCode) return;
+            for (let i = 1; i <= 5; i++) {
+                const oldCode = sanitizeText(entry[`renewal_item_code_${i}`] || '').trim(); // 기존코드
+                const oldName = sanitizeText(entry[`renewal_item_name_${i}`] || '').trim();
+                if (oldCode && oldCode !== newCode) {
+                    reversedRenewalLinkages.push({
+                        legacy_item_code: oldCode,    // 기존코드 → forward의 source
+                        legacy_item_name: oldName,
+                        renewal_item_code: newCode,    // 신규코드 → forward의 target (canonical)
+                        renewal_item_name: newName,
+                    });
+                }
+            }
+        });
+        const combinedLinkages = [...state.materialLinkages, ...reversedRenewalLinkages];
         state.materialLinkageResolver = combinedLinkages.length > 0
             ? createMaterialLinkageResolver(combinedLinkages)
             : null;
@@ -8560,6 +8579,18 @@ function applyFilters() {
     refreshChangeHistoryView();
 
     let filtered = enriched;
+
+    /* ── 리뉴얼 기존자재 제외 ──
+     * resolver에 의해 canonical_item_code가 변경된 레코드(기존자재)는 리스트에서 제외.
+     * 기존자재의 데이터는 canonical(신규자재) 레코드에 합산되어 표시됨. */
+    if (state.materialLinkageResolver) {
+        filtered = filtered.filter((record) => {
+            const code = sanitizeText(record.item_code).trim();
+            const canonical = getRecordCanonicalCode(record);
+            /* item_code와 canonical이 다르면 → 기존자재 → 제외 */
+            return !code || !canonical || code === canonical;
+        });
+    }
 
     /* ── 현재월 이전 데이터 필터링 ──
      * 계획월(YYYY-MM)이 시스템 날짜 기준 현재월보다 이전이면 제외.

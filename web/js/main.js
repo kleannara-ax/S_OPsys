@@ -6739,10 +6739,6 @@ async function loadData() {
             }
             return sanitizeText(a.legacy_item_code).localeCompare(sanitizeText(b.legacy_item_code));
         });
-        state.materialLinkageResolver = state.materialLinkages.length > 0
-            ? createMaterialLinkageResolver(state.materialLinkages)
-            : null;
-
         /* ── 리뉴얼 자재 연결 (SAP 인터페이스 수신 데이터) ── */
         let renewalMaterialLinkageData = [];
         if (renewalMaterialLinkageResponse && renewalMaterialLinkageResponse.ok) {
@@ -6757,6 +6753,16 @@ async function loadData() {
         state.renewalMaterialLinkages.sort((a, b) => {
             return sanitizeText(a.legacy_item_code).localeCompare(sanitizeText(b.legacy_item_code));
         });
+
+        /* ── 리뉴얼 자재 연결 resolver 생성 ──
+         * 수동 등록(materialLinkages) + SAP RFC_006(renewalMaterialLinkages) 통합
+         * → legacy_item_code → renewal_item_code_1 연결로 canonical 코드 결정
+         * → 기존자재의 현재고/판매실적/생산실적/가용재고가 리뉴얼자재1 기준으로 합산됨
+         * SAP 데이터 우선: 동일 legacy_item_code가 양쪽에 있으면 SAP 데이터가 덮어씀 */
+        const combinedLinkages = [...state.materialLinkages, ...state.renewalMaterialLinkages];
+        state.materialLinkageResolver = combinedLinkages.length > 0
+            ? createMaterialLinkageResolver(combinedLinkages)
+            : null;
 
         populateLineCapaFilters();
         populateLineItemMasterFilters();

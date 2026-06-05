@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260605b">
+    <link rel="stylesheet" href="css/style.css?v=20260605c">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -482,7 +482,7 @@
                     <div class="section-subheader">
                         <div>
                             <h3 id="material-renewal-title">리뉴얼 자재 연결 마스터</h3>
-                            <p>SAP 인터페이스를 통해 수신된 리뉴얼 자재 연결 데이터입니다. 기존 자재 코드 1건에 리뉴얼 자재를 최대 3세트까지 연결할 수 있습니다.</p>
+                            <p>SAP 인터페이스를 통해 수신된 리뉴얼 자재 연결 데이터입니다. 신규 자재 코드 1건에 기존 자재를 최대 5세트까지 연결할 수 있습니다.</p>
                             <div class="section-hint" role="note">* 데이터는 SAP에서 인터페이스를 통해 자동으로 등록됩니다. 활성화 여부만 변경할 수 있습니다.</div>
                         </div>
                     </div>
@@ -514,20 +514,20 @@
                                 <thead>
                                     <tr class="header-group">
                                         <th></th><!-- 카테고리 -->
-                                        <th></th><!-- 기존 자재 코드 -->
-                                        <th></th><!-- 기존 자재 명칭 -->
-                                        <th colspan="2">리뉴얼 자재 1</th>
-                                        <th colspan="2">리뉴얼 자재 2</th>
-                                        <th colspan="2">리뉴얼 자재 3</th>
-                                        <th colspan="2">리뉴얼 자재 4</th>
-                                        <th colspan="2">리뉴얼 자재 5</th>
+                                        <th></th><!-- 신규 코드 -->
+                                        <th></th><!-- 신규 자재 명칭 -->
+                                        <th colspan="2">기존 자재 1</th>
+                                        <th colspan="2">기존 자재 2</th>
+                                        <th colspan="2">기존 자재 3</th>
+                                        <th colspan="2">기존 자재 4</th>
+                                        <th colspan="2">기존 자재 5</th>
                                         <th></th><!-- 생성(변경)일자 -->
                                         <th></th><!-- 생성(변경)시간 -->
                                     </tr>
                                     <tr class="header-columns">
                                         <th>카테고리</th>
-                                        <th>기존 자재 코드</th>
-                                        <th>기존 자재 명칭</th>
+                                        <th>신규 코드</th>
+                                        <th>신규 자재 명칭</th>
                                         <th>코드</th>
                                         <th>명칭</th>
                                         <th>코드</th>
@@ -1856,6 +1856,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260605b" defer></script>
+    <script src="js/main.js?v=20260605c" defer></script>
 </body>
 </html>

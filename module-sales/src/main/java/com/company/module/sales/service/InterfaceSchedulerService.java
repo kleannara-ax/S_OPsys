@@ -22,6 +22,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,6 +47,9 @@ public class InterfaceSchedulerService {
 
     @Value("${server.port:8080}")
     private int serverPort;
+
+    /** 인터페이스별 동시실행 방지 락 — interfaceId단위로 중복 실행 차단 */
+    private static final ConcurrentHashMap<String, Boolean> RUNNING_INTERFACES = new ConcurrentHashMap<>();
 
     /**
      * 내부 SAP RFC URL 패턴: /sales-api/sap/rfc/001 ~ 006
@@ -139,6 +143,26 @@ public class InterfaceSchedulerService {
     public InterfaceHistory executeViaRfcUrl(String interfaceId, String interfaceName,
                                               String rfcUrl, String rfcParam,
                                               String executionType, Long retryOfId) {
+        /* 동시실행 방지: 같은 interfaceId가 이미 실행 중이면 즉시 에러 반환 */
+        if (RUNNING_INTERFACES.putIfAbsent(interfaceId, Boolean.TRUE) != null) {
+            log.warn("[IF-EXEC-RFC] 동시실행 차단: {} — 이미 실행 중입니다.", interfaceId);
+            InterfaceHistory blocked = InterfaceHistory.builder()
+                    .interfaceId(interfaceId)
+                    .interfaceName(interfaceName)
+                    .executionType(executionType)
+                    .startTime(LocalDateTime.now())
+                    .endTime(LocalDateTime.now())
+                    .durationMs(0L)
+                    .status("ERROR")
+                    .processedCount(0)
+                    .errorCount(1)
+                    .errorMessage("동시 실행 차단: 해당 인터페이스가 이미 실행 중입니다. 완료 후 다시 시도해주세요.")
+                    .execCommand("RFC: " + rfcUrl)
+                    .retryOfId(retryOfId)
+                    .build();
+            return historyRepo.save(blocked);
+        }
+
         LocalDateTime startTime = LocalDateTime.now();
         InterfaceHistory history = InterfaceHistory.builder()
                 .interfaceId(interfaceId)
@@ -222,9 +246,14 @@ public class InterfaceSchedulerService {
             history.setProcessedCount(0);
             history.setErrorCount(1);
             String errMsg = e.getMessage();
-            if (errMsg != null && errMsg.length() > 1500) errMsg = errMsg.substring(0, 1500) + "...";
+            if (errMsg == null || errMsg.trim().isEmpty()) {
+                errMsg = e.getClass().getSimpleName() + ": " + (e.getCause() != null ? e.getCause().getMessage() : "(no message)");
+            }
+            if (errMsg.length() > 1500) errMsg = errMsg.substring(0, 1500) + "...";
             history.setErrorMessage(errMsg);
-            log.error("[IF-EXEC-RFC] 예외 발생: {} - {}", interfaceId, e.getMessage(), e);
+            log.error("[IF-EXEC-RFC] 예외 발생: {} - {}", interfaceId, errMsg, e);
+        } finally {
+            RUNNING_INTERFACES.remove(interfaceId);
         }
 
         return historyRepo.save(history);

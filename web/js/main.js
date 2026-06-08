@@ -20129,8 +20129,17 @@ function bindIfExecEvents() {
         /* ---- 수동 실행 ---- */
         if (btn.classList.contains('if-exec-run-btn')) {
             const ifId = btn.dataset.ifId;
+            /* 동일 인터페이스 중복 실행 방지 — 전역 플래그로 완전 차단 */
+            if (!state._runningManualExec) state._runningManualExec = new Set();
+            if (state._runningManualExec.has(ifId)) {
+                alert(`"${ifId}" 수동 실행이 이미 진행 중입니다. 완료 후 다시 시도해주세요.`);
+                return;
+            }
             if (!confirm(`"${ifId}" 인터페이스를 수동 실행하시겠습니까?`)) return;
+            state._runningManualExec.add(ifId);
             btn.disabled = true;
+            /* 같은 ifId를 가진 모든 수동실행 버튼 비활성화 */
+            document.querySelectorAll(`.if-exec-run-btn[data-if-id="${ifId}"]`).forEach(b => { b.disabled = true; });
             const origText = btn.textContent;
             btn.textContent = '실행중...';
 
@@ -20162,8 +20171,10 @@ function bindIfExecEvents() {
                         alert(`수동 실행 완료 - 상태: ${statusLabel[d.status] || d.status}`);
                     } catch { alert(`"${ifId}" 수동 실행이 완료되었습니다.\n이력관리 탭에서 결과를 확인해주세요.`); }
                 }
+                state._runningManualExec.delete(ifId);
                 btn.disabled = false;
                 btn.textContent = origText;
+                document.querySelectorAll(`.if-exec-run-btn[data-if-id="${ifId}"]`).forEach(b => { b.disabled = false; });
                 await loadInterfaceExecutions();
                 /* 수동실행 완료 후 전체 데이터 갱신 (새로고침 없이 반영) */
                 await loadData();
@@ -20175,8 +20186,10 @@ function bindIfExecEvents() {
                 } else {
                     alert(`"${ifId}" 실행 요청이 전송되었습니다.\n프록시 타임아웃이 발생했지만, 서버에서는 정상 처리 중일 수 있습니다.\n이력관리 탭에서 결과를 확인해주세요.`);
                 }
+                state._runningManualExec.delete(ifId);
                 btn.disabled = false;
                 btn.textContent = origText;
+                document.querySelectorAll(`.if-exec-run-btn[data-if-id="${ifId}"]`).forEach(b => { b.disabled = false; });
                 loadInterfaceExecutions();
                 /* 타임아웃 후에도 데이터 갱신 시도 (서버에서 처리 완료되었을 수 있음) */
                 loadData();

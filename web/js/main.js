@@ -4327,11 +4327,66 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
 
     const chained = [];
 
-    grouped.forEach((records) => {
-        records.sort((a, b) => sanitizeText(a.month).localeCompare(sanitizeText(b.month)));
+    grouped.forEach((records, canonicalKey) => {
+        /* ── 같은 canonical + 같은 month 레코드 합산 ──
+         * 리뉴얼 자재 연결 시 기존코드와 신규코드가 동일 월에 각각 레코드를 가질 수 있음.
+         * 이 경우 숫자 필드를 합산하여 단일 레코드로 병합한다.
+         * canonical(신규코드) 레코드를 기준으로 기존코드 레코드의 값을 합산. */
+        const monthMap = new Map();
+        records.forEach((record) => {
+            const month = sanitizeText(record.month).trim();
+            if (!monthMap.has(month)) {
+                monthMap.set(month, []);
+            }
+            monthMap.get(month).push(record);
+        });
+
+        const mergedRecords = [];
+        monthMap.forEach((monthRecords, month) => {
+            if (monthRecords.length === 1) {
+                mergedRecords.push(monthRecords[0]);
+            } else {
+                /* canonical(신규코드) 레코드를 기준으로 선택 */
+                let base = monthRecords.find((r) => {
+                    const code = sanitizeText(r.item_code).trim();
+                    return code === canonicalKey;
+                });
+                if (!base) base = monthRecords[0]; // fallback
+
+                const merged = { ...base };
+                const sumFields = [
+                    'sales_actual', 'sales_plan', 'production_actual', 'production_plan',
+                    'production_remaining', 'beginning_inventory', 'available_inventory',
+                    'target_ending_inventory', 'capacity_limit',
+                ];
+
+                sumFields.forEach((field) => {
+                    let total = null;
+                    monthRecords.forEach((r) => {
+                        const val = parseNumberOrNull(r[field]);
+                        if (val !== null) {
+                            total = (total || 0) + val;
+                        }
+                    });
+                    if (total !== null) {
+                        merged[field] = total;
+                    }
+                });
+
+                /* 합산 디버그 로그 (기존자재 데이터가 합산된 경우만) */
+                if (monthRecords.length > 1) {
+                    const codes = monthRecords.map((r) => sanitizeText(r.item_code).trim()).join(', ');
+                    console.debug(`[buildChainedRecords] ${canonicalKey} ${month}: ${monthRecords.length}건 합산 (${codes})`);
+                }
+
+                mergedRecords.push(merged);
+            }
+        });
+
+        mergedRecords.sort((a, b) => sanitizeText(a.month).localeCompare(sanitizeText(b.month)));
         let previousEnding = null;
         const recentSalesActuals = [];
-        records.forEach((record) => {
+        mergedRecords.forEach((record) => {
             const rawBeginning = toNumber(record.beginning_inventory);
             const rawAvailable = record.available_inventory != null ? toNumber(record.available_inventory) : null;
             const isProjected = Boolean(record.isProjected);

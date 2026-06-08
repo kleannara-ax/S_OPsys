@@ -981,6 +981,55 @@ async function safeJson(response, fallback = null, options = {}) {
 }
 
 /**
+ * 페이지네이션 API를 반복 호출하여 전체 데이터를 수집합니다.
+ * 서버의 max-page-size 제한(기본 2000)에 관계없이 모든 레코드를 가져옵니다.
+ * @param {string} baseUrl - 기본 URL (예: '/sales-api/snop-records')
+ * @param {number} pageSize - 페이지당 요청 크기 (기본 2000)
+ * @param {string} label - 로그용 라벨
+ * @returns {Promise<Array>} 전체 데이터 배열
+ */
+async function fetchAllPages(baseUrl, pageSize = 2000, label = '') {
+    const allRecords = [];
+    let page = 0;
+    let totalPages = 1;
+    const MAX_PAGES = 50; // 안전 가드: 최대 50페이지 (100,000건)
+
+    while (page < totalPages && page < MAX_PAGES) {
+        const separator = baseUrl.includes('?') ? '&' : '?';
+        const url = `${baseUrl}${separator}page=${page}&size=${pageSize}`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                console.warn(`${label || baseUrl} 페이지 ${page} 조회 실패: ${response.status}`);
+                break;
+            }
+            const payload = await response.json();
+            const data = payload?.data;
+            if (!data) break;
+
+            if (data.content && Array.isArray(data.content)) {
+                allRecords.push(...data.content);
+                totalPages = data.total_pages ?? data.totalPages ?? 1;
+            } else if (Array.isArray(data)) {
+                allRecords.push(...data);
+                break; // 비페이지네이션 응답이면 한 번에 끝
+            } else {
+                break;
+            }
+        } catch (e) {
+            console.error(`${label || baseUrl} 페이지 ${page} 조회 오류:`, e);
+            break;
+        }
+        page++;
+    }
+
+    if (page > 1) {
+        console.info(`${label || baseUrl}: 전체 ${allRecords.length}건 조회 (${page}페이지)`);
+    }
+    return allRecords;
+}
+
+/**
  * ApiResponse 래퍼에서 데이터 배열을 추출하는 유틸리티.
  * 서버 응답 형식:
  *   - 페이지네이션: { success, data: { content: [...], page, size, ... } }
@@ -6585,8 +6634,10 @@ function handleChangeHistoryTabKeydown(event) {
 async function loadData() {
     try {
         toggleLoading(true);
+        /* snop-records는 페이지네이션 전체 조회 (서버 max-page-size 제한 우회) */
+        const snopRecordsPromise = fetchAllPages('/sales-api/snop-records', 2000, 'S&OP 생산계획');
+
         const [
-            snopResponse,
             salesResponse,
             channelResponse,
             lineCapaResponse,
@@ -6601,7 +6652,6 @@ async function loadData() {
             baseMaterialMasterResponse,
             monthlyClosingResponse,
         ] = await Promise.all([
-            fetch('/sales-api/snop-records?size=5000'),
             fetch('/sales-api/sales-plan-uploads?limit=1000'),
             fetch('/sales-api/sales-channels?limit=500'),
             fetch('/sales-api/line-capa-plans?limit=1000'),
@@ -6617,14 +6667,7 @@ async function loadData() {
             fetch('/sales-api/monthly-closings?limit=5000'),
         ]);
 
-        let snopRecords = [];
-        if (snopResponse && snopResponse.ok) {
-            const snopPayload = await safeJson(snopResponse, { data: [] }, { label: 'S&OP 생산계획' });
-            snopRecords = extractData(snopPayload);
-        } else {
-            const status = snopResponse ? snopResponse.status : 'no-response';
-            console.warn(`S&OP 생산계획 데이터를 불러오는 중 응답 상태(${status})가 비정상입니다.`);
-        }
+        let snopRecords = await snopRecordsPromise;
         if (!Array.isArray(snopRecords)) {
             snopRecords = [];
         }

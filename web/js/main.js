@@ -10760,22 +10760,35 @@ function getProductionPlanCategoryOptions() {
 }
 
 function populateOptimalBaselineCategoryOptions() {
-    if (!dom.optimalInventory || !dom.optimalInventory.baselineCategoryOptions) return;
-    const datalist = dom.optimalInventory.baselineCategoryOptions;
+    const select = dom.optimalInventory ? dom.optimalInventory.baselineCategory : null;
+    if (!select || select.tagName !== 'SELECT') return;
     const categories = getProductionPlanCategoryOptions();
 
-    datalist.innerHTML = '';
+    /* 현재 선택값 보존 */
+    const currentValue = select.value;
+
+    select.innerHTML = '';
+    /* 기본 placeholder 옵션 */
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.disabled = true;
+    defaultOption.textContent = categories.length > 0
+        ? '생산계획 현황 카테고리를 선택하세요'
+        : '카테고리가 없습니다';
+    select.appendChild(defaultOption);
+
     categories.forEach((category) => {
         const option = document.createElement('option');
         option.value = category;
-        datalist.appendChild(option);
+        option.textContent = category;
+        select.appendChild(option);
     });
 
-    if (dom.optimalInventory.baselineCategory) {
-        const placeholder = categories.length > 0
-            ? '생산계획 현황 카테고리를 선택하거나 입력하세요'
-            : '카테고리를 입력하세요';
-        dom.optimalInventory.baselineCategory.placeholder = placeholder;
+    /* 이전 선택값 복원 */
+    if (currentValue && categories.includes(currentValue)) {
+        select.value = currentValue;
+    } else {
+        select.selectedIndex = 0;
     }
 }
 

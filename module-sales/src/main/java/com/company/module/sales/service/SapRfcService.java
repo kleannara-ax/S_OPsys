@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -230,8 +231,11 @@ public class SapRfcService {
      * <ul>
      *   <li>JCo 3.1+: {@code table.getRecordMetaData().getName(int)}</li>
      *   <li>JCo 3.0.x: {@code table.getMetaData().getName(int)}</li>
-     *   <li>Fallback: {@code getString(String)} 대신 인덱스 기반 읽기</li>
      * </ul>
+     *
+     * <p><b>숫자 필드 처리 (BCD/DEC)</b>: SAP BCD(Binary Coded Decimal) 타입 필드는
+     * {@code getString()}으로 읽으면 소수점이 누락되어 100배/1000배 등의 오차가 발생할 수 있음.
+     * {@code getValue()}로 실제 Java 객체(BigDecimal)를 가져와서 소수점 스케일을 보존합니다.</p>
      */
     private List<Map<String, Object>> convertJCoTableToList(Object table) throws Exception {
         List<Map<String, Object>> list = new ArrayList<>();
@@ -244,7 +248,14 @@ public class SapRfcService {
         int fieldCount = (int) metaData.getClass().getMethod("getFieldCount").invoke(metaData);
         Method getMetaName = metaData.getClass().getMethod("getName", int.class);
 
-        // 값 읽기 — getString(String columnName) 사용 (모든 JCo 버전 호환)
+        // getValue(String) — 실제 Java 객체 반환 (BigDecimal, String, etc.)
+        // getString(String) — 폴백용 (getValue 실패 시)
+        Method getValueByName = null;
+        try {
+            getValueByName = table.getClass().getMethod("getValue", String.class);
+        } catch (NoSuchMethodException e) {
+            log.warn("JCoTable.getValue(String) 메서드를 찾을 수 없음 — getString() 폴백 사용");
+        }
         Method getStringByName = table.getClass().getMethod("getString", String.class);
         Method nextRow = table.getClass().getMethod("nextRow");
         Method firstRow = table.getClass().getMethod("firstRow");
@@ -257,12 +268,45 @@ public class SapRfcService {
 
         firstRow.invoke(table);
 
+        boolean loggedFirstRow = false;
+
         for (int row = 0; row < numRows; row++) {
             Map<String, Object> rowMap = new LinkedHashMap<>();
             for (int col = 0; col < fieldCount; col++) {
-                String colValue = (String) getStringByName.invoke(table, fieldNames[col]);
-                rowMap.put(fieldNames[col], colValue);
+                Object colValue = null;
+
+                if (getValueByName != null) {
+                    try {
+                        colValue = getValueByName.invoke(table, fieldNames[col]);
+                    } catch (Exception e) {
+                        // getValue 실패 시 getString 폴백
+                        colValue = getStringByName.invoke(table, fieldNames[col]);
+                    }
+                } else {
+                    colValue = getStringByName.invoke(table, fieldNames[col]);
+                }
+
+                // BigDecimal → 소수점 보존된 문자열로 변환
+                // SAP BCD/DEC 타입은 getValue()로 BigDecimal이 반환됨
+                // 이를 toPlainString()으로 변환하면 소수점 스케일이 보존됨
+                if (colValue instanceof BigDecimal) {
+                    colValue = ((BigDecimal) colValue).toPlainString();
+                }
+
+                rowMap.put(fieldNames[col], colValue != null ? colValue.toString() : null);
             }
+
+            // 첫 번째 행의 값 타입 디버그 로그 (배포 후 값 확인용)
+            if (!loggedFirstRow) {
+                loggedFirstRow = true;
+                StringBuilder sb = new StringBuilder();
+                for (int col = 0; col < Math.min(fieldCount, 10); col++) {
+                    if (col > 0) sb.append(", ");
+                    sb.append(fieldNames[col]).append("=").append(rowMap.get(fieldNames[col]));
+                }
+                log.info("[JCo] 첫 행 값 (최대 10필드): {}", sb.toString());
+            }
+
             list.add(rowMap);
             if (row < numRows - 1) {
                 nextRow.invoke(table);

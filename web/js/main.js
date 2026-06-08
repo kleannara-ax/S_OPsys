@@ -6671,13 +6671,18 @@ async function loadData() {
         if (!Array.isArray(snopRecords)) {
             snopRecords = [];
         }
-        state.rawData = snopRecords.map(normalizeRecord)
+        const normalizedAll = snopRecords.map(normalizeRecord);
+        state.rawData = normalizedAll
             .filter((record) => {
                 /* 필수 필드(item_code, month)가 없는 불완전한 레코드 제외 */
                 const code = sanitizeText(record.item_code).trim();
                 const month = sanitizeText(record.month).trim();
+                if (code && !month) {
+                    console.warn(`[loadData] item_code=${code} — month 없어 제외됨 (plan_month 미설정?)`);
+                }
                 return code && month;
             });
+        console.info(`[loadData] snop-records: API ${snopRecords.length}건 → normalize 후 ${normalizedAll.length}건 → rawData ${state.rawData.length}건`);
 
         /* 원본 생산계획값 저장 (override 적용 전) */
         state.originalProductionPlans = new Map();
@@ -8627,12 +8632,20 @@ function applyFilters() {
      * resolver에 의해 canonical_item_code가 변경된 레코드(기존자재)는 리스트에서 제외.
      * 기존자재의 데이터는 canonical(신규자재) 레코드에 합산되어 표시됨. */
     if (state.materialLinkageResolver) {
+        const beforeCount = filtered.length;
         filtered = filtered.filter((record) => {
             const code = sanitizeText(record.item_code).trim();
             const canonical = getRecordCanonicalCode(record);
             /* item_code와 canonical이 다르면 → 기존자재 → 제외 */
-            return !code || !canonical || code === canonical;
+            const keep = !code || !canonical || code === canonical;
+            if (!keep) {
+                console.debug(`[applyFilters] 기존자재 제외: ${code} → canonical=${canonical}`);
+            }
+            return keep;
         });
+        if (filtered.length < beforeCount) {
+            console.info(`[applyFilters] 리뉴얼 기존자재 ${beforeCount - filtered.length}건 제외`);
+        }
     }
 
     /* ── 현재월 이전 데이터 필터링 ──

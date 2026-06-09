@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260608e">
+    <link rel="stylesheet" href="css/style.css?v=20260608f">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -139,19 +139,19 @@
                             </label>
                             <label>
                                 BAG/BOX
-                                <input type="number" id="base-mat-conv3" min="0" step="0.001" placeholder="예: 1.000">
+                                <input type="number" id="base-mat-conv2" min="0" step="0.001" placeholder="예: 1.000">
                             </label>
                             <label>
                                 EA/BOX
-                                <input type="number" id="base-mat-conv2" min="0" step="0.001" placeholder="예: 30.000">
+                                <input type="text" id="base-mat-ea-per-box" readonly class="readonly-input" placeholder="자동 계산">
                             </label>
                             <label>
                                 BAG/PLT
-                                <input type="number" id="base-mat-conv5" min="0" step="0.001" placeholder="예: 1.000">
+                                <input type="number" id="base-mat-conv3" min="0" step="0.001" placeholder="예: 1.000">
                             </label>
                             <label>
                                 BOX/PLT
-                                <input type="text" id="base-mat-conv-ratio" readonly class="readonly-input" placeholder="자동 계산">
+                                <input type="number" id="base-mat-conv5" min="0" step="0.001" placeholder="예: 1.000">
                             </label>
                             <label>
                                 협력업체명
@@ -1858,6 +1858,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260608e" defer></script>
+    <script src="js/main.js?v=20260608f" defer></script>
 </body>
 </html>

@@ -702,10 +702,10 @@ const dom = {
         itemCode: document.querySelector('#base-mat-item-code'),
         itemName: document.querySelector('#base-mat-item-name'),
         conv1: document.querySelector('#base-mat-conv1'),
-        conv3: document.querySelector('#base-mat-conv3'),
         conv2: document.querySelector('#base-mat-conv2'),
+        eaPerBox: document.querySelector('#base-mat-ea-per-box'),
+        conv3: document.querySelector('#base-mat-conv3'),
         conv5: document.querySelector('#base-mat-conv5'),
-        convRatio: document.querySelector('#base-mat-conv-ratio'),
         vendorName: document.querySelector('#base-mat-vendor-name'),
         moq: document.querySelector('#base-mat-moq'),
         btnSave: document.querySelector('#btn-base-material-save'),
@@ -1132,27 +1132,29 @@ function formatSignedNumber(value, fallback = '0') {
 /* ── 단위 환산 유틸리티 ── */
 /**
  * 자재코드로 baseMaterialMasters에서 환산율 조회
- * - eaPerBox  : EA/BOX (conversion2) → BOX × eaPerBox = EA
- * - bagPerBox : BAG/BOX (conversion3) → BOX × bagPerBox = BAG
- * - eaPerBag  : EA/BAG (conversion1, 참고용)
+ * - eaPerBag  : EA/BAG  (conversion1)
+ * - bagPerBox : BAG/BOX (conversion2) → BOX × bagPerBox = BAG
+ * - eaPerBox  : EA/BOX  (conversion1 × conversion2) → BOX × eaPerBox = EA
  */
 function getConversionRates(itemCode) {
     const master = (state.baseMaterialMasters || []).find(
         m => m.item_code === itemCode
     );
     if (!master) return { eaPerBag: null, bagPerBox: null, eaPerBox: null };
+    const c1 = Number.isFinite(Number(master.conversion1)) && Number(master.conversion1) > 0 ? Number(master.conversion1) : null;
+    const c2 = Number.isFinite(Number(master.conversion2)) && Number(master.conversion2) > 0 ? Number(master.conversion2) : null;
     return {
-        eaPerBag: Number.isFinite(master.conversion1) && master.conversion1 > 0 ? master.conversion1 : null,
-        bagPerBox: Number.isFinite(master.conversion3) && master.conversion3 > 0 ? master.conversion3 : null,
-        eaPerBox: Number.isFinite(master.conversion2) && master.conversion2 > 0 ? master.conversion2 : null,
+        eaPerBag: c1,
+        bagPerBox: c2,
+        eaPerBox: (c1 != null && c2 != null) ? c1 * c2 : null,
     };
 }
 
 /**
  * BOX 기준 → EA, BAG 환산
  * BOX가 기본 단위이므로:
- *   EA  = BOX × eaPerBox  (conversion2)
- *   BAG = BOX × bagPerBox (conversion3)
+ *   EA  = BOX × eaPerBox  (conversion1 × conversion2)
+ *   BAG = BOX × bagPerBox (conversion2)
  */
 function convertFromBox(boxValue, rates) {
     if (!Number.isFinite(boxValue)) return { ea: null, bag: null, box: null };
@@ -7987,11 +7989,13 @@ function renderBaseMaterialMasterTable() {
             { value: master.production_unit, cls: '' },
             { value: master.item_code, cls: '' },
             { value: master.item_name, cls: '' },
-            { value: master.conversion1, cls: 'number', fmt: true },
-            { value: master.conversion3, cls: 'number', fmt: true },
-            { value: master.conversion2, cls: 'number', fmt: true },
-            { value: master.conversion5, cls: 'number', fmt: true },
-            { value: master.conversion_ratio, cls: 'number', fmt: true },
+            { value: master.conversion1, cls: 'number', fmt: true },                         /* EA/BAG */
+            { value: master.conversion2, cls: 'number', fmt: true },                         /* BAG/BOX */
+            { value: (Number.isFinite(Number(master.conversion1)) && Number.isFinite(Number(master.conversion2)))
+                ? (Number(master.conversion1) * Number(master.conversion2))
+                : null, cls: 'number', fmt: true },                                          /* EA/BOX = conversion1 × conversion2 */
+            { value: master.conversion3, cls: 'number', fmt: true },                         /* BAG/PLT */
+            { value: master.conversion5, cls: 'number', fmt: true },                         /* BOX/PLT */
             { value: master.vendor_name, cls: '' },
             { value: master.moq, cls: 'number', num: true },
         ];
@@ -8274,10 +8278,10 @@ function loadBaseMaterialMasterIntoForm(master) {
     if (d.itemCode) d.itemCode.value = master.item_code || '';
     if (d.itemName) d.itemName.value = master.item_name || '';
     if (d.conv1) d.conv1.value = master.conversion1 != null ? master.conversion1 : '';
-    if (d.conv3) d.conv3.value = master.conversion3 != null ? master.conversion3 : '';
     if (d.conv2) d.conv2.value = master.conversion2 != null ? master.conversion2 : '';
+    if (d.conv3) d.conv3.value = master.conversion3 != null ? master.conversion3 : '';
     if (d.conv5) d.conv5.value = master.conversion5 != null ? master.conversion5 : '';
-    updateBaseMaterialConvRatio();
+    updateBaseMaterialEaPerBox();
     if (d.vendorName) d.vendorName.value = master.vendor_name || '';
     if (d.moq) d.moq.value = master.moq != null ? master.moq : '';
     if (d.btnSave) d.btnSave.textContent = '수정 저장';
@@ -8312,10 +8316,10 @@ function handleBaseMaterialItemCodeAutoFill() {
     if (d.prodUnit) d.prodUnit.value = match.production_unit || '';
     if (d.itemName) d.itemName.value = match.item_name || '';
     if (d.conv1) d.conv1.value = match.conversion1 != null ? match.conversion1 : '';
-    if (d.conv3) d.conv3.value = match.conversion3 != null ? match.conversion3 : '';
     if (d.conv2) d.conv2.value = match.conversion2 != null ? match.conversion2 : '';
+    if (d.conv3) d.conv3.value = match.conversion3 != null ? match.conversion3 : '';
     if (d.conv5) d.conv5.value = match.conversion5 != null ? match.conversion5 : '';
-    updateBaseMaterialConvRatio();
+    updateBaseMaterialEaPerBox();
     if (d.vendorName) d.vendorName.value = match.vendor_name || '';
     if (d.moq) d.moq.value = match.moq != null ? match.moq : '';
 
@@ -8332,15 +8336,15 @@ function resetBaseMaterialMasterForm() {
     if (dom.baseMaterialMaster.btnSave) dom.baseMaterialMaster.btnSave.textContent = '저장';
 }
 
-function updateBaseMaterialConvRatio() {
+function updateBaseMaterialEaPerBox() {
     if (!dom.baseMaterialMaster) return;
-    const conv3Val = parseFloat(dom.baseMaterialMaster.conv3?.value);
-    const conv5Val = parseFloat(dom.baseMaterialMaster.conv5?.value);
-    if (dom.baseMaterialMaster.convRatio) {
-        if (Number.isFinite(conv3Val) && conv3Val !== 0 && Number.isFinite(conv5Val)) {
-            dom.baseMaterialMaster.convRatio.value = (conv5Val / conv3Val).toFixed(3);
+    const conv1Val = parseFloat(dom.baseMaterialMaster.conv1?.value);
+    const conv2Val = parseFloat(dom.baseMaterialMaster.conv2?.value);
+    if (dom.baseMaterialMaster.eaPerBox) {
+        if (Number.isFinite(conv1Val) && Number.isFinite(conv2Val)) {
+            dom.baseMaterialMaster.eaPerBox.value = (conv1Val * conv2Val).toFixed(3);
         } else {
-            dom.baseMaterialMaster.convRatio.value = '';
+            dom.baseMaterialMaster.eaPerBox.value = '';
         }
     }
 }
@@ -18567,8 +18571,8 @@ function bindEvents() {
             filterCategory: bmFilterCategory,
             filterProdUnit: bmFilterProdUnit,
             itemCode: bmItemCode,
-            conv3: bmConv3,
-            conv5: bmConv5,
+            conv1: bmConv1,
+            conv2: bmConv2,
             selectAll: bmSelectAll,
             btnRegisterPlan: bmBtnRegisterPlan,
         } = dom.baseMaterialMaster;
@@ -18601,11 +18605,11 @@ function bindEvents() {
         if (bmTableBody) {
             bmTableBody.addEventListener('click', handleBaseMaterialMasterTableClick);
         }
-        if (bmConv3) {
-            bmConv3.addEventListener('input', updateBaseMaterialConvRatio);
+        if (bmConv1) {
+            bmConv1.addEventListener('input', updateBaseMaterialEaPerBox);
         }
-        if (bmConv5) {
-            bmConv5.addEventListener('input', updateBaseMaterialConvRatio);
+        if (bmConv2) {
+            bmConv2.addEventListener('input', updateBaseMaterialEaPerBox);
         }
         if (bmSelectAll) {
             bmSelectAll.addEventListener('change', handleBaseMaterialSelectAll);

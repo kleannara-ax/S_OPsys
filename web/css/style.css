@@ -1789,28 +1789,32 @@ textarea:focus {
     border-left: none;
 }
 
-/* 판매계획 합계 + 업로드 원천 데이터 테이블 — 스크롤 시 헤더 틀고정 */
+/* 판매계획 합계 + 업로드 원천 데이터 + 업로드 이력 테이블 — 스크롤 시 헤더 틀고정 */
 .sales-summary-panel .table-wrapper.compact,
-.sales-upload-list .table-wrapper.compact {
+.sales-upload-list .table-wrapper.compact,
+#history-panel-upload .table-wrapper.compact {
     max-height: 60vh;
     overflow-y: auto;
     overflow-x: auto;
 }
 
 .sales-summary-panel .table-wrapper.compact::-webkit-scrollbar,
-.sales-upload-list .table-wrapper.compact::-webkit-scrollbar {
+.sales-upload-list .table-wrapper.compact::-webkit-scrollbar,
+#history-panel-upload .table-wrapper.compact::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
 .sales-summary-panel .table-wrapper.compact::-webkit-scrollbar-thumb,
-.sales-upload-list .table-wrapper.compact::-webkit-scrollbar-thumb {
+.sales-upload-list .table-wrapper.compact::-webkit-scrollbar-thumb,
+#history-panel-upload .table-wrapper.compact::-webkit-scrollbar-thumb {
     background: rgba(100, 116, 139, 0.35);
     border-radius: 999px;
 }
 
 .sales-summary-panel .table-wrapper.compact::-webkit-scrollbar-track,
-.sales-upload-list .table-wrapper.compact::-webkit-scrollbar-track {
+.sales-upload-list .table-wrapper.compact::-webkit-scrollbar-track,
+#history-panel-upload .table-wrapper.compact::-webkit-scrollbar-track {
     background: rgba(203, 213, 225, 0.2);
 }
 
@@ -1821,6 +1825,23 @@ textarea:focus {
     z-index: 2;
     background: rgba(241, 245, 249, 0.98);
     backdrop-filter: blur(4px);
+    box-shadow: inset 0 -2px 0 rgba(148, 163, 184, 0.25);
+}
+
+/* 판매계획 업로드 이력 — 2행 헤더 틀고정 */
+#change-upload-history-table thead th {
+    position: sticky;
+    z-index: 2;
+    background: rgba(241, 245, 249, 0.98);
+    backdrop-filter: blur(4px);
+}
+/* 1행: rowspan=2 셀 + colspan 그룹 헤더 */
+#change-upload-history-table thead tr:first-child th {
+    top: 0;
+}
+/* 2행: 스탠다드 / 프로모션 / 총 수량 서브 헤더 */
+#change-upload-history-table thead tr:nth-child(2) th {
+    top: 37px;
     box-shadow: inset 0 -2px 0 rgba(148, 163, 184, 0.25);
 }
 

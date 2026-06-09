@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260609a">
+    <link rel="stylesheet" href="css/style.css?v=20260609b">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -492,6 +492,12 @@
                             <input type="hidden" id="material-renewal-record-id">
                         </form>
                         <datalist id="material-code-options"></datalist>
+                        <div class="renewal-filter-bar">
+                            <label for="renewal-code-filter" class="renewal-filter-label">코드 검색</label>
+                            <input type="text" id="renewal-code-filter" class="renewal-filter-input" placeholder="자재코드 입력 (신규코드 또는 기존자재 코드)">
+                            <button type="button" id="renewal-code-filter-clear" class="ghost small renewal-filter-clear" title="필터 초기화">초기화</button>
+                            <span id="renewal-filter-count" class="renewal-filter-count"></span>
+                        </div>
                         <div class="material-renewal-table-wrapper table-wrapper compact">
                             <table id="material-renewal-table" aria-live="polite">
                                 <colgroup>
@@ -1858,6 +1864,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260609a" defer></script>
+    <script src="js/main.js?v=20260609b" defer></script>
 </body>
 </html>

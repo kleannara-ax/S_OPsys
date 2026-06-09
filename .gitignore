@@ -39,3 +39,4 @@ module-sales/libs/*.jar
 module-sales/libs/*.so
 module-sales/libs/*.jnilib
 *.jcoDestination
+snop-data-export.json

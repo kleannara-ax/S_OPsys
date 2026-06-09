@@ -2469,6 +2469,7 @@ function renderMaterialRenewalTable() {
     if (!dom.materialRenewal || !dom.materialRenewal.tableBody) return;
     const tbody = dom.materialRenewal.tableBody;
     const emptyState = dom.materialRenewal.empty;
+    const filterCountEl = document.getElementById('renewal-filter-count');
 
     /* 새 테이블(renewal_material_linkages) 데이터 우선, 없으면 기존 material_linkages 사용 */
     const renewalLinkages = Array.isArray(state.renewalMaterialLinkages) ? state.renewalMaterialLinkages : [];
@@ -2483,6 +2484,44 @@ function renderMaterialRenewalTable() {
         if (emptyState) {
             emptyState.classList.remove('hidden');
         }
+        if (filterCountEl) filterCountEl.textContent = '';
+        return;
+    }
+
+    /* ── 코드 검색 필터 적용 ── */
+    const filterInput = document.getElementById('renewal-code-filter');
+    const filterKeyword = (filterInput?.value || '').trim().toUpperCase();
+    const filtered = filterKeyword
+        ? linkages.filter((entry) => {
+            if (!entry) return false;
+            const codes = [
+                entry.legacy_item_code,
+                entry.renewal_item_code_1 ?? entry.renewal_item_code,
+                entry.renewal_item_code_2,
+                entry.renewal_item_code_3,
+                entry.renewal_item_code_4,
+                entry.renewal_item_code_5,
+            ];
+            return codes.some((code) => {
+                const c = sanitizeText(code ?? '').trim().toUpperCase();
+                return c && c.includes(filterKeyword);
+            });
+        })
+        : linkages;
+
+    if (filterCountEl) {
+        filterCountEl.textContent = filterKeyword
+            ? `${filtered.length} / ${linkages.length}건`
+            : `전체 ${linkages.length}건`;
+    }
+
+    if (!filtered.length) {
+        if (emptyState) {
+            emptyState.textContent = filterKeyword
+                ? `"${filterInput.value}" 코드를 포함하는 데이터가 없습니다.`
+                : 'SAP에서 수신된 리뉴얼 자재 연결 데이터가 없습니다.';
+            emptyState.classList.remove('hidden');
+        }
         return;
     }
 
@@ -2492,7 +2531,7 @@ function renderMaterialRenewalTable() {
 
     const fragment = document.createDocumentFragment();
 
-    linkages.forEach((entry) => {
+    filtered.forEach((entry) => {
         if (!entry) return;
         const row = document.createElement('tr');
         if (entry.id) {
@@ -18897,6 +18936,32 @@ function bindEvents() {
             }
             updateChart();
         });
+    }
+
+    /* ── 리뉴얼 자재 연결 마스터 코드 검색 필터 ── */
+    {
+        const renewalFilterInput = document.getElementById('renewal-code-filter');
+        const renewalFilterClear = document.getElementById('renewal-code-filter-clear');
+        let renewalFilterTimer = null;
+        if (renewalFilterInput) {
+            renewalFilterInput.addEventListener('input', () => {
+                clearTimeout(renewalFilterTimer);
+                renewalFilterTimer = setTimeout(() => renderMaterialRenewalTable(), 250);
+            });
+            renewalFilterInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    clearTimeout(renewalFilterTimer);
+                    renderMaterialRenewalTable();
+                }
+            });
+        }
+        if (renewalFilterClear) {
+            renewalFilterClear.addEventListener('click', () => {
+                if (renewalFilterInput) renewalFilterInput.value = '';
+                renderMaterialRenewalTable();
+            });
+        }
     }
 }
 

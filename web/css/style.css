@@ -6453,3 +6453,44 @@ td.number {
 #material-renewal-table tbody td:nth-child(14) {
     border-left: 2px solid #94a3b8;
 }
+
+/* ── 리뉴얼 자재 코드 검색 필터 ── */
+.renewal-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+.renewal-filter-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+}
+.renewal-filter-input {
+    flex: 1;
+    max-width: 320px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 5px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.renewal-filter-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+.renewal-filter-clear {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+}
+.renewal-filter-count {
+    font-size: 0.78rem;
+    color: #64748b;
+    white-space: nowrap;
+}

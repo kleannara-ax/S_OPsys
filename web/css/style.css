@@ -6424,6 +6424,7 @@ td.number {
     font-weight: 600;
     padding: 6px;
     color: var(--text-secondary, #475569);
+    text-align: center;
 }
 
 /* ── 리뉴얼 자재 그룹 구분선 (기존 자재 1~5 사이 진한 세로선) ── */

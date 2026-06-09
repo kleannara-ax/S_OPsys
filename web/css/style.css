@@ -6425,3 +6425,31 @@ td.number {
     padding: 6px;
     color: var(--text-secondary, #475569);
 }
+
+/* ── 리뉴얼 자재 그룹 구분선 (기존 자재 1~5 사이 진한 세로선) ── */
+/* 1행 그룹 헤더: 셀 4~8 = 기존 자재 1~5, 셀 9 = 생성일자 */
+#material-renewal-table thead tr.header-group th:nth-child(4),
+#material-renewal-table thead tr.header-group th:nth-child(5),
+#material-renewal-table thead tr.header-group th:nth-child(6),
+#material-renewal-table thead tr.header-group th:nth-child(7),
+#material-renewal-table thead tr.header-group th:nth-child(8),
+#material-renewal-table thead tr.header-group th:nth-child(9) {
+    border-left: 2px solid #94a3b8;
+}
+/* 2행 컬럼 헤더 + 데이터 행: 열 4,6,8,10,12 = 각 그룹 시작(코드), 열 14 = 생성일자 */
+#material-renewal-table thead tr.header-columns th:nth-child(4),
+#material-renewal-table thead tr.header-columns th:nth-child(6),
+#material-renewal-table thead tr.header-columns th:nth-child(8),
+#material-renewal-table thead tr.header-columns th:nth-child(10),
+#material-renewal-table thead tr.header-columns th:nth-child(12),
+#material-renewal-table thead tr.header-columns th:nth-child(14) {
+    border-left: 2px solid #94a3b8;
+}
+#material-renewal-table tbody td:nth-child(4),
+#material-renewal-table tbody td:nth-child(6),
+#material-renewal-table tbody td:nth-child(8),
+#material-renewal-table tbody td:nth-child(10),
+#material-renewal-table tbody td:nth-child(12),
+#material-renewal-table tbody td:nth-child(14) {
+    border-left: 2px solid #94a3b8;
+}

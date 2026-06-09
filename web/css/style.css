@@ -350,6 +350,7 @@ button.danger:hover {
 .summary-sub {
     font-size: 0.85rem;
     color: var(--muted-text);
+    min-height: 2.6em;          /* 서브텍스트 2줄 높이 통일 — 1줄 카드도 동일 높이 확보 */
 }
 
 .summary-breakdown {

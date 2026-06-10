@@ -197,6 +197,8 @@ public class RfcReceiverService {
 
         // 수신 데이터에 포함된 plan_month 목록 수집 (Step 2에서 사용)
         Set<String> affectedPlanMonths = new HashSet<>();
+        // seed 자동 생성 추적용 — 동일 RFC 실행 내 plant+storage 중복 seed 생성 방지
+        Set<String> autoCreatedSeeds = new HashSet<>();
 
         // Step 1: Upsert — item_code + plant_code + storage_location + plan_month 키로 기존 레코드 업데이트 또는 신규 생성
         // ※ 기존 삭제+재삽입 방식에서 변경: is_selected 속성을 보존하기 위해 upsert 방식 사용
@@ -232,6 +234,31 @@ public class RfcReceiverService {
                         plantStorageLocationRepo.findByItemCodeAndPlantCodeAndStorageLocationAndPlanMonth(
                                 itemCode, plantCode, storageLocation != null ? storageLocation : "", planMonth);
 
+                // seed 데이터(plan_month=null)에서 is_selected 조회 — 신규/기존 모두 동기화
+                String storageLoc = storageLocation != null ? storageLocation : "";
+                List<PlantStorageLocation> seedRecords =
+                        plantStorageLocationRepo.findByPlantCodeAndStorageLocationAndPlanMonthIsNull(
+                                plantCode, storageLoc);
+                Boolean seedIsSelected;
+                if (!seedRecords.isEmpty()) {
+                    seedIsSelected = seedRecords.get(0).getIsSelected();
+                } else {
+                    // seed가 없으면 자동 생성 (is_selected=true) — SAP에서 넘어온 저장위치는 기본 선택
+                    String seedKey = plantCode + "|" + storageLoc;
+                    if (!autoCreatedSeeds.contains(seedKey)) {
+                        PlantStorageLocation newSeed = new PlantStorageLocation();
+                        newSeed.setPlantCode(plantCode);
+                        newSeed.setStorageLocation(storageLoc);
+                        newSeed.setPlanMonth(null);
+                        newSeed.setIsSelected(true);
+                        plantStorageLocationRepo.save(newSeed);
+                        autoCreatedSeeds.add(seedKey);
+                        log.info("[RFC-002] seed 자동 생성: plant={}, storage={}, is_selected=true",
+                                plantCode, storageLoc);
+                    }
+                    seedIsSelected = true;
+                }
+
                 PlantStorageLocation psl;
                 if (!existingList.isEmpty()) {
                     psl = existingList.get(0);
@@ -243,6 +270,10 @@ public class RfcReceiverService {
                         log.info("[RFC-002] 중복 레코드 {}건 자동 삭제: item={}, plant={}, storage={}, month={}",
                                 existingList.size() - 1, itemCode, plantCode, storageLocation, planMonth);
                     }
+                    // 기존 레코드도 seed의 is_selected와 항상 동기화
+                    if (seedIsSelected != null) {
+                        psl.setIsSelected(seedIsSelected);
+                    }
                     updateCount++;
                 } else {
                     // 신규 생성 — seed 데이터(plan_month=null)의 is_selected를 상속
@@ -251,13 +282,8 @@ public class RfcReceiverService {
                     psl.setStorageLocation(storageLocation);
                     psl.setPlanMonth(planMonth);
 
-                    // seed 데이터(plan_month=null)에서 is_selected 상속
-                    // ※ plant_code + storage_location 조합에 seed가 여러 건일 수 있으므로 List로 조회
-                    List<PlantStorageLocation> seedRecords =
-                            plantStorageLocationRepo.findByPlantCodeAndStorageLocationAndPlanMonthIsNull(
-                                    plantCode, storageLocation != null ? storageLocation : "");
-                    if (!seedRecords.isEmpty()) {
-                        psl.setIsSelected(seedRecords.get(0).getIsSelected());
+                    if (seedIsSelected != null) {
+                        psl.setIsSelected(seedIsSelected);
                     }
 
                     insertCount++;
@@ -298,6 +324,9 @@ public class RfcReceiverService {
             }
         }
 
+        // Step 1 완료 후 flush — Step 2에서 최신 데이터(자동 생성된 seed 포함) 조회 보장
+        plantStorageLocationRepo.flush();
+
         // Step 2: SnopRecord에 재고 데이터 반영
         // 핵심: 마스터 데이터(plan_month=null)에서 is_selected=true인 plant_code+storage_location만
         // 해당하는 RFC 재고 데이터를 합산하여 SnopRecord에 반영
@@ -306,6 +335,7 @@ public class RfcReceiverService {
         int snopInsertCount = 0;
         try {
             // 마스터 데이터에서 선택된 저장위치 목록 조회 (plan_month=null AND is_selected=true)
+            // ※ Step 1에서 자동 생성된 seed(is_selected=true)도 포함됨
             List<PlantStorageLocation> selectedMasters =
                     plantStorageLocationRepo.findByPlanMonthIsNullAndIsSelectedTrue();
             Set<String> selectedKeys = new HashSet<>();

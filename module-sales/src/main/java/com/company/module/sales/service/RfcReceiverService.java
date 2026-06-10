@@ -327,6 +327,61 @@ public class RfcReceiverService {
         // Step 1 완료 후 flush — Step 2에서 최신 데이터(자동 생성된 seed 포함) 조회 보장
         plantStorageLocationRepo.flush();
 
+        // Step 1.5: SAP에서 더 이상 보내지 않는 기존 행의 재고를 0으로 초기화
+        // SAP T_OUTPUT에 없는 저장위치의 이전 데이터가 합산에 포함되지 않도록 정리
+        int staleResetCount = 0;
+        try {
+            // 이번 RFC에서 수신된 키 목록 구성 (item_code|plant_code|storage_location|plan_month)
+            Set<String> receivedKeys = new HashSet<>();
+            for (Map<String, Object> row : dataList) {
+                String rItemCode = getStr(row, "item_code");
+                String rPlantCode = getStr(row, "plant_code");
+                String rStorageLoc = getStr(row, "storage_location");
+                String rPlanMonth = convertPlanMonthDay(getStr(row, "plan_month_day"));
+                if (rItemCode != null && rPlantCode != null && rPlanMonth != null) {
+                    receivedKeys.add(rItemCode + "|" + rPlantCode + "|" +
+                            (rStorageLoc != null ? rStorageLoc : "") + "|" + rPlanMonth);
+                }
+            }
+
+            // 영향받는 plan_month별로 기존 데이터 조회 → 수신 키에 없으면 재고 0 처리
+            for (String planMonth : affectedPlanMonths) {
+                List<PlantStorageLocation> monthData =
+                        plantStorageLocationRepo.findByPlanMonth(planMonth);
+                for (PlantStorageLocation loc : monthData) {
+                    String locKey = loc.getItemCode() + "|" + loc.getPlantCode() + "|" +
+                            (loc.getStorageLocation() != null ? loc.getStorageLocation() : "") + "|" + planMonth;
+                    if (!receivedKeys.contains(locKey)) {
+                        // SAP에서 더 이상 보내지 않는 행 → 재고 0 처리
+                        boolean changed = false;
+                        if (loc.getBeginningInventory() != null && loc.getBeginningInventory() != 0.0) {
+                            loc.setBeginningInventory(0.0);
+                            changed = true;
+                        }
+                        if (loc.getAvailableInventory() != null && loc.getAvailableInventory() != 0.0) {
+                            loc.setAvailableInventory(0.0);
+                            changed = true;
+                        }
+                        if (loc.getAvailableStock() != null && loc.getAvailableStock() != 0.0) {
+                            loc.setAvailableStock(0.0);
+                            changed = true;
+                        }
+                        if (changed) {
+                            loc.setSapSyncAt(LocalDateTime.now());
+                            plantStorageLocationRepo.save(loc);
+                            staleResetCount++;
+                        }
+                    }
+                }
+            }
+            if (staleResetCount > 0) {
+                log.info("[RFC-002] SAP 미수신 저장위치 재고 0 초기화: {}건", staleResetCount);
+                plantStorageLocationRepo.flush();
+            }
+        } catch (Exception e) {
+            log.warn("[RFC-002] 미수신 저장위치 정리 중 오류 (무시): {}", e.getMessage());
+        }
+
         // Step 2: SnopRecord에 재고 데이터 반영
         // 핵심: 마스터 데이터(plan_month=null)에서 is_selected=true인 plant_code+storage_location만
         // 해당하는 RFC 재고 데이터를 합산하여 SnopRecord에 반영
@@ -442,8 +497,8 @@ public class RfcReceiverService {
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-002] 일자별재고 수신 완료: 신규={}, 수정={}, 처리={}, 에러={}, SnopRecord(업데이트={}, 신규={})",
-                insertCount, updateCount, processedCount, errorCount, snopUpdateCount, snopInsertCount);
+        log.info("[RFC-002] 일자별재고 수신 완료: 신규={}, 수정={}, 처리={}, 에러={}, 미수신초기화={}, SnopRecord(업데이트={}, 신규={})",
+                insertCount, updateCount, processedCount, errorCount, staleResetCount, snopUpdateCount, snopInsertCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -452,6 +507,7 @@ public class RfcReceiverService {
         result.put("processed_count", processedCount);
         result.put("insert_count", insertCount);
         result.put("update_count", updateCount);
+        result.put("stale_reset_count", staleResetCount);
         result.put("snop_update_count", snopUpdateCount);
         result.put("snop_insert_count", snopInsertCount);
         result.put("error_count", errorCount);

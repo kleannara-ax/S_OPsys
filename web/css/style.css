@@ -6517,3 +6517,59 @@ td.number {
     color: #64748b;
     white-space: nowrap;
 }
+
+/* ─── 생산계획 현황 테이블 확대 모달 ─── */
+.table-expand-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--surface-color, #fff);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.table-expand-modal.hidden {
+    display: none;
+}
+.table-expand-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background: var(--bg-color, #f5f7fb);
+    flex-shrink: 0;
+}
+.table-expand-modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-color, #1f2937);
+}
+.table-expand-modal-close {
+    background: none;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 12px;
+    color: var(--text-color, #1f2937);
+    transition: background 0.15s;
+}
+.table-expand-modal-close:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+.table-expand-modal-body {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+.table-expand-modal-body .table-wrapper {
+    max-height: none;
+    overflow: visible;
+}
+.table-expand-modal-body #plan-table {
+    font-size: 0.82rem;
+}

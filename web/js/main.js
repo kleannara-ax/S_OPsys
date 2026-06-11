@@ -18837,6 +18837,55 @@ function bindEvents() {
         });
     }
 
+    /* 생산계획 현황 테이블 확대 보기 */
+    (function initExpandTable() {
+        const btnExpand = document.getElementById('btn-expand-table');
+        const modal = document.getElementById('table-expand-modal');
+        const btnClose = document.getElementById('btn-close-expand-modal');
+        const modalBody = modal ? modal.querySelector('.table-expand-modal-body') : null;
+        if (!btnExpand || !modal || !modalBody) return;
+
+        // 원래 위치 기억용
+        let originalParent = null;
+        let originalNextSibling = null;
+
+        function openExpandModal() {
+            const tableWrapper = document.querySelector('#view-table .table-wrapper[data-scroll-wrapper]');
+            if (!tableWrapper) return;
+            // 원래 위치 저장
+            originalParent = tableWrapper.parentNode;
+            originalNextSibling = tableWrapper.nextSibling;
+            // 모달로 이동
+            modalBody.appendChild(tableWrapper);
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeExpandModal() {
+            const tableWrapper = modalBody.querySelector('.table-wrapper[data-scroll-wrapper]');
+            if (tableWrapper && originalParent) {
+                // 원래 위치로 복원
+                if (originalNextSibling) {
+                    originalParent.insertBefore(tableWrapper, originalNextSibling);
+                } else {
+                    originalParent.appendChild(tableWrapper);
+                }
+            }
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            originalParent = null;
+            originalNextSibling = null;
+        }
+
+        btnExpand.addEventListener('click', openExpandModal);
+        btnClose.addEventListener('click', closeExpandModal);
+        // ESC 키로 닫기
+        modal.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeExpandModal();
+        });
+        // 배경 클릭으로 닫기 방지 (전체 화면이므로 불필요)
+    })();
+
     if (dom.salesUpload) {
         if (dom.salesUpload.uploadButton) {
             dom.salesUpload.uploadButton.addEventListener('click', handleSalesUploadStart);

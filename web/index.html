@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260609f">
+    <link rel="stylesheet" href="css/style.css?v=20260611a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -866,6 +866,7 @@
                         <button id="btn-confirm-production-changes" type="button" class="primary" disabled aria-disabled="true">변경 로그 확정 (0건)</button>
                         <button id="btn-open-target-inventory-upload" type="button" class="secondary">SKU별 적정재고 업로드</button>
                         <button id="btn-sync-from-master" type="button" class="secondary">자재마스터 동기화</button>
+                        <button id="btn-expand-table" type="button" class="secondary" title="테이블 확대 보기">&#x26F6; 확대 보기</button>
                     </div>
                     <span class="toolbar-note" id="bulk-confirm-note">* 확정 대기 건수가 있는 경우에만 버튼이 활성화됩니다. 예측(전월 연동) 행을 수정한 값은 시뮬레이션 용도로만 적용되며 변경 로그에는 기록되지 않습니다.</span>
                 </div>
@@ -1863,7 +1864,18 @@
         </div>
     </div>
 
+    <!-- 생산계획 현황 테이블 확대 모달 -->
+    <div id="table-expand-modal" class="table-expand-modal hidden" role="dialog" aria-modal="true" aria-label="생산계획 현황 확대 보기">
+        <div class="table-expand-modal-header">
+            <h3>자재별 생산계획 현황</h3>
+            <button id="btn-close-expand-modal" type="button" class="table-expand-modal-close" aria-label="닫기">&times;</button>
+        </div>
+        <div class="table-expand-modal-body">
+            <!-- 테이블이 여기로 이동됨 -->
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260609f" defer></script>
+    <script src="js/main.js?v=20260611a" defer></script>
 </body>
 </html>

@@ -26,6 +26,11 @@ public class BaseMaterialMasterService {
     @Transactional(readOnly = true)
     public List<BaseMaterialMaster> findAllSorted() {
         List<BaseMaterialMaster> all = repository.findAll();
+        // 카테고리(hierarchyName)가 빈칸이거나 "원단"인 경우 목록에서 제외
+        all.removeIf(m -> {
+            String h = m.getHierarchyName();
+            return h == null || h.trim().isEmpty() || h.trim().equals("원단");
+        });
         all.sort(Comparator.comparing(
             (BaseMaterialMaster m) -> m.getScmArea() != null ? m.getScmArea() : "",
             String::compareToIgnoreCase

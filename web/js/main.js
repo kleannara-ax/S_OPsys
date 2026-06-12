@@ -5988,12 +5988,19 @@ function updateDashboardBaseMonthOptions() {
     const monthFilterValue = dom.filters.month.value;
     let targetMonth = null;
 
+    // 시스템 현재월 (YYYY-MM)
+    const now = new Date();
+    const systemMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
     if (manualSelection && previousSelection && months.includes(previousSelection)) {
         targetMonth = previousSelection;
     } else if (monthFilterValue && monthFilterValue !== 'all' && months.includes(monthFilterValue)) {
         targetMonth = monthFilterValue;
     } else if (previousSelection && months.includes(previousSelection)) {
         targetMonth = previousSelection;
+    } else if (months.includes(systemMonth)) {
+        // 디폴트: 시스템 현재월
+        targetMonth = systemMonth;
     } else {
         targetMonth = months[0];
     }

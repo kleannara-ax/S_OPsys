@@ -1141,7 +1141,7 @@ textarea:focus {
 }
 
 #recent-sales-view-table tbody td.number {
-    text-align: right;
+    text-align: center;
     font-variant-numeric: tabular-nums;
 }
 

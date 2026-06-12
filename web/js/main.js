@@ -7177,13 +7177,6 @@ function populateFilterOptions() {
     sortMonthFilterOptions();
     if (months.includes(previousMonth)) {
         dom.filters.month.value = previousMonth;
-    } else if (previousMonth === 'all' || !previousMonth) {
-        // 초기 로드 시 시스템 현재월을 디폴트로 선택
-        const now = new Date();
-        const sysMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-        if (months.includes(sysMonth)) {
-            dom.filters.month.value = sysMonth;
-        }
     }
 
     const lines = getUniqueLines(state.rawData);
@@ -9499,9 +9492,14 @@ function renderSummaries() {
 
     if (dom.summary.monthContext) {
         const monthFilterValue = dom.filters && dom.filters.month ? dom.filters.month.value : 'all';
-        const contextText = monthFilterValue && monthFilterValue !== 'all'
-            ? monthFilterValue
-            : '전체 기간';
+        let contextText;
+        if (monthFilterValue && monthFilterValue !== 'all') {
+            contextText = monthFilterValue;
+        } else {
+            // 필터가 '전체'일 때 시스템 현재월 표시
+            const _now = new Date();
+            contextText = _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0');
+        }
         dom.summary.monthContext.textContent = contextText;
     }
 

@@ -5116,7 +5116,8 @@ function renderInventoryForecastTable(baseMonth, filteredRecords) {
         const beginning = parseNumberOrNull(record.beginning_inventory);
         const salesPlan = parseNumberOrNull(record.sales_plan);
         const salesActual = parseNumberOrNull(record.sales_actual);
-        const productionPlan = parseNumberOrNull(record.production_plan);
+        const productionPlan = parseNumberOrNull(record.adjusted_production_plan)
+            ?? parseNumberOrNull(record.production_plan);
         const productionActual = parseNumberOrNull(record.production_actual);
         const ending = parseNumberOrNull(record.ending_inventory);
         const salesAccuracy = computeAccuracyRatio(salesPlan, salesActual);
@@ -5184,7 +5185,8 @@ function renderInventoryForecastTable(baseMonth, filteredRecords) {
                 hasSalesActual = true;
             }
 
-            const productionPlan = parseNumberOrNull(record.production_plan);
+            const productionPlan = parseNumberOrNull(record.adjusted_production_plan)
+                ?? parseNumberOrNull(record.production_plan);
             if (Number.isFinite(productionPlan)) {
                 productionPlanTotal += productionPlan;
                 hasProductionPlan = true;

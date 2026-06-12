@@ -13905,8 +13905,8 @@ async function handleDelete(id) {
         resetForm();
     }
 
-    alert(`총 ${recordIdsToDelete.length.toLocaleString('ko-KR')}건의 생산계획이 삭제되었습니다.`);
     await loadData();
+    alert(`총 ${recordIdsToDelete.length.toLocaleString('ko-KR')}건의 생산계획이 삭제되었습니다.`);
 }
 
 function loadRecordIntoForm(id) {

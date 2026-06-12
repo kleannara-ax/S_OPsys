@@ -714,6 +714,7 @@ const dom = {
         empty: document.querySelector('#base-material-master-empty'),
         filterScm: document.querySelector('#base-material-filter-scm'),
         filterCategory: document.querySelector('#base-material-filter-category'),
+        filterItemCode: document.querySelector('#base-material-filter-item-code'),
         filterProdUnit: document.querySelector('#base-material-filter-prod-unit'),
         selectAll: document.querySelector('#base-material-select-all'),
         btnRegisterPlan: document.querySelector('#btn-register-production-plan'),
@@ -7869,13 +7870,16 @@ async function refreshLineItemMasters() {
 
 function ensureBaseMaterialMasterFilters() {
     if (!state.baseMaterialMasterFilters) {
-        state.baseMaterialMasterFilters = { scm: 'all', category: 'all', prodUnit: 'all' };
+        state.baseMaterialMasterFilters = { scm: 'all', category: 'all', itemCode: '', prodUnit: 'all' };
     }
     if (!state.baseMaterialMasterFilters.scm) {
         state.baseMaterialMasterFilters.scm = 'all';
     }
     if (!state.baseMaterialMasterFilters.category) {
         state.baseMaterialMasterFilters.category = 'all';
+    }
+    if (state.baseMaterialMasterFilters.itemCode == null) {
+        state.baseMaterialMasterFilters.itemCode = '';
     }
     if (!state.baseMaterialMasterFilters.prodUnit) {
         state.baseMaterialMasterFilters.prodUnit = 'all';
@@ -7974,16 +7978,19 @@ function renderBaseMaterialMasterTable() {
     }
 
     const categoryFilter = (filters.category || 'all').trim().toLowerCase();
+    const itemCodeFilter = (filters.itemCode || '').trim().toLowerCase();
     const prodUnitFilter = (filters.prodUnit || 'all').trim().toLowerCase();
 
     const filtered = masters.filter(m => {
         const area = (m.scm_area ?? '').trim().toLowerCase();
         const cat = (m.hierarchy_name ?? '').trim().toLowerCase();
+        const code = (m.item_code ?? '').trim().toLowerCase();
         const unit = (m.production_unit ?? '').trim().toLowerCase();
         const scmOk = scmFilter === '' || scmFilter === 'all' || area === scmFilter;
         const catOk = categoryFilter === '' || categoryFilter === 'all' || cat === categoryFilter;
+        const codeOk = !itemCodeFilter || code.includes(itemCodeFilter);
         const prodOk = prodUnitFilter === '' || prodUnitFilter === 'all' || unit === prodUnitFilter;
-        return scmOk && catOk && prodOk;
+        return scmOk && catOk && codeOk && prodOk;
     });
 
     if (!filtered.length) {
@@ -8308,6 +8315,8 @@ function setBaseMaterialMasterFilter(type, value) {
         filters.scm = normalized;
     } else if (type === 'category') {
         filters.category = normalized;
+    } else if (type === 'itemCode') {
+        filters.itemCode = trimmed;
     } else if (type === 'prodUnit') {
         filters.prodUnit = normalized;
     }
@@ -18620,6 +18629,7 @@ function bindEvents() {
             tableBody: bmTableBody,
             filterScm: bmFilterScm,
             filterCategory: bmFilterCategory,
+            filterItemCode: bmFilterItemCode,
             filterProdUnit: bmFilterProdUnit,
             itemCode: bmItemCode,
             conv1: bmConv1,
@@ -18646,6 +18656,11 @@ function bindEvents() {
         if (bmFilterCategory) {
             bmFilterCategory.addEventListener('change', (event) => {
                 setBaseMaterialMasterFilter('category', event.target.value);
+            });
+        }
+        if (bmFilterItemCode) {
+            bmFilterItemCode.addEventListener('input', (event) => {
+                setBaseMaterialMasterFilter('itemCode', event.target.value);
             });
         }
         if (bmFilterProdUnit) {

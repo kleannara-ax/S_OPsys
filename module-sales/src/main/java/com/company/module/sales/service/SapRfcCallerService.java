@@ -62,8 +62,8 @@ public class SapRfcCallerService {
     // ─── SAP IMPORT 파라미터 이름 ───
     // RFC_001, RFC_006: I_FLAG (A=전체, B=신규/수정)
     private static final String IMPORT_PARAM_TYPE = "I_FLAG";
-    // RFC_005: I_YYYYMM (마감 대상 년월)
-    private static final String IMPORT_PARAM_YEARMONTH = "I_YYYYMM";
+    // RFC_005: I_DATE (마감 대상 년월, YYYYMM 형식)
+    private static final String IMPORT_PARAM_YEARMONTH = "I_DATE";
 
     // ─── 실행유형 상수 ───
     private static final String EXEC_TYPE_MANUAL = "MANUAL";

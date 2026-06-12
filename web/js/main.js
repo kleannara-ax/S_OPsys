@@ -5401,7 +5401,9 @@ function buildCategoryAccuracySummaryRows(groupedRecords, months) {
 
             if (record) {
                 const salesPlanValue = parseNumberOrNull(record.sales_plan);
-                const productionPlanValue = parseNumberOrNull(record.production_plan);
+                /* 보정 생산계획(사용자 관리값) 우선, 없으면 원본 production_plan 폴백 */
+                const productionPlanValue = parseNumberOrNull(record.adjusted_production_plan)
+                    ?? parseNumberOrNull(record.production_plan);
 
                 /* ── 월말마감 확정 데이터 우선 적용 ──
                    과거 확정월(monthly_closings에 존재)이면 확정 실적 사용,

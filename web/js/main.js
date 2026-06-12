@@ -9995,7 +9995,7 @@ function selectSummarySalesAccuracy(records, options = {}) {
 
 function selectSummaryProductionAccuracy(records, options = {}) {
     return selectSummaryAccuracy(records, {
-        planField: 'production_plan',
+        planField: 'adjusted_production_plan',
         actualField: 'production_actual',
         metric: 'production',
         metricLabel: '생산',

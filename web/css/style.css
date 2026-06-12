@@ -1140,6 +1140,7 @@ textarea:focus {
     white-space: nowrap;
 }
 
+#recent-sales-view-table thead th.number,
 #recent-sales-view-table tbody td.number {
     text-align: center;
     font-variant-numeric: tabular-nums;

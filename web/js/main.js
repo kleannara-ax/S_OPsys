@@ -8759,14 +8759,13 @@ function applyFilters() {
         salesAggregates: salesAggregatesMap,
         recentSalesIndex: state.recentSalesIndex,
     });
-    state.enrichedData = enriched;
-    populateAnalyticsMonthFilter(enriched);
+    /* ── 제외 카테고리(원단/미지정) 필터링 — enrichedData 단계에서 적용 ── */
+    const enrichedFiltered = enriched.filter((record) => !isExcludedCategory(record.category));
+    state.enrichedData = enrichedFiltered;
+    populateAnalyticsMonthFilter(enrichedFiltered);
     refreshChangeHistoryView();
 
-    let filtered = enriched;
-
-    /* ── 제외 카테고리(원단/미지정) 필터링 ── */
-    filtered = filtered.filter((record) => !isExcludedCategory(record.category));
+    let filtered = enrichedFiltered;
 
     /* ── 리뉴얼 기존자재 제외 ──
      * resolver에 의해 canonical_item_code가 변경된 레코드(기존자재)는 리스트에서 제외.

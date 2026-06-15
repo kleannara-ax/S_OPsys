@@ -9568,7 +9568,8 @@ function renderSummaries() {
             overstockByCategory.set(categoryKey, (overstockByCategory.get(categoryKey) || 0) + 1);
         }
 
-        /* OEM 상품은 CAPA 산정 대상이 아니므로 CAPA 사용률 계산에서 제외 */
+        /* OEM·원단·미지정 카테고리는 CAPA 산정 대상에서 제외 */
+        if (isExcludedCategory(record.category)) return;
         const lineUpperForCapa = sanitizeText(record.production_line).trim().toUpperCase();
         if (lineUpperForCapa.includes('OEM')) return;
 
@@ -9590,7 +9591,8 @@ function renderSummaries() {
     const uniqueLineRecords = new Map();
     data.forEach((record) => {
         if (!record.lineKey) return;
-        /* OEM 상품은 CAPA 산정 대상이 아니므로 제외 */
+        /* OEM·원단·미지정 카테고리는 CAPA 산정 대상에서 제외 */
+        if (isExcludedCategory(record.category)) return;
         const lineUpper = sanitizeText(record.production_line).trim().toUpperCase();
         if (lineUpper.includes('OEM')) return;
         if (!uniqueLineRecords.has(record.lineKey)) {

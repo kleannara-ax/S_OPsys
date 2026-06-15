@@ -9548,6 +9548,19 @@ function renderSummaries() {
     /* 총 생산계획 물량: 카테고리 빈칸(미지정) 및 원단은 제외 */
     const EXCLUDED_CATEGORIES = new Set(['', '원단']);
     const isExcludedCategory = (cat) => EXCLUDED_CATEGORIES.has((cat ?? '').trim());
+
+    /* CAPA 사용률 대상 생산라인 화이트리스트 */
+    const CAPA_TARGET_LINES = new Set([
+        '가공 3호기 (1,2겹)',
+        '가공 3호기 (3겹)',
+        '가공 4호기',
+        '가공 5호기 (3겹)',
+        '가공 6호기 (1,2겹)',
+        '가공 6호기 (3겹)',
+        '생리대 5호기',
+        '생리대 6호기',
+    ]);
+    const isCapaTargetLine = (line) => CAPA_TARGET_LINES.has((line ?? '').trim());
     const totalProduction = data.reduce((sum, record) => {
         if (isExcludedCategory(record.category)) return sum;
         return sum + (record.adjusted_production_plan ?? record.production_plan);
@@ -9572,6 +9585,8 @@ function renderSummaries() {
         if (isExcludedCategory(record.category)) return;
         const lineUpperForCapa = sanitizeText(record.production_line).trim().toUpperCase();
         if (lineUpperForCapa.includes('OEM')) return;
+        /* CAPA 대상 라인 화이트리스트 필터 */
+        if (!isCapaTargetLine(record.production_line)) return;
 
         /* ── 라인별 CAPA 사용률 집계 (lineKey 기준, 중복 방지) ── */
         const lineKey = record.lineKey || null;
@@ -9595,6 +9610,8 @@ function renderSummaries() {
         if (isExcludedCategory(record.category)) return;
         const lineUpper = sanitizeText(record.production_line).trim().toUpperCase();
         if (lineUpper.includes('OEM')) return;
+        /* CAPA 대상 라인 화이트리스트 필터 */
+        if (!isCapaTargetLine(record.production_line)) return;
         if (!uniqueLineRecords.has(record.lineKey)) {
             uniqueLineRecords.set(record.lineKey, record);
         }

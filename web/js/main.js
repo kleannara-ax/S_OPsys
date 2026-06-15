@@ -9532,7 +9532,7 @@ function renderSummaries() {
         dom.summary.totalProduction.textContent = '0 EA';
         dom.summary.avgCapa.textContent = '-';
         if (dom.summary.avgCapaBreakdown) {
-            dom.summary.avgCapaBreakdown.innerHTML = '<div class="summary-chip"><span class="label">카테고리 없음</span><span class="value">데이터 없음</span></div>';
+            dom.summary.avgCapaBreakdown.innerHTML = '<div class="summary-chip"><span class="label">라인 없음</span><span class="value">데이터 없음</span></div>';
         }
         if (dom.summary.totalProductionBreakdown) {
             dom.summary.totalProductionBreakdown.innerHTML = '<div class="summary-chip"><span class="label">카테고리 없음</span><span class="value">0 EA</span></div>';
@@ -9556,7 +9556,7 @@ function renderSummaries() {
     const shortageByCategory = new Map();
     const overstockByCategory = new Map();
     const categoryTotals = new Map();
-    const categoryCapaUsage = new Map();
+    const lineCapaUsage = new Map();
     data.forEach((record) => {
         const categoryKey = sanitizeText(record.category).trim() || '미지정';
         if (!isExcludedCategory(record.category)) {
@@ -9572,30 +9572,16 @@ function renderSummaries() {
         const lineUpperForCapa = sanitizeText(record.production_line).trim().toUpperCase();
         if (lineUpperForCapa.includes('OEM')) return;
 
-        if (!categoryCapaUsage.has(categoryKey)) {
-            categoryCapaUsage.set(categoryKey, {
-                ratioSum: 0,
-                count: 0,
-                missing: 0,
-                recordCount: 0,
-                lineKeys: new Set(),
-            });
-        }
-        const usageEntry = categoryCapaUsage.get(categoryKey);
-        usageEntry.recordCount += 1;
+        /* ── 라인별 CAPA 사용률 집계 (lineKey 기준, 중복 방지) ── */
         const lineKey = record.lineKey || null;
-        if (lineKey) {
-            if (!usageEntry.lineKeys.has(lineKey)) {
-                usageEntry.lineKeys.add(lineKey);
-                if (Number.isFinite(record.lineCapacityRatio)) {
-                    usageEntry.ratioSum += record.lineCapacityRatio;
-                    usageEntry.count += 1;
-                } else {
-                    usageEntry.missing += 1;
-                }
-            }
-        } else {
-            usageEntry.missing += 1;
+        if (lineKey && !lineCapaUsage.has(lineKey)) {
+            const lineName = sanitizeText(record.production_line).trim() || '미지정';
+            lineCapaUsage.set(lineKey, {
+                lineName,
+                ratio: Number.isFinite(record.lineCapacityRatio) ? record.lineCapacityRatio : null,
+                totalProduction: Number.isFinite(record.lineTotalProduction) ? record.lineTotalProduction : null,
+                capacityLimit: Number.isFinite(record.lineCapacityLimit) ? record.lineCapacityLimit : null,
+            });
         }
     });
 
@@ -9786,35 +9772,43 @@ function renderSummaries() {
     }
 
     if (dom.summary.avgCapaBreakdown) {
-        if (categoryCapaUsage.size === 0) {
-            dom.summary.avgCapaBreakdown.innerHTML = '<div class="summary-chip"><span class="label">카테고리 없음</span><span class="value">데이터 없음</span></div>';
+        if (lineCapaUsage.size === 0) {
+            dom.summary.avgCapaBreakdown.innerHTML = '<div class="summary-chip"><span class="label">라인 없음</span><span class="value">데이터 없음</span></div>';
         } else {
             const fragment = document.createDocumentFragment();
-            Array.from(categoryCapaUsage.entries())
-                .sort((a, b) => sanitizeText(a[0]).localeCompare(sanitizeText(b[0])))
-                .forEach(([category, stats]) => {
+            Array.from(lineCapaUsage.values())
+                .sort((a, b) => {
+                    /* 사용률 있는 라인 우선, 그 안에서 사용률 내림차순, 동률이면 이름순 */
+                    const aHas = Number.isFinite(a.ratio) ? 0 : 1;
+                    const bHas = Number.isFinite(b.ratio) ? 0 : 1;
+                    if (aHas !== bHas) return aHas - bHas;
+                    if (aHas === 0 && bHas === 0) {
+                        if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+                    }
+                    return sanitizeText(a.lineName).localeCompare(sanitizeText(b.lineName));
+                })
+                .forEach((stats) => {
                     const chip = document.createElement('div');
                     chip.className = 'summary-chip stacked';
                     const label = document.createElement('span');
                     label.className = 'label';
-                    const ratio = stats.count > 0 ? stats.ratioSum / stats.count : null;
-                    const ratioText = Number.isFinite(ratio) ? formatPercent(ratio) : '데이터 없음';
-                    label.textContent = `${category} (${ratioText})`;
-                    const value = document.createElement('span');
-                    value.className = 'value';
-                    if (Number.isFinite(ratio) && ratio > 1) {
+                    const ratioText = Number.isFinite(stats.ratio) ? formatPercent(stats.ratio) : '데이터 없음';
+                    label.textContent = `${stats.lineName} (${ratioText})`;
+                    if (Number.isFinite(stats.ratio) && stats.ratio > 1) {
                         label.classList.add('over-capacity');
                     }
+                    const value = document.createElement('span');
+                    value.className = 'value';
                     const detailParts = [];
-                    detailParts.push(`${stats.recordCount.toLocaleString('ko-KR')}건`);
-                    if (stats.count > 0) {
-                        detailParts.push(`라인 ${stats.count.toLocaleString('ko-KR')}개`);
+                    if (Number.isFinite(stats.totalProduction)) {
+                        detailParts.push(`총생산 ${formatNumber(stats.totalProduction)}`);
                     }
-                    if (stats.missing > 0) {
-                        detailParts.push(`미확인 라인 ${stats.missing.toLocaleString('ko-KR')}개`);
+                    if (Number.isFinite(stats.capacityLimit) && stats.capacityLimit > 0) {
+                        detailParts.push(`CAPA ${formatNumber(stats.capacityLimit)}`);
+                    } else {
+                        detailParts.push('CAPA 미설정');
                     }
-                    const detailText = detailParts.filter(Boolean).join(' / ');
-                    value.textContent = detailText ? detailText : '상세 없음';
+                    value.textContent = detailParts.join(' / ');
                     chip.appendChild(label);
                     chip.appendChild(value);
                     fragment.appendChild(chip);

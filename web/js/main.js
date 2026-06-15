@@ -4048,7 +4048,7 @@ function buildLineStats(records) {
             };
         }
 
-        entry.totalProduction += toNumber(record.production_plan);
+        entry.totalProduction += toNumber(record.production_actual);
         if (recordLineCategory) {
             entry.categories.add(recordLineCategory);
             if (!entry.lineCategory) {
@@ -4210,9 +4210,9 @@ function enrichRecord(record, lineStats, overrides = {}) {
     const effectiveLineKey = lineKeyBase || lineCompositeKey;
 
     const fallbackCapacityLimit = capacityLimit > 0 ? capacityLimit : null;
-    const fallbackRatio = fallbackCapacityLimit ? productionPlan / fallbackCapacityLimit : null;
+    const fallbackRatio = fallbackCapacityLimit ? productionActual / fallbackCapacityLimit : null;
 
-    const lineTotalProduction = lineStat ? lineStat.totalProduction : productionPlan;
+    const lineTotalProduction = lineStat ? lineStat.totalProduction : productionActual;
     const lineCapacityLimit = lineStat ? lineStat.capacityLimit : fallbackCapacityLimit;
     const lineCapacityRatio = lineStat ? lineStat.ratio : fallbackRatio;
     const lineCapacityStatus = lineStat ? lineStat.status : buildCapacityStatus(lineCapacityRatio);

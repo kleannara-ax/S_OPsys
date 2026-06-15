@@ -9545,7 +9545,13 @@ function renderSummaries() {
 
     const shortageCount = data.filter((record) => record.inventoryStatus && record.inventoryStatus.className === 'alert').length;
     const overstockCount = data.filter((record) => record.inventoryStatus && record.inventoryStatus.className === 'overstock').length;
-    const totalProduction = data.reduce((sum, record) => sum + (record.adjusted_production_plan ?? record.production_plan), 0);
+    /* 총 생산계획 물량: 카테고리 빈칸(미지정) 및 원단은 제외 */
+    const EXCLUDED_CATEGORIES = new Set(['', '원단']);
+    const isExcludedCategory = (cat) => EXCLUDED_CATEGORIES.has((cat ?? '').trim());
+    const totalProduction = data.reduce((sum, record) => {
+        if (isExcludedCategory(record.category)) return sum;
+        return sum + (record.adjusted_production_plan ?? record.production_plan);
+    }, 0);
 
     const shortageByCategory = new Map();
     const overstockByCategory = new Map();
@@ -9553,7 +9559,9 @@ function renderSummaries() {
     const categoryCapaUsage = new Map();
     data.forEach((record) => {
         const categoryKey = sanitizeText(record.category).trim() || '미지정';
-        categoryTotals.set(categoryKey, (categoryTotals.get(categoryKey) || 0) + (record.adjusted_production_plan ?? record.production_plan));
+        if (!isExcludedCategory(record.category)) {
+            categoryTotals.set(categoryKey, (categoryTotals.get(categoryKey) || 0) + (record.adjusted_production_plan ?? record.production_plan));
+        }
         if (record.inventoryStatus && record.inventoryStatus.className === 'alert') {
             shortageByCategory.set(categoryKey, (shortageByCategory.get(categoryKey) || 0) + 1);
         } else if (record.inventoryStatus && record.inventoryStatus.className === 'overstock') {

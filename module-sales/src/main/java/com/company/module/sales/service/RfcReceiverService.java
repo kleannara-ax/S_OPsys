@@ -388,6 +388,7 @@ public class RfcReceiverService {
         // → 플랜트별 저장위치 화면에서 선택된 저장위치의 재고만 생산계획현황에 표시
         int snopUpdateCount = 0;
         int snopInsertCount = 0;
+        int snopSkipCount = 0;
         try {
             // 마스터 데이터에서 선택된 저장위치 목록 조회 (plan_month=null AND is_selected=true)
             // ※ Step 1에서 자동 생성된 seed(is_selected=true)도 포함됨
@@ -468,6 +469,15 @@ public class RfcReceiverService {
                             }
                             snopUpdateCount += existingRecords.size();
                         } else {
+                            // 기본자재마스터에 미등록된 자재는 SnopRecord 신규 생성 skip
+                            List<BaseMaterialMaster> masterCheck = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);
+                            if (masterCheck.isEmpty()) {
+                                snopSkipCount++;
+                                if (snopSkipCount <= 5) {
+                                    log.info("[RFC-002] SnopRecord 신규 생성 skip (기본자재마스터 미등록): item={}, month={}", itemCode, planMonth);
+                                }
+                                continue;
+                            }
                             SnopRecord record = new SnopRecord();
                             record.setItemCode(itemCode);
                             record.setPlanMonth(planMonth);
@@ -483,8 +493,8 @@ public class RfcReceiverService {
                 }
             }
 
-            log.info("[RFC-002] SnopRecord 재고 반영 완료: 업데이트={}, 신규={}",
-                    snopUpdateCount, snopInsertCount);
+            log.info("[RFC-002] SnopRecord 재고 반영 완료: 업데이트={}, 신규={}, skip(마스터미등록)={}",
+                    snopUpdateCount, snopInsertCount, snopSkipCount);
 
         } catch (Exception e) {
             log.error("[RFC-002] SnopRecord 재고 반영 중 오류: {}", e.getMessage(), e);
@@ -497,8 +507,8 @@ public class RfcReceiverService {
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-002] 일자별재고 수신 완료: 신규={}, 수정={}, 처리={}, 에러={}, 미수신초기화={}, SnopRecord(업데이트={}, 신규={})",
-                insertCount, updateCount, processedCount, errorCount, staleResetCount, snopUpdateCount, snopInsertCount);
+        log.info("[RFC-002] 일자별재고 수신 완료: 신규={}, 수정={}, 처리={}, 에러={}, 미수신초기화={}, SnopRecord(업데이트={}, 신규={}, skip={})",
+                insertCount, updateCount, processedCount, errorCount, staleResetCount, snopUpdateCount, snopInsertCount, snopSkipCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -510,6 +520,7 @@ public class RfcReceiverService {
         result.put("stale_reset_count", staleResetCount);
         result.put("snop_update_count", snopUpdateCount);
         result.put("snop_insert_count", snopInsertCount);
+        result.put("snop_skip_count", snopSkipCount);
         result.put("error_count", errorCount);
         result.put("errors", errors);
         result.put("duration_ms", durationMs);
@@ -536,6 +547,7 @@ public class RfcReceiverService {
         int errorCount = 0;
         int insertCount = 0;
         int updateCount = 0;
+        int skipCount = 0;
         List<String> errors = new ArrayList<>();
 
         // RFC 실행시 등록자/수정자를 'IF'로 설정
@@ -601,6 +613,15 @@ public class RfcReceiverService {
                     record = optExisting.get();
                     updateCount++;
                 } else {
+                    // 기본자재마스터에 미등록된 자재는 SnopRecord 신규 생성 skip
+                    List<BaseMaterialMaster> masterCheck = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);
+                    if (masterCheck.isEmpty()) {
+                        skipCount++;
+                        if (skipCount <= 5) {
+                            log.info("[RFC-003] SnopRecord 신규 생성 skip (기본자재마스터 미등록): item={}, month={}", itemCode, planMonth);
+                        }
+                        continue;
+                    }
                     record = new SnopRecord();
                     record.setItemCode(itemCode);
                     record.setPlanMonth(planMonth);
@@ -627,8 +648,8 @@ public class RfcReceiverService {
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-003] 생산실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, 에러={}",
-                processedCount, actualSum.size(), insertCount, updateCount, errorCount);
+        log.info("[RFC-003] 생산실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, skip(마스터미등록)={}, 에러={}",
+                processedCount, actualSum.size(), insertCount, updateCount, skipCount, errorCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -637,6 +658,7 @@ public class RfcReceiverService {
         result.put("processed_count", processedCount);
         result.put("insert_count", insertCount);
         result.put("update_count", updateCount);
+        result.put("skip_count", skipCount);
         result.put("error_count", errorCount);
         result.put("errors", errors);
         result.put("duration_ms", durationMs);
@@ -659,6 +681,7 @@ public class RfcReceiverService {
         int errorCount = 0;
         int insertCount = 0;
         int updateCount = 0;
+        int skipCount = 0;
         List<String> errors = new ArrayList<>();
 
         // RFC 실행시 등록자/수정자를 'IF'로 설정
@@ -739,7 +762,15 @@ public class RfcReceiverService {
                     }
                     updateCount += existingList.size();
                 } else {
-                    // 매칭 레코드 없으면 신규 생성
+                    // 기본자재마스터에 미등록된 자재는 SnopRecord 신규 생성 skip
+                    List<BaseMaterialMaster> masterCheck = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);
+                    if (masterCheck.isEmpty()) {
+                        skipCount++;
+                        if (skipCount <= 5) {
+                            log.info("[RFC-004] SnopRecord 신규 생성 skip (기본자재마스터 미등록): item={}, month={}", itemCode, planMonth);
+                        }
+                        continue;
+                    }
                     SnopRecord record = new SnopRecord();
                     record.setItemCode(itemCode);
                     record.setPlanMonth(planMonth);
@@ -766,8 +797,8 @@ public class RfcReceiverService {
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-004] 판매실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, 에러={}",
-                processedCount, actualSum.size(), insertCount, updateCount, errorCount);
+        log.info("[RFC-004] 판매실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, skip(마스터미등록)={}, 에러={}",
+                processedCount, actualSum.size(), insertCount, updateCount, skipCount, errorCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -777,6 +808,7 @@ public class RfcReceiverService {
         result.put("aggregated_count", actualSum.size());
         result.put("insert_count", insertCount);
         result.put("update_count", updateCount);
+        result.put("skip_count", skipCount);
         result.put("error_count", errorCount);
         result.put("errors", errors);
         result.put("duration_ms", durationMs);

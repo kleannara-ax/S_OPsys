@@ -386,6 +386,23 @@ const PROJECTED_MONTH_EXTENSION = 12;
 const CHANGE_TYPE_THRESHOLD_MS = 1000;
 const PLAN_TABLE_SCROLL_STEP = 320;
 
+/* ── 제외 카테고리 (원단 / 미지정) ── */
+const EXCLUDED_CATEGORIES = new Set(['', '원단']);
+const isExcludedCategory = (cat) => EXCLUDED_CATEGORIES.has((cat ?? '').trim());
+
+/* ── CAPA 사용률 대상 생산라인 화이트리스트 ── */
+const CAPA_TARGET_LINES = new Set([
+    '가공 3호기 (1,2겹)',
+    '가공 3호기 (3겹)',
+    '가공 4호기',
+    '가공 5호기 (3겹)',
+    '가공 6호기 (1,2겹)',
+    '가공 6호기 (3겹)',
+    '생리대 5호기',
+    '생리대 6호기',
+]);
+const isCapaTargetLine = (line) => CAPA_TARGET_LINES.has((line ?? '').trim());
+
 /* ── localStorage 키 ── */
 const LS_KEY_ADJUSTED_OVERRIDES = 'snop_adjusted_plan_overrides';
 const LS_KEY_CHANGE_HISTORY = 'snop_change_history_local';
@@ -3151,7 +3168,7 @@ function getUniqueCategories(records) {
     const categories = new Set();
     records.forEach((record) => {
         const category = sanitizeText(record.category).trim();
-        if (category) {
+        if (category && !isExcludedCategory(category)) {
             categories.add(category);
         }
     });
@@ -7918,10 +7935,10 @@ function populateBaseMaterialMasterFilters() {
         filterScm.value = filters.scm;
     }
 
-    /* 카테고리 필터 */
+    /* 카테고리 필터 — 제외 카테고리(원단/미지정) 필터링 */
     if (filterCategory) {
         const categories = [...new Set(
-            masters.map(m => (m.hierarchy_name || '').trim()).filter(Boolean)
+            masters.map(m => (m.hierarchy_name || '').trim()).filter(cat => cat && !isExcludedCategory(cat))
         )].sort();
 
         const prevCat = filters.category;
@@ -7986,6 +8003,8 @@ function renderBaseMaterialMasterTable() {
     const prodUnitFilter = (filters.prodUnit || 'all').trim().toLowerCase();
 
     const filtered = masters.filter(m => {
+        /* 제외 카테고리(원단/미지정) 필터링 */
+        if (isExcludedCategory(m.hierarchy_name)) return false;
         const area = (m.scm_area ?? '').trim().toLowerCase();
         const cat = (m.hierarchy_name ?? '').trim().toLowerCase();
         const code = (m.item_code ?? '').trim().toLowerCase();
@@ -8745,6 +8764,9 @@ function applyFilters() {
     refreshChangeHistoryView();
 
     let filtered = enriched;
+
+    /* ── 제외 카테고리(원단/미지정) 필터링 ── */
+    filtered = filtered.filter((record) => !isExcludedCategory(record.category));
 
     /* ── 리뉴얼 기존자재 제외 ──
      * resolver에 의해 canonical_item_code가 변경된 레코드(기존자재)는 리스트에서 제외.
@@ -9545,22 +9567,7 @@ function renderSummaries() {
 
     const shortageCount = data.filter((record) => record.inventoryStatus && record.inventoryStatus.className === 'alert').length;
     const overstockCount = data.filter((record) => record.inventoryStatus && record.inventoryStatus.className === 'overstock').length;
-    /* 총 생산계획 물량: 카테고리 빈칸(미지정) 및 원단은 제외 */
-    const EXCLUDED_CATEGORIES = new Set(['', '원단']);
-    const isExcludedCategory = (cat) => EXCLUDED_CATEGORIES.has((cat ?? '').trim());
-
-    /* CAPA 사용률 대상 생산라인 화이트리스트 */
-    const CAPA_TARGET_LINES = new Set([
-        '가공 3호기 (1,2겹)',
-        '가공 3호기 (3겹)',
-        '가공 4호기',
-        '가공 5호기 (3겹)',
-        '가공 6호기 (1,2겹)',
-        '가공 6호기 (3겹)',
-        '생리대 5호기',
-        '생리대 6호기',
-    ]);
-    const isCapaTargetLine = (line) => CAPA_TARGET_LINES.has((line ?? '').trim());
+    /* 총 생산계획 물량: 제외 카테고리(원단, 미지정) 적용 — 전역 EXCLUDED_CATEGORIES 사용 */
     const totalProduction = data.reduce((sum, record) => {
         if (isExcludedCategory(record.category)) return sum;
         return sum + (record.adjusted_production_plan ?? record.production_plan);
@@ -11684,6 +11691,9 @@ function renderOptimalInventoryView() {
 
     let records = Array.isArray(state.enrichedData) ? [...state.enrichedData] : [];
 
+    /* 제외 카테고리(원단/미지정) 필터링 */
+    records = records.filter((record) => !isExcludedCategory(record.category));
+
     records = records.filter((record) => {
         const month = sanitizeText(record.month).trim();
         return month && month >= OPTIMAL_INVENTORY_MIN_MONTH;
@@ -12159,12 +12169,16 @@ function populateLineCapaUsageFilters() {
 
     records.forEach((record) => {
         if (!record) return;
+        /* 제외 카테고리(원단/미지정) 필터링 */
+        if (isExcludedCategory(record.category)) return;
         const monthValue = sanitizeText(record.month).trim();
         if (monthValue) {
             monthSet.add(monthValue);
         }
         const categoryValue = sanitizeText(record.lineCategory ?? record.category).trim() || '미지정';
-        categorySet.add(categoryValue);
+        if (!isExcludedCategory(categoryValue)) {
+            categorySet.add(categoryValue);
+        }
         const lineValue = sanitizeText(record.production_line).trim() || '미지정';
         lineSet.add(lineValue);
     });
@@ -14816,7 +14830,9 @@ function renderAnalyticsRiskTable() {
     const useAllMonths = !selectedMonth || selectedMonth === 'all';
     const baseMonth = useAllMonths ? '' : selectedMonth;
 
-    const enriched = Array.isArray(state.enrichedData) ? state.enrichedData : [];
+    const enrichedAll = Array.isArray(state.enrichedData) ? state.enrichedData : [];
+    /* 제외 카테고리(원단/미지정) 필터링 */
+    const enriched = enrichedAll.filter((record) => !isExcludedCategory(record.category));
     const enrichedIndex = new Map();
 
     enriched.forEach((record) => {
@@ -15318,10 +15334,11 @@ function populateSalesSummaryFilters() {
     const categoryValues = Array.from(new Set(
         aggregates
             .map((entry) => sanitizeText(entry.category).trim())
-            .filter(Boolean)
+            .filter((cat) => cat && !isExcludedCategory(cat))
     )).sort((a, b) => sanitizeText(a).localeCompare(sanitizeText(b)));
 
-    const hasUnspecifiedCategory = aggregates.some((entry) => !sanitizeText(entry.category).trim());
+    /* 미지정 카테고리는 EXCLUDED_CATEGORIES에 포함되므로 더 이상 표시하지 않음 */
+    const hasUnspecifiedCategory = false;
 
     if (monthSelect) {
         const previous = monthSelect.value || 'all';
@@ -15496,6 +15513,8 @@ function renderSalesSummaryTable() {
     const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
     const filteredAggregates = aggregates.filter((entry) => {
+        /* 제외 카테고리(원단/미지정) 필터링 */
+        if (isExcludedCategory(entry.category)) return false;
         const itemValue = sanitizeText(entry.item_code).trim().toUpperCase();
         const monthValue = sanitizeText(entry.month).trim();
         const categoryValue = sanitizeText(entry.category).trim();
@@ -17737,7 +17756,7 @@ function buildRecentSalesViewData() {
             total: r.total ?? 0,
             average: r.average ?? 0,
         };
-    });
+    }).filter((d) => !isExcludedCategory(d.category));
 }
 
 function populateRecentSalesViewFilters(viewData) {

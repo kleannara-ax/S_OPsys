@@ -9545,7 +9545,7 @@ function renderSummaries() {
 
     const shortageCount = data.filter((record) => record.inventoryStatus && record.inventoryStatus.className === 'alert').length;
     const overstockCount = data.filter((record) => record.inventoryStatus && record.inventoryStatus.className === 'overstock').length;
-    const totalProduction = data.reduce((sum, record) => sum + record.production_plan, 0);
+    const totalProduction = data.reduce((sum, record) => sum + (record.adjusted_production_plan ?? record.production_plan), 0);
 
     const shortageByCategory = new Map();
     const overstockByCategory = new Map();
@@ -9553,7 +9553,7 @@ function renderSummaries() {
     const categoryCapaUsage = new Map();
     data.forEach((record) => {
         const categoryKey = sanitizeText(record.category).trim() || '미지정';
-        categoryTotals.set(categoryKey, (categoryTotals.get(categoryKey) || 0) + record.production_plan);
+        categoryTotals.set(categoryKey, (categoryTotals.get(categoryKey) || 0) + (record.adjusted_production_plan ?? record.production_plan));
         if (record.inventoryStatus && record.inventoryStatus.className === 'alert') {
             shortageByCategory.set(categoryKey, (shortageByCategory.get(categoryKey) || 0) + 1);
         } else if (record.inventoryStatus && record.inventoryStatus.className === 'overstock') {

@@ -7199,6 +7199,13 @@ function populateFilterOptions() {
     sortMonthFilterOptions();
     if (months.includes(previousMonth)) {
         dom.filters.month.value = previousMonth;
+    } else {
+        /* 첫 로드 시 현재 시스템월을 기본 선택 (성능 최적화) */
+        const now = new Date();
+        const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        if (months.includes(currentMonth)) {
+            dom.filters.month.value = currentMonth;
+        }
     }
 
     const lines = getUniqueLines(state.rawData);

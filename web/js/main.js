@@ -4697,6 +4697,10 @@ function setActiveView(viewId, options = {}) {
     if (targetView === 'user-mgmt') {
         loadUsers();
     }
+    if (targetView === 'sales-upload') {
+        /* 판매계획 업로드 탭 진입 시 등록 월 기본값 설정 */
+        applySalesUploadDefaultMonth();
+    }
 }
 
 function setupViewNavigation() {
@@ -14849,6 +14853,17 @@ function setSalesUploadStatus(message, type = '') {
 function resetSalesUploadForm() {
     if (!dom.salesUpload || !dom.salesUpload.form) return;
     dom.salesUpload.form.reset();
+    /* 등록 월을 시스템 현재월로 기본 설정 */
+    applySalesUploadDefaultMonth();
+}
+
+/** 판매계획 업로드 등록 월 기본값 — 시스템 현재월(YYYY-MM) */
+function applySalesUploadDefaultMonth() {
+    if (!dom.salesUpload || !dom.salesUpload.month) return;
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    dom.salesUpload.month.value = `${yyyy}-${mm}`;
 }
 
 function renderAnalyticsRiskTable() {

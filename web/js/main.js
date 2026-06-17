@@ -274,6 +274,8 @@ function getOptimalBaselineKey(year, category) {
     return `${normalizedYear}__${normalizedCategory}`;
 }
 
+const OPTIMAL_INVENTORY_DEFAULT_YEAR = String(new Date().getFullYear());
+
 const state = {
     rawData: [],
     enrichedData: [],
@@ -342,7 +344,7 @@ const state = {
     },
     optimalInventoryChart: null,
     optimalInventoryFilters: {
-        year: '2025',
+        year: OPTIMAL_INVENTORY_DEFAULT_YEAR,
         aggregationMode: 'all',
     },
     optimalInventoryMonths: [],
@@ -382,7 +384,6 @@ const LINE_CAPA_USAGE_COLORS = [
 ];
 
 const OPTIMAL_INVENTORY_MIN_MONTH = '2025-01';
-const OPTIMAL_INVENTORY_DEFAULT_YEAR = String(new Date().getFullYear());
 
 const PROJECTED_MONTH_EXTENSION = 12;
 const CHANGE_TYPE_THRESHOLD_MS = 1000;

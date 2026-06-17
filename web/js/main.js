@@ -359,6 +359,8 @@ const state = {
     baseMaterialMasterFilters: { scm: 'all' },
     monthlyClosings: [],
     monthlyClosingIndex: new Map(),
+    /** 생산계획 현황 테이블 준비 상태 — 첫 로드 시 false, 필터 조작 후 true */
+    planTableReady: false,
 };
 
 const LINE_CAPA_USAGE_COLORS = [
@@ -929,6 +931,7 @@ function populateCategoryFilterOptions(categories, previousSelections) {
         checkbox.addEventListener('change', () => {
             syncCategoryAllCheckbox();
             updateCategoryFilterDisplay();
+            state.planTableReady = true;
             debouncedApplyFilters();
         });
         label.appendChild(checkbox);
@@ -8754,6 +8757,8 @@ function applyFilters() {
     const inventoryStatusFilter = dom.filters.inventoryStatus ? dom.filters.inventoryStatus.value : 'all';
     const capaStatusFilter = dom.filters.capaStatus ? dom.filters.capaStatus.value : 'all';
 
+    /* planTableReady는 사용자가 필터를 직접 조작할 때 true로 전환됨 (이벤트 리스너에서 설정) */
+
     const projectedRaw = generateProjectedRawRecords(state.rawData, PROJECTED_MONTH_EXTENSION, state.projectedOverrides);
     projectedRaw.forEach((record) => ensureMonthFilterOption(record.month));
 
@@ -8955,6 +8960,19 @@ function handlePlanTableScrollButtons(event) {
 
 function renderTable() {
     dom.tableBody.innerHTML = '';
+
+    /* 첫 로드 시 테이블 렌더링 생략 — 필터 선택 후 표시 (성능 최적화) */
+    if (!state.planTableReady) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 45;
+        cell.className = 'empty';
+        cell.textContent = '계획월, 카테고리, 생산라인 등 필터를 선택하면 데이터가 표시됩니다.';
+        row.appendChild(cell);
+        dom.tableBody.appendChild(row);
+        updatePlanTableScrollControls();
+        return;
+    }
 
     if (state.filteredData.length === 0) {
         const row = document.createElement('tr');
@@ -18348,8 +18366,11 @@ function bindEvents() {
             }
         });
     }
+    /* 생산계획 현황 테이블: 사용자가 필터를 조작하면 테이블 렌더링 활성화 */
+    function activatePlanTable() { state.planTableReady = true; }
+
     /* 자재코드 검색 필터 초기화 (hidden input change 시에도 applyFilters 호출) */
-    dom.filters.item.addEventListener('change', applyFilters);
+    dom.filters.item.addEventListener('change', () => { activatePlanTable(); applyFilters(); });
     initItemSearchFilter();
     if (dom.itemName) {
         dom.itemName.addEventListener('input', autoFillCategoryFromItemName);
@@ -18382,6 +18403,7 @@ function bindEvents() {
                 e.target.indeterminate = false;
             }
             updateCategoryFilterDisplay();
+            activatePlanTable();
             debouncedApplyFilters();
         });
     }
@@ -18392,13 +18414,13 @@ function bindEvents() {
             toggleCategoryMenu(true);
         }
     });
-    dom.filters.month.addEventListener('change', handleFilterMonthChange);
-    dom.filters.line.addEventListener('change', applyFilters);
+    dom.filters.month.addEventListener('change', () => { activatePlanTable(); handleFilterMonthChange(); });
+    dom.filters.line.addEventListener('change', () => { activatePlanTable(); applyFilters(); });
     if (dom.filters.inventoryStatus) {
-        dom.filters.inventoryStatus.addEventListener('change', applyFilters);
+        dom.filters.inventoryStatus.addEventListener('change', () => { activatePlanTable(); applyFilters(); });
     }
     if (dom.filters.capaStatus) {
-        dom.filters.capaStatus.addEventListener('change', applyFilters);
+        dom.filters.capaStatus.addEventListener('change', () => { activatePlanTable(); applyFilters(); });
     }
     if (dom.dashboard && dom.dashboard.baseMonth) {
         dom.dashboard.baseMonth.addEventListener('change', (event) => {
@@ -18430,7 +18452,7 @@ function bindEvents() {
         dom.dashboard.forecastTable.addEventListener('click', handleForecastCategoryToggle);
     }
     if (dom.filters.apply) {
-        dom.filters.apply.addEventListener('click', applyFilters);
+        dom.filters.apply.addEventListener('click', () => { activatePlanTable(); applyFilters(); });
     }
 
     /* ── 제품 유형 탭 (전체 / OEM) ── */
@@ -18553,6 +18575,7 @@ function bindEvents() {
         if (dom.dashboard && dom.dashboard.baseMonth) {
             dom.dashboard.baseMonth.dataset.manualSelection = 'false';
         }
+        state.planTableReady = false;
         applyFilters();
     });
 

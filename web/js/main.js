@@ -4610,29 +4610,6 @@ function getDashboardFilteredRecords() {
  *  멀티탭 관리  (MES 스타일 열린 탭 바)
  * ══════════════════════════════════════════════════════════ */
 
-/** 메뉴 바 펼침/접힘 상태 */
-let menuExpanded = false;
-
-/** 메뉴 바 토글 */
-function toggleMenuBar(forceState) {
-    const nav = dom.views.container;
-    const bar = dom.openTabsBar;
-    if (!nav) return;
-    menuExpanded = typeof forceState === 'boolean' ? forceState : !menuExpanded;
-    nav.classList.toggle('collapsed', !menuExpanded);
-    if (bar) bar.classList.toggle('menu-expanded', menuExpanded);
-    /* 기준정보 관리 서브탭 메뉴 펼침 상태 동기화 */
-    const subTabsBar = document.getElementById('planner-sub-tabs-bar');
-    if (subTabsBar) subTabsBar.classList.toggle('menu-expanded', menuExpanded);
-    /* 토글 버튼 상태 갱신 */
-    const toggleBtn = bar ? bar.querySelector('.open-tabs-menu-toggle') : null;
-    if (toggleBtn) {
-        toggleBtn.classList.toggle('active', menuExpanded);
-        toggleBtn.setAttribute('aria-expanded', menuExpanded ? 'true' : 'false');
-        toggleBtn.title = menuExpanded ? '메뉴 접기' : '메뉴 펼치기';
-    }
-}
-
 /** 열린 탭 바를 다시 그린다 */
 function renderOpenTabs() {
     const bar = dom.openTabsBar;
@@ -4644,24 +4621,6 @@ function renderOpenTabs() {
     }
     bar.style.display = 'flex';
     bar.innerHTML = '';
-
-    /* ☰ 메뉴 토글 버튼 */
-    const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'open-tabs-menu-toggle' + (menuExpanded ? ' active' : '');
-    toggleBtn.type = 'button';
-    toggleBtn.setAttribute('aria-label', '메뉴 펼치기/접기');
-    toggleBtn.setAttribute('aria-expanded', menuExpanded ? 'true' : 'false');
-    toggleBtn.title = menuExpanded ? '메뉴 접기' : '메뉴 펼치기';
-    toggleBtn.innerHTML = '&#9776;';     /* ☰ */
-    toggleBtn.addEventListener('click', () => toggleMenuBar());
-    bar.appendChild(toggleBtn);
-
-    /* 구분선 */
-    const divider = document.createElement('div');
-    divider.className = 'open-tabs-divider';
-    bar.appendChild(divider);
-
-    /* 탭들 */
     const isSole = tabs.length === 1;
     tabs.forEach((viewId) => {
         const label = VIEW_LABEL_MAP[viewId] || viewId;
@@ -4691,7 +4650,6 @@ function renderOpenTabs() {
 /**
  * 메뉴 클릭 시 호출 — 탭이 없으면 열고, 있으면 전환.
  * 최대 탭 수 초과 시 가장 오래된 비활성 탭을 자동 닫는다.
- * 메뉴 선택 후 메뉴 바를 자동으로 접는다.
  */
 function openTab(viewId) {
     if (!state.openTabs.includes(viewId)) {
@@ -4704,8 +4662,6 @@ function openTab(viewId) {
         }
         state.openTabs.push(viewId);
     }
-    /* 메뉴에서 선택했으므로 메뉴 바 자동 접기 */
-    toggleMenuBar(false);
     switchToTab(viewId);
 }
 
@@ -4797,7 +4753,6 @@ function setActiveView(viewId, options = {}) {
     const isPlanner = targetView === 'planner';
     if (plannerSubTabsBar) {
         plannerSubTabsBar.style.display = isPlanner ? 'flex' : 'none';
-        plannerSubTabsBar.classList.toggle('menu-expanded', menuExpanded);
     }
     if (dom.openTabsBar) {
         dom.openTabsBar.classList.toggle('has-sub-tabs', isPlanner);
@@ -19342,8 +19297,6 @@ async function initialize() {
     setupViewNavigation();
     setupPlannerSubTabs();
     bindEvents();
-    /* 메뉴 바 기본 접힘 상태 */
-    toggleMenuBar(false);
     await loadData();
     setActiveView(state.activeView, { scroll: false, focusButton: false });
     initDevSchedule();

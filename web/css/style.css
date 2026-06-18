@@ -52,16 +52,24 @@ main {
 /* ── 서브메뉴 탭 (생산/OEM 계획 수기등록 내부) ── */
 /* ── 기준정보 관리: 메인탭-서브탭 연결 패널 ── */
 .planner-sub-tabs {
-    display: flex;
+    display: none;                       /* 기본 숨김 — planner 뷰 활성 시 JS가 flex로 전환 */
     flex-wrap: wrap;
     gap: 6px;
     padding: 10px 16px 10px 20px;
-    margin: -8px 0 20px 0;
+    margin: 0;
     background: linear-gradient(135deg, rgba(37, 99, 235, 0.07) 0%, rgba(99, 102, 241, 0.04) 100%);
     border: 1px solid rgba(37, 99, 235, 0.18);
     border-top: none;
     border-radius: 0 0 var(--radius-lg, 12px) var(--radius-lg, 12px);
-    position: relative;
+    position: sticky;
+    top: 112px;                         /* 메뉴 접힘 시 header 바로 아래 */
+    z-index: 9;
+    transition: top 0.28s ease;
+}
+/* 메뉴 바 펼침 시 서브탭 위치 조정 */
+.planner-sub-tabs.menu-expanded {
+    top: 164px;                         /* header(112) + view-tabs(~52) */
+    margin-top: -1px;
 }
 
 /* 좌측 강조 바: 하위 메뉴 계층 표현 */
@@ -224,6 +232,16 @@ main {
     border-top: none;
     margin-top: -1px;
     box-shadow: none;
+}
+/* 기준정보 관리 서브탭 표시 시 열린 탭 바 위치 추가 조정 */
+.open-tabs-bar.has-sub-tabs {
+    top: 157px;                         /* header(112) + sub-tabs(~45) */
+    border-radius: 0 0 var(--radius-lg, 12px) var(--radius-lg, 12px);
+    border-top: none;
+    margin-top: -1px;
+}
+.open-tabs-bar.menu-expanded.has-sub-tabs {
+    top: 210px;                         /* header(112) + view-tabs(~52) + sub-tabs(~46) */
 }
 
 /* 메뉴 토글 버튼 */

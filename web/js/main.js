@@ -4621,6 +4621,9 @@ function toggleMenuBar(forceState) {
     menuExpanded = typeof forceState === 'boolean' ? forceState : !menuExpanded;
     nav.classList.toggle('collapsed', !menuExpanded);
     if (bar) bar.classList.toggle('menu-expanded', menuExpanded);
+    /* 기준정보 관리 서브탭 메뉴 펼침 상태 동기화 */
+    const subTabsBar = document.getElementById('planner-sub-tabs-bar');
+    if (subTabsBar) subTabsBar.classList.toggle('menu-expanded', menuExpanded);
     /* 토글 버튼 상태 갱신 */
     const toggleBtn = bar ? bar.querySelector('.open-tabs-menu-toggle') : null;
     if (toggleBtn) {
@@ -4788,6 +4791,16 @@ function setActiveView(viewId, options = {}) {
     const viewTabsContainer = dom.views.container || document.querySelector('.view-tabs');
     if (viewTabsContainer) {
         viewTabsContainer.classList.toggle('has-sub-tabs', targetView === 'planner');
+    }
+    /* 기준정보 관리 서브탭 표시/숨김 + 열린 탭 바 위치 조정 */
+    const plannerSubTabsBar = document.getElementById('planner-sub-tabs-bar');
+    const isPlanner = targetView === 'planner';
+    if (plannerSubTabsBar) {
+        plannerSubTabsBar.style.display = isPlanner ? 'flex' : 'none';
+        plannerSubTabsBar.classList.toggle('menu-expanded', menuExpanded);
+    }
+    if (dom.openTabsBar) {
+        dom.openTabsBar.classList.toggle('has-sub-tabs', isPlanner);
     }
 
     if (targetView === 'analytics' && state.chart) {

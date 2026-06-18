@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260617b">
+    <link rel="stylesheet" href="css/style.css?v=20260618a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -41,6 +41,8 @@
             <button class="view-tab" type="button" data-view-target="interface-master" role="tab" aria-selected="false" aria-controls="view-interface-master">인터페이스 관리</button>
             <button class="view-tab" type="button" data-view-target="user-mgmt" role="tab" aria-selected="false" aria-controls="view-user-mgmt">사용자 관리</button>
         </nav>
+        <!-- 열린 탭 바 (MES 스타일 멀티탭) -->
+        <div class="open-tabs-bar" id="open-tabs-bar" role="tablist" aria-label="열린 화면 탭"></div>
         <section class="summary-section view-section" id="view-summary" data-view="summary">
             <div class="summary-meta">
                 <span id="summary-month-context" class="summary-context">전체 월 기준</span>
@@ -1880,6 +1882,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260617b" defer></script>
+    <script src="js/main.js?v=20260618a" defer></script>
 </body>
 </html>

@@ -363,7 +363,27 @@ const state = {
     monthlyClosingIndex: new Map(),
     /** 생산계획 현황 테이블 준비 상태 — 첫 로드 시 false, 필터 조작 후 true */
     planTableReady: false,
+    /** 멀티탭 — 열린 탭 목록 (viewId 배열, 순서 = 탭 순서) */
+    openTabs: ['summary'],
 };
+
+/** 뷰 ID → 탭 표시 라벨 매핑 */
+const VIEW_LABEL_MAP = {
+    'summary': '통합 계획 요약',
+    'planner': '기준정보 관리',
+    'sales-upload': '판매계획 업로드',
+    'table': '생산계획 현황',
+    'line-capa': '생산 CAPA 현황',
+    'inventory': '계획 대비 실적 현황',
+    'analytics': '재고 분석 대시보드',
+    'optimal-inventory': '적정재고관리',
+    'change-history': '변경 이력 관리',
+    'interface-master': '인터페이스 관리',
+    'user-mgmt': '사용자 관리',
+};
+
+/** 멀티탭 최대 개수 */
+const MAX_OPEN_TABS = 7;
 
 const LINE_CAPA_USAGE_COLORS = [
     '#2563eb',
@@ -793,6 +813,7 @@ const dom = {
         buttons: Array.from(document.querySelectorAll('.view-tab')),
         sections: Array.from(document.querySelectorAll('.view-section')),
     },
+    openTabsBar: document.getElementById('open-tabs-bar'),
 };
 
 let planTableScrollAnimationFrame = null;
@@ -4585,6 +4606,85 @@ function getDashboardFilteredRecords() {
     });
 }
 
+/* ══════════════════════════════════════════════════════════
+ *  멀티탭 관리  (MES 스타일 열린 탭 바)
+ * ══════════════════════════════════════════════════════════ */
+
+/** 열린 탭 바를 다시 그린다 */
+function renderOpenTabs() {
+    const bar = dom.openTabsBar;
+    if (!bar) return;
+    const tabs = state.openTabs;
+    if (!tabs.length) {
+        bar.style.display = 'none';
+        return;
+    }
+    bar.style.display = 'flex';
+    bar.innerHTML = '';
+    const isSole = tabs.length === 1;
+    tabs.forEach((viewId) => {
+        const label = VIEW_LABEL_MAP[viewId] || viewId;
+        const isActive = viewId === state.activeView;
+        const tab = document.createElement('div');
+        tab.className = 'open-tab' + (isActive ? ' active' : '') + (isSole ? ' sole-tab' : '');
+        tab.dataset.viewId = viewId;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.innerHTML =
+            `<span class="open-tab-label" title="${label}">${label}</span>` +
+            `<button class="open-tab-close" type="button" aria-label="${label} 닫기" title="닫기">&times;</button>`;
+        /* 탭 클릭 → 해당 화면으로 전환 */
+        tab.addEventListener('click', (e) => {
+            if (e.target.closest('.open-tab-close')) return;
+            switchToTab(viewId);
+        });
+        /* 닫기 버튼 */
+        tab.querySelector('.open-tab-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeTab(viewId);
+        });
+        bar.appendChild(tab);
+    });
+}
+
+/**
+ * 메뉴 클릭 시 호출 — 탭이 없으면 열고, 있으면 전환.
+ * 최대 탭 수 초과 시 가장 오래된 비활성 탭을 자동 닫는다.
+ */
+function openTab(viewId) {
+    if (!state.openTabs.includes(viewId)) {
+        /* 최대 탭 수 체크 */
+        while (state.openTabs.length >= MAX_OPEN_TABS) {
+            /* 현재 활성 탭이 아닌 가장 오래된(첫 번째) 탭 제거 */
+            const removeIdx = state.openTabs.findIndex((id) => id !== state.activeView);
+            if (removeIdx === -1) break;          /* 모두 활성(불가능하지만 안전장치) */
+            state.openTabs.splice(removeIdx, 1);
+        }
+        state.openTabs.push(viewId);
+    }
+    switchToTab(viewId);
+}
+
+/** 탭 닫기 — 마지막 1개는 닫지 않는다 */
+function closeTab(viewId) {
+    if (state.openTabs.length <= 1) return;
+    const idx = state.openTabs.indexOf(viewId);
+    if (idx === -1) return;
+    state.openTabs.splice(idx, 1);
+    if (state.activeView === viewId) {
+        /* 닫힌 탭이 활성이면 인접 탭으로 전환 */
+        const nextIdx = Math.min(idx, state.openTabs.length - 1);
+        switchToTab(state.openTabs[nextIdx]);
+    } else {
+        renderOpenTabs();
+    }
+}
+
+/** 이미 열린 탭으로 전환 */
+function switchToTab(viewId) {
+    setActiveView(viewId, { scroll: false, focusButton: false });
+}
+
 function setActiveView(viewId, options = {}) {
     if (!dom.views) return;
 
@@ -4701,6 +4801,9 @@ function setActiveView(viewId, options = {}) {
         /* 판매계획 업로드 탭 진입 시 등록 월 기본값 설정 */
         applySalesUploadDefaultMonth();
     }
+
+    /* 멀티탭 바 갱신 */
+    renderOpenTabs();
 }
 
 function setupViewNavigation() {
@@ -4726,7 +4829,7 @@ function setupViewNavigation() {
         button.setAttribute('role', 'tab');
         button.setAttribute('tabindex', '-1');
         button.addEventListener('click', () => {
-            setActiveView(button.dataset.viewTarget, { focusButton: false });
+            openTab(button.dataset.viewTarget);
         });
         button.addEventListener('keydown', (event) => {
             if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
@@ -4738,7 +4841,7 @@ function setupViewNavigation() {
             const nextButton = buttons[nextIndex];
             if (nextButton) {
                 nextButton.focus();
-                setActiveView(nextButton.dataset.viewTarget, { focusButton: false, scroll: true });
+                openTab(nextButton.dataset.viewTarget);
             }
         });
     });
@@ -4748,7 +4851,7 @@ function setupViewNavigation() {
             const targetButton = event.target.closest('.view-tab');
             if (!targetButton || !container.contains(targetButton)) return;
             event.preventDefault();
-            setActiveView(targetButton.dataset.viewTarget, { focusButton: true, scroll: true });
+            openTab(targetButton.dataset.viewTarget);
         });
         container.addEventListener('keydown', (event) => {
             if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
@@ -4763,7 +4866,7 @@ function setupViewNavigation() {
             const nextButton = buttons[nextIndex];
             if (nextButton) {
                 nextButton.focus();
-                setActiveView(nextButton.dataset.viewTarget, { focusButton: false, scroll: true });
+                openTab(nextButton.dataset.viewTarget);
             }
         });
         container.dataset.bindViewNav = 'true';

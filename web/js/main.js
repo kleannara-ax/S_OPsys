@@ -809,11 +809,15 @@ const dom = {
         uploadFilterReset: document.querySelector('#upload-history-filter-reset'),
     },
     views: {
-        container: document.querySelector('.view-tabs'),
-        buttons: Array.from(document.querySelectorAll('.view-tab')),
+        container: document.getElementById('sidebar'),
+        buttons: Array.from(document.querySelectorAll('.sidebar-item')),
         sections: Array.from(document.querySelectorAll('.view-section')),
     },
     openTabsBar: document.getElementById('open-tabs-bar'),
+    sidebar: document.getElementById('sidebar'),
+    sidebarToggle: document.getElementById('sidebar-toggle'),
+    sidebarOverlay: document.getElementById('sidebar-overlay'),
+    sidebarPlannerSub: document.getElementById('sidebar-planner-sub'),
 };
 
 let planTableScrollAnimationFrame = null;
@@ -4691,7 +4695,7 @@ function setActiveView(viewId, options = {}) {
     const { scroll = true, focusButton = false } = options;
     const buttons = Array.isArray(dom.views.buttons)
         ? dom.views.buttons
-        : Array.from(document.querySelectorAll('.view-tab'));
+        : Array.from(document.querySelectorAll('.sidebar-item'));
     const sections = Array.isArray(dom.views.sections)
         ? dom.views.sections
         : Array.from(document.querySelectorAll('.view-section'));
@@ -4743,19 +4747,10 @@ function setActiveView(viewId, options = {}) {
         activeButton.focus();
     }
 
-    /* 기준정보 관리 탭 활성 시 메인탭↔서브탭 시각적 연결 */
-    const viewTabsContainer = dom.views.container || document.querySelector('.view-tabs');
-    if (viewTabsContainer) {
-        viewTabsContainer.classList.toggle('has-sub-tabs', targetView === 'planner');
-    }
-    /* 기준정보 관리 서브탭 표시/숨김 + 열린 탭 바 위치 조정 */
-    const plannerSubTabsBar = document.getElementById('planner-sub-tabs-bar');
+    /* 기준정보 관리 탭 활성 시 사이드바 서브메뉴 표시/숨김 */
     const isPlanner = targetView === 'planner';
-    if (plannerSubTabsBar) {
-        plannerSubTabsBar.style.display = isPlanner ? 'flex' : 'none';
-    }
-    if (dom.openTabsBar) {
-        dom.openTabsBar.classList.toggle('has-sub-tabs', isPlanner);
+    if (dom.sidebarPlannerSub) {
+        dom.sidebarPlannerSub.classList.toggle('visible', isPlanner);
     }
 
     if (targetView === 'analytics' && state.chart) {
@@ -4820,15 +4815,25 @@ function setupViewNavigation() {
 
     const buttons = Array.isArray(dom.views.buttons)
         ? dom.views.buttons
-        : Array.from(document.querySelectorAll('.view-tab'));
+        : Array.from(document.querySelectorAll('.sidebar-item'));
     const sections = Array.isArray(dom.views.sections)
         ? dom.views.sections
         : Array.from(document.querySelectorAll('.view-section'));
-    const container = dom.views.container || document.querySelector('.view-tabs');
 
     dom.views.buttons = buttons;
     dom.views.sections = sections;
-    dom.views.container = container;
+
+    /* 사이드바 토글 이벤트 */
+    setupSidebarToggle();
+
+    /* 사이드바 아이템에 data-tooltip 속성 추가 (접힌 상태에서 툴팁용) */
+    buttons.forEach((button) => {
+        if (!button) return;
+        const label = button.querySelector('.sidebar-label');
+        if (label) {
+            button.setAttribute('data-tooltip', label.textContent.trim());
+        }
+    });
 
     buttons.forEach((button) => {
         if (!button) return;
@@ -4841,11 +4846,11 @@ function setupViewNavigation() {
             openTab(button.dataset.viewTarget);
         });
         button.addEventListener('keydown', (event) => {
-            if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
             event.preventDefault();
             const currentIndex = buttons.indexOf(button);
             if (currentIndex === -1) return;
-            const direction = event.key === 'ArrowRight' ? 1 : -1;
+            const direction = event.key === 'ArrowDown' ? 1 : -1;
             const nextIndex = (currentIndex + direction + buttons.length) % buttons.length;
             const nextButton = buttons[nextIndex];
             if (nextButton) {
@@ -4855,22 +4860,18 @@ function setupViewNavigation() {
         });
     });
 
-    if (container && !container.dataset.bindViewNav) {
-        container.addEventListener('click', (event) => {
-            const targetButton = event.target.closest('.view-tab');
-            if (!targetButton || !container.contains(targetButton)) return;
-            event.preventDefault();
-            openTab(targetButton.dataset.viewTarget);
-        });
-        container.addEventListener('keydown', (event) => {
-            if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-            const activeButton = document.activeElement && document.activeElement.classList.contains('view-tab')
+    /* 사이드바 nav 컨테이너에 키보드 내비게이션 바인딩 */
+    const sidebarNav = dom.sidebar ? dom.sidebar.querySelector('.sidebar-nav') : null;
+    if (sidebarNav && !sidebarNav.dataset.bindViewNav) {
+        sidebarNav.addEventListener('keydown', (event) => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+            const activeButton = document.activeElement && document.activeElement.classList.contains('sidebar-item')
                 ? document.activeElement
                 : buttons.find((btn) => btn && btn.classList.contains('active'));
             if (!activeButton) return;
             const currentIndex = buttons.indexOf(activeButton);
             if (currentIndex === -1) return;
-            const direction = event.key === 'ArrowRight' ? 1 : -1;
+            const direction = event.key === 'ArrowDown' ? 1 : -1;
             const nextIndex = (currentIndex + direction + buttons.length) % buttons.length;
             const nextButton = buttons[nextIndex];
             if (nextButton) {
@@ -4878,7 +4879,7 @@ function setupViewNavigation() {
                 openTab(nextButton.dataset.viewTarget);
             }
         });
-        container.dataset.bindViewNav = 'true';
+        sidebarNav.dataset.bindViewNav = 'true';
     }
 
     sections.forEach((section) => {
@@ -19254,42 +19255,90 @@ function bindEvents() {
    ═══════════════════════════════════════════════════════ */
 
 function setupPlannerSubTabs() {
-    const tabContainer = document.querySelector('.planner-sub-tabs');
-    if (!tabContainer) return;
+    /* 사이드바 서브메뉴 + 기존 .planner-sub-tabs 둘 다 지원 */
+    const sidebarSubContainer = document.getElementById('sidebar-planner-sub');
+    const legacyContainer = document.querySelector('.planner-sub-tabs');
+    const subContainer = sidebarSubContainer || legacyContainer;
+    if (!subContainer) return;
 
-    const tabs = Array.from(tabContainer.querySelectorAll('.planner-sub-tab'));
+    const tabClass = sidebarSubContainer ? '.sidebar-sub-item' : '.planner-sub-tab';
+    const tabs = Array.from(subContainer.querySelectorAll(tabClass));
     const sections = Array.from(document.querySelectorAll('.planner-sub-section'));
 
     function activateSubTab(targetKey) {
-        // 탭 활성화
         tabs.forEach(tab => {
             const isActive = tab.dataset.subTarget === targetKey;
             tab.classList.toggle('active', isActive);
             tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
 
-        // 섹션 표시/숨김
         sections.forEach(section => {
             const isActive = section.dataset.plannerSub === targetKey;
             section.classList.toggle('active', isActive);
         });
     }
 
-    // 클릭 이벤트
-    tabContainer.addEventListener('click', (e) => {
-        const tab = e.target.closest('.planner-sub-tab');
+    subContainer.addEventListener('click', (e) => {
+        const tab = e.target.closest(tabClass);
         if (!tab) return;
         e.preventDefault();
         activateSubTab(tab.dataset.subTarget);
     });
 
-    // 초기 활성화 (첫 번째 탭)
     const activeTab = tabs.find(t => t.classList.contains('active'));
     if (activeTab) {
         activateSubTab(activeTab.dataset.subTarget);
     } else if (tabs.length > 0) {
         activateSubTab(tabs[0].dataset.subTarget);
     }
+}
+
+/* ══════════════════════════════════════════════════════════
+ *  사이드바 토글
+ * ══════════════════════════════════════════════════════════ */
+function setupSidebarToggle() {
+    const sidebar = dom.sidebar;
+    const toggle = dom.sidebarToggle;
+    const overlay = dom.sidebarOverlay;
+    if (!sidebar || !toggle) return;
+
+    function expandSidebar() {
+        sidebar.classList.add('expanded');
+        document.body.classList.add('sidebar-expanded');
+        if (overlay) overlay.classList.add('visible');
+        toggle.setAttribute('aria-label', '메뉴 닫기');
+    }
+
+    function collapseSidebar() {
+        sidebar.classList.remove('expanded');
+        document.body.classList.remove('sidebar-expanded');
+        if (overlay) overlay.classList.remove('visible');
+        toggle.setAttribute('aria-label', '메뉴 열기');
+    }
+
+    function toggleSidebar() {
+        if (sidebar.classList.contains('expanded')) {
+            collapseSidebar();
+        } else {
+            expandSidebar();
+        }
+    }
+
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleSidebar();
+    });
+
+    if (overlay) {
+        overlay.addEventListener('click', collapseSidebar);
+    }
+
+    /* ESC로 닫기 */
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('expanded')) {
+            collapseSidebar();
+        }
+    });
 }
 
 async function initialize() {

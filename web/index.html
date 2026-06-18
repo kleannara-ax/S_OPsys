@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260618d">
+    <link rel="stylesheet" href="css/style.css?v=20260618e">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -27,29 +27,58 @@
         </div>
     </header>
 
+    <!-- ══ 좌측 세로 사이드바 네비게이션 ══ -->
+    <aside class="sidebar" id="sidebar" aria-label="메인 메뉴">
+        <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="메뉴 열기/닫기" title="메뉴 열기/닫기">
+            <span class="sidebar-toggle-icon">&#9776;</span>
+        </button>
+        <nav class="sidebar-nav" role="tablist" aria-label="주요 기능 화면 선택">
+            <button class="sidebar-item active" type="button" data-view-target="summary" role="tab" aria-selected="true" aria-controls="view-summary">
+                <span class="sidebar-icon" aria-hidden="true">&#x25A3;</span><span class="sidebar-label">통합 계획 요약</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="planner" role="tab" aria-selected="false" aria-controls="view-planner">
+                <span class="sidebar-icon" aria-hidden="true">&#x2699;</span><span class="sidebar-label">기준정보 관리</span>
+            </button>
+            <div class="sidebar-sub-menu" id="sidebar-planner-sub" aria-label="기준정보 관리 하위 메뉴">
+                <button class="sidebar-sub-item active" type="button" data-sub-target="sub-base-material" role="tab" aria-selected="true">기본자재 마스터</button>
+                <button class="sidebar-sub-item" type="button" data-sub-target="sub-recent-sales" role="tab" aria-selected="false">판매실적 업로드</button>
+                <button class="sidebar-sub-item" type="button" data-sub-target="sub-line-capa" role="tab" aria-selected="false">라인 CAPA 관리</button>
+                <button class="sidebar-sub-item" type="button" data-sub-target="sub-line-item" role="tab" aria-selected="false">생산자재 마스터</button>
+                <button class="sidebar-sub-item" type="button" data-sub-target="sub-material-renewal" role="tab" aria-selected="false">리뉴얼 자재 연결</button>
+                <button class="sidebar-sub-item" type="button" data-sub-target="sub-plant-storage" role="tab" aria-selected="false">플랜트별 저장위치</button>
+            </div>
+            <button class="sidebar-item" type="button" data-view-target="sales-upload" role="tab" aria-selected="false" aria-controls="view-sales-upload">
+                <span class="sidebar-icon" aria-hidden="true">&#x25B2;</span><span class="sidebar-label">판매계획 업로드</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="table" role="tab" aria-selected="false" aria-controls="view-table">
+                <span class="sidebar-icon" aria-hidden="true">&#x25A6;</span><span class="sidebar-label">생산계획 현황</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="line-capa" role="tab" aria-selected="false" aria-controls="view-line-capa">
+                <span class="sidebar-icon" aria-hidden="true">&#x2692;</span><span class="sidebar-label">생산 CAPA 현황</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="inventory" role="tab" aria-selected="false" aria-controls="view-inventory">
+                <span class="sidebar-icon" aria-hidden="true">&#x25C9;</span><span class="sidebar-label">계획 대비 실적</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="analytics" role="tab" aria-selected="false" aria-controls="view-analytics">
+                <span class="sidebar-icon" aria-hidden="true">&#x25E4;</span><span class="sidebar-label">재고 분석</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="optimal-inventory" role="tab" aria-selected="false" aria-controls="view-optimal-inventory">
+                <span class="sidebar-icon" aria-hidden="true">&#x25CE;</span><span class="sidebar-label">적정재고관리</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="change-history" role="tab" aria-selected="false" aria-controls="view-change-history">
+                <span class="sidebar-icon" aria-hidden="true">&#x2630;</span><span class="sidebar-label">변경 이력 관리</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="interface-master" role="tab" aria-selected="false" aria-controls="view-interface-master">
+                <span class="sidebar-icon" aria-hidden="true">&#x21C4;</span><span class="sidebar-label">인터페이스 관리</span>
+            </button>
+            <button class="sidebar-item" type="button" data-view-target="user-mgmt" role="tab" aria-selected="false" aria-controls="view-user-mgmt">
+                <span class="sidebar-icon" aria-hidden="true">&#x263A;</span><span class="sidebar-label">사용자 관리</span>
+            </button>
+        </nav>
+    </aside>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     <main>
-        <nav class="view-tabs" role="tablist" aria-label="주요 기능 화면 선택">
-            <button class="view-tab active" type="button" data-view-target="summary" role="tab" aria-selected="true" aria-controls="view-summary">통합 계획 요약</button>
-            <button class="view-tab" type="button" data-view-target="planner" role="tab" aria-selected="false" aria-controls="view-planner">기준정보 관리</button>
-            <button class="view-tab" type="button" data-view-target="sales-upload" role="tab" aria-selected="false" aria-controls="view-sales-upload">판매계획 업로드</button>
-            <button class="view-tab" type="button" data-view-target="table" role="tab" aria-selected="false" aria-controls="view-table">생산계획 현황</button>
-            <button class="view-tab" type="button" data-view-target="line-capa" role="tab" aria-selected="false" aria-controls="view-line-capa">생산 CAPA 현황</button>
-            <button class="view-tab" type="button" data-view-target="inventory" role="tab" aria-selected="false" aria-controls="view-inventory">계획 대비 실적 현황</button>
-            <button class="view-tab" type="button" data-view-target="analytics" role="tab" aria-selected="false" aria-controls="view-analytics">재고 분석 대시보드</button>
-            <button class="view-tab" type="button" data-view-target="optimal-inventory" role="tab" aria-selected="false" aria-controls="view-optimal-inventory">적정재고관리</button>
-            <button class="view-tab" type="button" data-view-target="change-history" role="tab" aria-selected="false" aria-controls="view-change-history">변경 이력 관리</button>
-            <button class="view-tab" type="button" data-view-target="interface-master" role="tab" aria-selected="false" aria-controls="view-interface-master">인터페이스 관리</button>
-            <button class="view-tab" type="button" data-view-target="user-mgmt" role="tab" aria-selected="false" aria-controls="view-user-mgmt">사용자 관리</button>
-        </nav>
-        <!-- 기준정보 관리 서브탭 (메뉴 바와 함께 표시) -->
-        <nav class="planner-sub-tabs" id="planner-sub-tabs-bar" role="tablist" aria-label="기준정보 관리 하위 메뉴">
-            <button class="planner-sub-tab active" type="button" data-sub-target="sub-base-material" role="tab" aria-selected="true">기본자재 마스터</button>
-            <button class="planner-sub-tab" type="button" data-sub-target="sub-recent-sales" role="tab" aria-selected="false">최근 3개월 판매실적 엑셀 업로드</button>
-            <button class="planner-sub-tab" type="button" data-sub-target="sub-line-capa" role="tab" aria-selected="false">라인 CAPA 관리</button>
-            <button class="planner-sub-tab" type="button" data-sub-target="sub-line-item" role="tab" aria-selected="false">생산자재 마스터 관리</button>
-            <button class="planner-sub-tab" type="button" data-sub-target="sub-material-renewal" role="tab" aria-selected="false">리뉴얼 자재 연결 마스터</button>
-            <button class="planner-sub-tab" type="button" data-sub-target="sub-plant-storage" role="tab" aria-selected="false">플랜트별 저장위치 선택</button>
-        </nav>
         <!-- 열린 탭 바 (MES 스타일 멀티탭) -->
         <div class="open-tabs-bar" id="open-tabs-bar" role="tablist" aria-label="열린 화면 탭"></div>
         <section class="summary-section view-section" id="view-summary" data-view="summary">
@@ -1881,6 +1910,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260618d" defer></script>
+    <script src="js/main.js?v=20260618e" defer></script>
 </body>
 </html>

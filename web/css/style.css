@@ -5164,7 +5164,7 @@ td.number {
 }
 
 .inventory-forecast-panel {
-    margin: 32px 0;
+    margin: 0;
     background: var(--surface-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);

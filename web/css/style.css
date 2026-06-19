@@ -47,7 +47,7 @@ main {
     padding: 0 24px;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 0;
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -309,7 +309,7 @@ body.sidebar-expanded main {
     display: none;                       /* 탭이 열리면 JS가 flex로 전환 */
     align-items: center;
     gap: 2px;
-    padding: 6px 12px 0;
+    padding: 4px 12px 0;
     background: var(--surface-color);
     border: 1px solid rgba(148, 163, 184, 0.28);
     border-radius: var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0;
@@ -319,6 +319,7 @@ body.sidebar-expanded main {
     backdrop-filter: blur(10px);
     overflow-x: auto;
     scrollbar-width: thin;
+    margin-top: 4px;
 }
 .open-tabs-bar.has-sub-tabs {
     /* 서브탭은 사이드바로 이동하여 더 이상 위치 보정 불필요 */
@@ -392,6 +393,10 @@ body.sidebar-expanded main {
     display: none;
 }
 
+.view-section {
+    padding-top: 12px;
+}
+
 .view-section[aria-hidden="true"] {
     pointer-events: none;
 }
@@ -405,7 +410,7 @@ body.sidebar-expanded main {
     background: rgba(248, 250, 252, 0.95);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(148, 163, 184, 0.3);
-    padding: 8px 0;
+    padding: 4px 0;
 }
 
 .header-container {

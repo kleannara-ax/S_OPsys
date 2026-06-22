@@ -379,7 +379,7 @@ const VIEW_LABEL_MAP = {
     'optimal-inventory': '적정재고관리',
     'change-history': '변경 이력 관리',
     'interface-master': '인터페이스 관리',
-    'user-mgmt': '사용자 관리',
+    'user-mgmt': '사용자 권한 관리',
 };
 
 /** 멀티탭 최대 개수 */
@@ -20869,6 +20869,59 @@ async function initInterfaceMaster() {
  *  인증 체크 & 로그아웃
  * ========================================================================= */
 
+/**
+ * 사이드바 메뉴를 사용자 권한에 따라 표시/숨김 처리.
+ * - ADMIN: 모든 메뉴 표시 (user-mgmt 포함)
+ * - 일반 사용자: allowed_views에 포함된 메뉴만 표시, user-mgmt는 항상 숨김
+ * - 권한 설정이 없는 경우(빈 배열): 전체 메뉴 표시 (초기 설정 전 호환)
+ */
+function applyMenuPermissions(role, allowedViews) {
+    const isAdmin = (role || '').toUpperCase() === 'ADMIN';
+    const sidebar = document.querySelector('.sidebar-nav');
+    if (!sidebar) return;
+
+    const sidebarItems = sidebar.querySelectorAll('.sidebar-item[data-view-target]');
+    const subMenus = sidebar.querySelectorAll('.sidebar-sub-menu');
+
+    // ADMIN은 전체 메뉴 표시
+    if (isAdmin) {
+        sidebarItems.forEach(btn => { btn.style.display = ''; });
+        subMenus.forEach(sub => { sub.style.display = ''; });
+        return;
+    }
+
+    // 권한 목록이 없거나 빈 배열이면 → 전체 표시 (하위 호환)
+    // 단, user-mgmt는 ADMIN이 아니면 항상 숨김
+    const hasPermissions = Array.isArray(allowedViews) && allowedViews.length > 0;
+
+    sidebarItems.forEach(btn => {
+        const viewId = btn.dataset.viewTarget;
+
+        // user-mgmt(사용자 권한 관리)는 ADMIN 전용
+        if (viewId === 'user-mgmt') {
+            btn.style.display = 'none';
+            return;
+        }
+
+        if (!hasPermissions) {
+            // 권한 미설정: 전체 표시
+            btn.style.display = '';
+        } else {
+            btn.style.display = allowedViews.includes(viewId) ? '' : 'none';
+        }
+    });
+
+    // 기준정보 관리 서브메뉴: 부모(planner)가 숨겨지면 서브메뉴도 숨김
+    subMenus.forEach(sub => {
+        const parentItem = sub.previousElementSibling;
+        if (parentItem && parentItem.style.display === 'none') {
+            sub.style.display = 'none';
+        } else {
+            sub.style.display = '';
+        }
+    });
+}
+
 async function checkAuthAndRedirect() {
     try {
         const res = await fetch('/sales-api/auth/me', { credentials: 'same-origin' });
@@ -20893,6 +20946,12 @@ async function checkAuthAndRedirect() {
         sessionStorage.setItem('loginUser', data.user_id);
         sessionStorage.setItem('loginUserName', data.user_name);
         sessionStorage.setItem('loginUserRole', data.role);
+        // 메뉴 권한 저장 (localStorage — 로그인 시 1회만 갱신)
+        if (Array.isArray(data.allowed_views)) {
+            localStorage.setItem('allowedViews', JSON.stringify(data.allowed_views));
+        }
+        // 사이드바 메뉴 필터링 적용
+        applyMenuPermissions(data.role, data.allowed_views);
         return true;
     } catch (e) {
         window.location.href = '/login.html';
@@ -20905,6 +20964,7 @@ async function doLogout() {
         await fetch('/sales-api/auth/logout', { method: 'POST', credentials: 'same-origin' });
     } catch (e) { /* ignore */ }
     sessionStorage.clear();
+    localStorage.removeItem('allowedViews');
     window.location.href = '/login.html';
 }
 // 전역에서 접근 가능하도록 (onclick="doLogout()")
@@ -20914,7 +20974,21 @@ window.doLogout = doLogout;
  *  사용자 관리 (CRUD)
  * ========================================================================= */
 
-const userMgmtState = { data: [], editId: null, adding: false };
+const userMgmtState = { data: [], editId: null, adding: false, permUserId: null, permData: {} };
+
+/** 메뉴 권한 설정 대상 목록 — 사이드바의 view-target과 동일 */
+const MENU_PERMISSION_VIEWS = [
+    { id: 'summary', label: '통합 계획 요약' },
+    { id: 'planner', label: '기준정보 관리' },
+    { id: 'sales-upload', label: '판매계획 업로드' },
+    { id: 'table', label: '생산계획 현황' },
+    { id: 'line-capa', label: '생산 CAPA 현황' },
+    { id: 'inventory', label: '계획 대비 실적' },
+    { id: 'analytics', label: '재고 분석 대시보드' },
+    { id: 'optimal-inventory', label: '적정재고관리' },
+    { id: 'change-history', label: '변경 이력 관리' },
+    { id: 'interface-master', label: '인터페이스 관리' },
+];
 
 async function loadUsers() {
     try {
@@ -20986,6 +21060,7 @@ function renderUserTable() {
                     <td>${formatDateTime(u.created_at)}</td>
                     <td class="if-manage-btns">
                         <button class="small primary user-edit-btn" data-id="${u.id}">수정</button>
+                        <button class="user-perm-btn" data-user-id="${u.user_id}" data-user-name="${u.user_name || ''}" data-role="${u.role || 'USER'}">메뉴 권한</button>
                         <button class="small danger user-delete-btn" data-id="${u.id}">삭제</button>
                     </td>
                 </tr>`;
@@ -21092,6 +21167,14 @@ function bindUserMgmtEvents() {
             renderUserTable();
         }
 
+        // 메뉴 권한
+        if (btn.classList.contains('user-perm-btn')) {
+            const userId = btn.dataset.userId;
+            const userName = btn.dataset.userName;
+            const role = btn.dataset.role;
+            openMenuPermissionPanel(userId, userName, role);
+        }
+
         // 삭제
         if (btn.classList.contains('user-delete-btn')) {
             const id = btn.dataset.id;
@@ -21116,8 +21199,125 @@ function bindUserMgmtEvents() {
     });
 }
 
+/* ── 메뉴 권한 패널 ── */
+
+async function openMenuPermissionPanel(userId, userName, role) {
+    const panel = document.getElementById('menu-permission-panel');
+    if (!panel) return;
+
+    userMgmtState.permUserId = userId;
+    document.getElementById('perm-target-user-name').textContent = userName || userId;
+    document.getElementById('perm-target-user-id-badge').textContent = userId;
+
+    // ADMIN 안내
+    const isAdmin = (role || '').toUpperCase() === 'ADMIN';
+
+    // 기존 권한 조회
+    let allowedViews = [];
+    try {
+        const res = await fetch(`/sales-api/user-menu-permissions/${encodeURIComponent(userId)}`, { credentials: 'same-origin' });
+        if (res.ok) {
+            const json = await res.json();
+            const perms = extractData(json);
+            allowedViews = perms.filter(p => p.allowed).map(p => p.view_id);
+        }
+    } catch (e) {
+        console.warn('메뉴 권한 조회 실패:', e);
+    }
+
+    // 권한 설정이 하나도 없는 경우 (신규 사용자) → 전체 선택 기본값
+    const noPermSet = allowedViews.length === 0;
+
+    // 체크박스 그리드 생성
+    const grid = document.getElementById('menu-permission-grid');
+    grid.innerHTML = MENU_PERMISSION_VIEWS.map(v => {
+        const checked = noPermSet || allowedViews.includes(v.id);
+        return `<label class="${checked ? 'checked' : ''}">
+            <input type="checkbox" value="${v.id}" ${checked ? 'checked' : ''} ${isAdmin ? 'disabled' : ''}>
+            ${v.label}
+        </label>`;
+    }).join('');
+
+    if (isAdmin) {
+        document.querySelector('.menu-permission-desc').textContent =
+            'ADMIN 역할은 설정과 무관하게 전체 메뉴에 접근 가능합니다. 권한 변경이 필요하면 역할을 먼저 변경하세요.';
+    } else {
+        document.querySelector('.menu-permission-desc').textContent =
+            '체크된 메뉴만 해당 사용자에게 표시됩니다. ADMIN 역할은 설정과 무관하게 전체 메뉴에 접근 가능합니다.';
+    }
+
+    // 체크박스 변경 시 label 스타일 업데이트
+    grid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            cb.closest('label').classList.toggle('checked', cb.checked);
+        });
+    });
+
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function saveMenuPermissions() {
+    const userId = userMgmtState.permUserId;
+    if (!userId) return;
+
+    const grid = document.getElementById('menu-permission-grid');
+    const views = [];
+    grid.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+        views.push(cb.value);
+    });
+
+    try {
+        const res = await fetch(`/sales-api/user-menu-permissions/${encodeURIComponent(userId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ views }),
+            credentials: 'same-origin'
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message || '저장 실패');
+            return;
+        }
+        alert(`${userId} 사용자의 메뉴 권한이 저장되었습니다.\n해당 사용자가 다음 로그인 시 적용됩니다.`);
+    } catch (err) {
+        alert('저장 중 오류: ' + err.message);
+    }
+}
+
+function closeMenuPermissionPanel() {
+    const panel = document.getElementById('menu-permission-panel');
+    if (panel) panel.style.display = 'none';
+    userMgmtState.permUserId = null;
+}
+
+function bindMenuPermissionEvents() {
+    const saveBtn = document.getElementById('btn-perm-save');
+    const closeBtn = document.getElementById('btn-perm-close');
+    const selectAllBtn = document.getElementById('btn-perm-select-all');
+    const deselectAllBtn = document.getElementById('btn-perm-deselect-all');
+
+    if (saveBtn) saveBtn.addEventListener('click', saveMenuPermissions);
+    if (closeBtn) closeBtn.addEventListener('click', closeMenuPermissionPanel);
+    if (selectAllBtn) selectAllBtn.addEventListener('click', () => {
+        const grid = document.getElementById('menu-permission-grid');
+        grid.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(cb => {
+            cb.checked = true;
+            cb.closest('label').classList.add('checked');
+        });
+    });
+    if (deselectAllBtn) deselectAllBtn.addEventListener('click', () => {
+        const grid = document.getElementById('menu-permission-grid');
+        grid.querySelectorAll('input[type="checkbox"]:not(:disabled)').forEach(cb => {
+            cb.checked = false;
+            cb.closest('label').classList.remove('checked');
+        });
+    });
+}
+
 function initUserMgmt() {
     bindUserMgmtEvents();
+    bindMenuPermissionEvents();
     loadUsers();
 }
 

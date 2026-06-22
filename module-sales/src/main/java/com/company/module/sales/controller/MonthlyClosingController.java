@@ -28,7 +28,7 @@ public class MonthlyClosingController {
         if (from != null && to != null) {
             records = service.findByRange(from, to);
         } else {
-            records = service.findByRange(null, null);
+            records = service.findAll();
         }
         return ResponseEntity.ok(ApiResponse.ok(records));
     }

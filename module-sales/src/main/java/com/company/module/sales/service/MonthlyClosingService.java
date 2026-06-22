@@ -23,6 +23,12 @@ public class MonthlyClosingService {
         return repository.findAll(pageable);
     }
 
+    /** 전체 조회 (파라미터 없이 호출 시) */
+    @Transactional(readOnly = true)
+    public List<MonthlyClosing> findAll() {
+        return repository.findAll();
+    }
+
     @Transactional(readOnly = true)
     public MonthlyClosing findById(Long id) {
         return repository.findById(id)

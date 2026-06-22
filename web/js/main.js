@@ -21233,7 +21233,7 @@ async function openMenuPermissionPanel(userId, userName, role) {
     grid.innerHTML = MENU_PERMISSION_VIEWS.map(v => {
         const checked = noPermSet || allowedViews.includes(v.id);
         return `<label class="${checked ? 'checked' : ''}">
-            <input type="checkbox" value="${v.id}" ${checked ? 'checked' : ''} ${isAdmin ? 'disabled' : ''}>
+            <input type="checkbox" value="${v.id}" ${checked ? 'checked' : ''}>
             ${v.label}
         </label>`;
     }).join('');

@@ -6,6 +6,7 @@ import com.company.module.sales.entity.UserMenuPermission;
 import com.company.module.sales.repository.UserMenuPermissionRepository;
 import com.company.module.sales.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,7 +30,9 @@ import java.util.stream.Collectors;
 public class AuthController {
 
     private final UserRepository userRepository;
-    private final UserMenuPermissionRepository menuPermissionRepository;
+
+    @Autowired(required = false)
+    private UserMenuPermissionRepository menuPermissionRepository;
 
     /** 로그인 */
     @PostMapping("/login")
@@ -72,12 +75,19 @@ public class AuthController {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        // 메뉴 권한 조회
-        List<String> allowedViews = menuPermissionRepository.findByUserId(user.getUserId())
-                .stream()
-                .filter(p -> Boolean.TRUE.equals(p.getAllowed()))
-                .map(UserMenuPermission::getViewId)
-                .collect(Collectors.toList());
+        // 메뉴 권한 조회 (테이블 미생성 등 예외 시에도 로그인 성공)
+        List<String> allowedViews = List.of();
+        try {
+            if (menuPermissionRepository != null) {
+                allowedViews = menuPermissionRepository.findByUserId(user.getUserId())
+                        .stream()
+                        .filter(p -> Boolean.TRUE.equals(p.getAllowed()))
+                        .map(UserMenuPermission::getViewId)
+                        .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            // 권한 테이블 미생성 등 예외 → 빈 목록(전체 접근 허용)
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
@@ -132,10 +142,17 @@ public class AuthController {
     /** 사용자의 허용된 메뉴 view_id 목록 조회 */
     private List<String> getallowedViews(String userId) {
         if (userId == null) return List.of();
-        return menuPermissionRepository.findByUserId(userId)
-                .stream()
-                .filter(p -> Boolean.TRUE.equals(p.getAllowed()))
-                .map(UserMenuPermission::getViewId)
-                .collect(Collectors.toList());
+        try {
+            if (menuPermissionRepository != null) {
+                return menuPermissionRepository.findByUserId(userId)
+                        .stream()
+                        .filter(p -> Boolean.TRUE.equals(p.getAllowed()))
+                        .map(UserMenuPermission::getViewId)
+                        .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            // 권한 테이블 미생성 등 예외 → 빈 목록(전체 접근 허용)
+        }
+        return List.of();
     }
 }

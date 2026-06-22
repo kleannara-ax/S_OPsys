@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260619e">
+    <link rel="stylesheet" href="css/style.css?v=20260622a">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -71,7 +71,7 @@
                 <span class="sidebar-icon" aria-hidden="true">&#x21C4;</span><span class="sidebar-label">인터페이스 관리</span>
             </button>
             <button class="sidebar-item" type="button" data-view-target="user-mgmt" role="tab" aria-selected="false" aria-controls="view-user-mgmt">
-                <span class="sidebar-icon" aria-hidden="true">&#x263A;</span><span class="sidebar-label">사용자 관리</span>
+                <span class="sidebar-icon" aria-hidden="true">&#x263A;</span><span class="sidebar-label">사용자 권한 관리</span>
             </button>
         </nav>
     </aside>
@@ -1675,9 +1675,11 @@
         <!-- 사용자 관리 -->
         <section class="user-mgmt-section view-section" id="view-user-mgmt" data-view="user-mgmt">
             <div class="section-header">
-                <h2>사용자 관리</h2>
-                <p>시스템 사용자 계정을 등록, 수정, 삭제할 수 있습니다.</p>
+                <h2>사용자별 메뉴 권한 관리</h2>
+                <p>시스템 사용자 계정을 관리하고, 사용자별로 접근 가능한 메뉴를 설정합니다.</p>
             </div>
+
+            <!-- 사용자 목록 -->
             <div style="margin-bottom:8px; text-align:right;">
                 <button type="button" class="primary small" id="btn-user-add-row">+ 사용자 등록</button>
             </div>
@@ -1691,6 +1693,24 @@
                         <tr><td colspan="10" class="empty">등록된 사용자가 없습니다.</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- 메뉴 권한 설정 패널 -->
+            <div id="menu-permission-panel" class="menu-permission-panel" style="display:none;">
+                <div class="menu-permission-header">
+                    <h3><span id="perm-target-user-name"></span> 님의 메뉴 접근 권한</h3>
+                    <span class="perm-user-id-badge" id="perm-target-user-id-badge"></span>
+                </div>
+                <p class="menu-permission-desc">체크된 메뉴만 해당 사용자에게 표시됩니다. ADMIN 역할은 설정과 무관하게 전체 메뉴에 접근 가능합니다.</p>
+                <div class="menu-permission-grid" id="menu-permission-grid">
+                    <!-- JS에서 동적 생성 -->
+                </div>
+                <div class="menu-permission-actions">
+                    <button type="button" class="primary small" id="btn-perm-save">권한 저장</button>
+                    <button type="button" class="secondary small" id="btn-perm-select-all">전체 선택</button>
+                    <button type="button" class="secondary small" id="btn-perm-deselect-all">전체 해제</button>
+                    <button type="button" class="ghost small" id="btn-perm-close">닫기</button>
+                </div>
             </div>
         </section>
 
@@ -1909,6 +1929,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260619e" defer></script>
+    <script src="js/main.js?v=20260622a" defer></script>
 </body>
 </html>

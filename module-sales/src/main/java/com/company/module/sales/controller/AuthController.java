@@ -2,6 +2,8 @@ package com.company.module.sales.controller;
 
 import com.company.module.sales.dto.ApiResponse;
 import com.company.module.sales.entity.User;
+import com.company.module.sales.entity.UserMenuPermission;
+import com.company.module.sales.repository.UserMenuPermissionRepository;
 import com.company.module.sales.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,8 +14,10 @@ import javax.servlet.http.HttpSession;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * 인증 관련 컨트롤러.
@@ -25,6 +29,7 @@ import java.util.Optional;
 public class AuthController {
 
     private final UserRepository userRepository;
+    private final UserMenuPermissionRepository menuPermissionRepository;
 
     /** 로그인 */
     @PostMapping("/login")
@@ -67,11 +72,19 @@ public class AuthController {
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
+        // 메뉴 권한 조회
+        List<String> allowedViews = menuPermissionRepository.findByUserId(user.getUserId())
+                .stream()
+                .filter(p -> Boolean.TRUE.equals(p.getAllowed()))
+                .map(UserMenuPermission::getViewId)
+                .collect(Collectors.toList());
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
         result.put("user_id", user.getUserId());
         result.put("user_name", user.getUserName());
         result.put("role", user.getRole());
+        result.put("allowed_views", allowedViews);
         return ResponseEntity.ok(result);
     }
 
@@ -96,6 +109,7 @@ public class AuthController {
             userRepository.findByUserId(principal.getName()).ifPresent(user -> {
                 result.put("user_name", user.getUserName());
                 result.put("role", user.getRole());
+                result.put("allowed_views", getallowedViews(user.getUserId()));
             });
             return ResponseEntity.ok(result);
         }
@@ -104,12 +118,24 @@ public class AuthController {
         if (session != null && session.getAttribute("loginUser") != null) {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("authenticated", true);
-            result.put("user_id", session.getAttribute("loginUser"));
+            String sessionUserId = (String) session.getAttribute("loginUser");
+            result.put("user_id", sessionUserId);
             result.put("user_name", session.getAttribute("loginUserName"));
             result.put("role", session.getAttribute("loginUserRole"));
+            result.put("allowed_views", getallowedViews(sessionUserId));
             return ResponseEntity.ok(result);
         }
         return ResponseEntity.status(401)
                 .body(Map.of("authenticated", false, "message", "인증이 필요합니다."));
+    }
+
+    /** 사용자의 허용된 메뉴 view_id 목록 조회 */
+    private List<String> getallowedViews(String userId) {
+        if (userId == null) return List.of();
+        return menuPermissionRepository.findByUserId(userId)
+                .stream()
+                .filter(p -> Boolean.TRUE.equals(p.getAllowed()))
+                .map(UserMenuPermission::getViewId)
+                .collect(Collectors.toList());
     }
 }

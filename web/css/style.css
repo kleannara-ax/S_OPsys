@@ -6869,8 +6869,8 @@ td.number {
     background: #e0e7ff;
     color: #3730a3;
     border: 1px solid #c7d2fe;
-    font-size: 0.78rem;
-    padding: 3px 10px;
+    font-size: 0.85rem;
+    padding: 8px 14px;
     border-radius: 4px;
     cursor: pointer;
     transition: background 0.15s;

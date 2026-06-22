@@ -124,15 +124,102 @@ if (PROXY_TARGET && !FORCE_MOCK) {
         console.log('[테스트서버] Mock 모드 — 인증 우회 + 임의 데이터를 사용합니다.');
     }
 
+    // ── Users Mock 데이터 (in-memory) ──
+    let mockUsers = [
+        {
+            id: 1, user_id: 'admin', user_name: '관리자', password: 'admin1234',
+            email: 'admin@company.com', department: '시스템관리', role: 'ADMIN',
+            is_active: true, last_login_at: new Date().toISOString(),
+            created_at: '2025-01-01T00:00:00', updated_at: new Date().toISOString(),
+        },
+        {
+            id: 2, user_id: 'planner', user_name: '계획담당자', password: 'plan1234',
+            email: 'planner@company.com', department: 'SCM기획', role: 'USER',
+            is_active: true, last_login_at: null,
+            created_at: '2025-01-01T00:00:00', updated_at: new Date().toISOString(),
+        },
+    ];
+    let mockUserIdSeq = 3;
+
+    // ── 메뉴 권한 Mock 데이터 (in-memory) ──
+    // { userId: [viewId, viewId, ...] }
+    const mockMenuPermissions = {};
+
     // ── Auth Mock (항상 인증 통과) ──
     app.post('/sales-api/auth/login', (req, res) => {
-        res.json({ user_id: 'test', user_name: '테스트 사용자', role: 'ADMIN', authenticated: true });
+        const loginId = req.body?.user_id || req.body?.userId || 'admin';
+        const user = mockUsers.find(u => u.user_id === loginId) || mockUsers[0];
+        const allowedViews = mockMenuPermissions[user.user_id] || [];
+        res.json({
+            user_id: user.user_id, user_name: user.user_name,
+            role: user.role, authenticated: true,
+            allowed_views: allowedViews,
+        });
     });
     app.get('/sales-api/auth/me', (req, res) => {
-        res.json({ user_id: 'test', user_name: '테스트 사용자', role: 'ADMIN', authenticated: true });
+        // 기본 admin으로 응답
+        const allowedViews = mockMenuPermissions['admin'] || [];
+        res.json({
+            user_id: 'admin', user_name: '관리자',
+            role: 'ADMIN', authenticated: true,
+            allowed_views: allowedViews,
+        });
     });
     app.post('/sales-api/auth/logout', (req, res) => {
         res.json({ success: true });
+    });
+
+    // ── Users CRUD Mock ──
+    app.get('/sales-api/users', (req, res) => {
+        res.json({ success: true, data: mockUsers });
+    });
+    app.get('/sales-api/users/:id', (req, res) => {
+        const user = mockUsers.find(u => u.id === parseInt(req.params.id));
+        if (user) return res.json({ success: true, data: user });
+        res.status(404).json({ success: false, message: '사용자를 찾을 수 없습니다.' });
+    });
+    app.post('/sales-api/users', (req, res) => {
+        const newUser = { id: mockUserIdSeq++, ...req.body, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+        mockUsers.push(newUser);
+        res.status(201).json({ success: true, data: newUser, message: '사용자 등록 완료' });
+    });
+    app.put('/sales-api/users/:id', (req, res) => {
+        const idx = mockUsers.findIndex(u => u.id === parseInt(req.params.id));
+        if (idx >= 0) {
+            mockUsers[idx] = { ...mockUsers[idx], ...req.body, updated_at: new Date().toISOString() };
+            return res.json({ success: true, data: mockUsers[idx], message: '사용자 수정 완료' });
+        }
+        res.status(404).json({ success: false, message: '사용자를 찾을 수 없습니다.' });
+    });
+    app.delete('/sales-api/users/:id', (req, res) => {
+        mockUsers = mockUsers.filter(u => u.id !== parseInt(req.params.id));
+        res.json({ success: true, message: '삭제되었습니다.' });
+    });
+    app.patch('/sales-api/users/:id/reset-password', (req, res) => {
+        const user = mockUsers.find(u => u.id === parseInt(req.params.id));
+        if (user) user.password = req.body?.password || 'password1234';
+        res.json({ success: true, message: '비밀번호가 초기화되었습니다.' });
+    });
+
+    // ── 메뉴 권한 API Mock ──
+    app.get('/sales-api/user-menu-permissions', (req, res) => {
+        // 전체 권한 목록 반환
+        const all = [];
+        Object.entries(mockMenuPermissions).forEach(([userId, views]) => {
+            views.forEach(viewId => all.push({ user_id: userId, view_id: viewId, allowed: true }));
+        });
+        res.json({ success: true, data: all });
+    });
+    app.get('/sales-api/user-menu-permissions/:userId', (req, res) => {
+        const views = mockMenuPermissions[req.params.userId] || [];
+        const perms = views.map(v => ({ user_id: req.params.userId, view_id: v, allowed: true }));
+        res.json({ success: true, data: perms });
+    });
+    app.put('/sales-api/user-menu-permissions/:userId', (req, res) => {
+        const views = req.body?.views || [];
+        mockMenuPermissions[req.params.userId] = views;
+        console.log(`[Mock] 메뉴 권한 저장: ${req.params.userId} → [${views.join(', ')}]`);
+        res.json({ success: true, message: '메뉴 권한이 저장되었습니다.' });
     });
 
     // ── 공통 ApiResponse 래퍼 ──

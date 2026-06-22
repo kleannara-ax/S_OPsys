@@ -141,9 +141,16 @@ if (PROXY_TARGET && !FORCE_MOCK) {
     ];
     let mockUserIdSeq = 3;
 
-    // ── 메뉴 권한 Mock 데이터 (in-memory) ──
+    // ── 메뉴 권한 Mock 데이터 (파일 영속화) ──
     // { userId: [viewId, viewId, ...] }
-    const mockMenuPermissions = {};
+    const PERM_FILE = path.join(__dirname, 'mock-menu-permissions.json');
+    let mockMenuPermissions = {};
+    try {
+        if (fs.existsSync(PERM_FILE)) {
+            mockMenuPermissions = JSON.parse(fs.readFileSync(PERM_FILE, 'utf8'));
+            console.log('[Mock] 메뉴 권한 파일 로드:', Object.keys(mockMenuPermissions).length, '명');
+        }
+    } catch (e) { /* 무시 */ }
 
     // ── Auth Mock (항상 인증 통과) ──
     app.post('/sales-api/auth/login', (req, res) => {
@@ -218,6 +225,7 @@ if (PROXY_TARGET && !FORCE_MOCK) {
     app.put('/sales-api/user-menu-permissions/:userId', (req, res) => {
         const views = req.body?.views || [];
         mockMenuPermissions[req.params.userId] = views;
+        try { fs.writeFileSync(PERM_FILE, JSON.stringify(mockMenuPermissions, null, 2), 'utf8'); } catch (e) { /* 무시 */ }
         console.log(`[Mock] 메뉴 권한 저장: ${req.params.userId} → [${views.join(', ')}]`);
         res.json({ success: true, message: '메뉴 권한이 저장되었습니다.' });
     });

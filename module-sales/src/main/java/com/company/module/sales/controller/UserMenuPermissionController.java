@@ -54,32 +54,34 @@ public class UserMenuPermissionController {
             @RequestBody Map<String, Object> body) {
 
         try {
-            // 기존 권한 삭제
-            repository.deleteByUserId(userId);
-            repository.flush();
+            // 기존 권한 삭제 (clearAutomatically=true로 영속성 컨텍스트 자동 초기화)
+            repository.deleteAllByUserId(userId);
 
             // 새 권한 생성
             @SuppressWarnings("unchecked")
             List<String> views = (List<String>) body.getOrDefault("views", Collections.emptyList());
 
-            List<UserMenuPermission> saved = new ArrayList<>();
+            List<UserMenuPermission> newPerms = new ArrayList<>();
             for (String viewId : views) {
-                UserMenuPermission perm = UserMenuPermission.builder()
-                        .userId(userId)
-                        .viewId(viewId)
-                        .allowed(true)
-                        .build();
-                saved.add(repository.save(perm));
+                UserMenuPermission perm = new UserMenuPermission();
+                perm.setUserId(userId);
+                perm.setViewId(viewId);
+                perm.setAllowed(true);
+                newPerms.add(perm);
             }
+            repository.saveAll(newPerms);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("user_id", userId);
             result.put("views", views);
-            result.put("count", saved.size());
+            result.put("count", newPerms.size());
             return ResponseEntity.ok(ApiResponse.ok(result, "메뉴 권한이 저장되었습니다."));
         } catch (Exception e) {
+            // 에러 원인을 클라이언트에 전달 (디버깅용)
+            String cause = e.getMessage();
+            if (e.getCause() != null) cause += " / " + e.getCause().getMessage();
             return ResponseEntity.status(500)
-                    .body(Map.of("success", false, "message", "권한 저장 중 오류: " + e.getMessage()));
+                    .body(Map.of("success", false, "message", "권한 저장 중 오류: " + cause));
         }
     }
 }

@@ -40,7 +40,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneric(Exception ex) {
         log.error("서버 오류", ex);
+        // 디버깅을 위해 실제 에러 메시지도 포함
+        String detail = ex.getMessage();
+        if (ex.getCause() != null) {
+            detail += " [원인: " + ex.getCause().getMessage() + "]";
+        }
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("INTERNAL_ERROR", "서버 내부 오류가 발생했습니다."));
+                .body(ApiResponse.error("INTERNAL_ERROR", "서버 내부 오류가 발생했습니다. (" + detail + ")"));
     }
 }

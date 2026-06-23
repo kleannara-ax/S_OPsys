@@ -26,10 +26,15 @@ public class BaseMaterialMasterService {
     @Transactional(readOnly = true)
     public List<BaseMaterialMaster> findAllSorted() {
         List<BaseMaterialMaster> all = repository.findAll();
-        // 카테고리(hierarchyName)가 빈칸이거나 "원단"인 경우 목록에서 제외
+        // 제외 조건:
+        // 1) 카테고리(hierarchyName)가 빈칸이거나 "원단"인 경우
+        // 2) 자재코드가 'H'로 시작하는 경우 (S&OP 관리 대상 아님)
         all.removeIf(m -> {
             String h = m.getHierarchyName();
-            return h == null || h.trim().isEmpty() || h.trim().equals("원단");
+            if (h == null || h.trim().isEmpty() || h.trim().equals("원단")) return true;
+            String code = m.getItemCode();
+            if (code != null && code.toUpperCase().startsWith("H")) return true;
+            return false;
         });
         all.sort(Comparator.comparing(
             (BaseMaterialMaster m) -> m.getScmArea() != null ? m.getScmArea() : "",

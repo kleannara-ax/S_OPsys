@@ -275,7 +275,12 @@ if (PROXY_TARGET && !FORCE_MOCK) {
         const key = endpointKeyMap[endpoint];
         if (snapshotData && key && snapshotData[key]) {
             // 스냅샷 데이터를 그대로 반환 (서버 원본 응답 형식 유지)
-            const data = snapshotData[key];
+            let data = snapshotData[key];
+
+            // base-material-masters: 자재코드가 'H'로 시작하는 자재 제외 (S&OP 관리 대상 아님)
+            if (endpoint === 'base-material-masters' && Array.isArray(data?.data)) {
+                data = { ...data, data: data.data.filter(m => !m.item_code || !m.item_code.toUpperCase().startsWith('H')) };
+            }
 
             // 페이지네이션 지원: snop-records 등
             if (req.query.page !== undefined && data?.data?.content) {

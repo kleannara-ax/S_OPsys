@@ -83,6 +83,12 @@ public class RfcReceiverService {
                     continue;
                 }
 
+                // 자재코드가 'H'로 시작하는 자재는 S&OP 관리 대상이 아니므로 skip
+                if (itemCode.toUpperCase().startsWith("H")) {
+                    log.debug("[RFC-001] H 자재 제외: {}", itemCode);
+                    continue;
+                }
+
                 switch (updateType.trim()) {
                     case "1": // Insert (신규)
                         List<BaseMaterialMaster> existingForInsert = baseMaterialMasterRepo.findByItemCodeIgnoreCase(itemCode);

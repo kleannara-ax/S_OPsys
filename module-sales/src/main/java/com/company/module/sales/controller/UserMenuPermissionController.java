@@ -25,13 +25,21 @@ public class UserMenuPermissionController {
     /** 전체 사용자 메뉴 권한 조회 */
     @GetMapping
     public ResponseEntity<ApiResponse<List<UserMenuPermission>>> listAll() {
-        return ResponseEntity.ok(ApiResponse.ok(repository.findAll()));
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(repository.findAll()));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.ok(Collections.emptyList()));
+        }
     }
 
     /** 특정 사용자의 메뉴 권한 조회 */
     @GetMapping("/{userId}")
     public ResponseEntity<ApiResponse<List<UserMenuPermission>>> getByUser(@PathVariable String userId) {
-        return ResponseEntity.ok(ApiResponse.ok(repository.findByUserId(userId)));
+        try {
+            return ResponseEntity.ok(ApiResponse.ok(repository.findByUserId(userId)));
+        } catch (Exception e) {
+            return ResponseEntity.ok(ApiResponse.ok(Collections.emptyList()));
+        }
     }
 
     /**
@@ -41,32 +49,37 @@ public class UserMenuPermissionController {
      */
     @PutMapping("/{userId}")
     @Transactional
-    public ResponseEntity<ApiResponse<Map<String, Object>>> savePermissions(
+    public ResponseEntity<?> savePermissions(
             @PathVariable String userId,
             @RequestBody Map<String, Object> body) {
 
-        // 기존 권한 삭제
-        repository.deleteByUserId(userId);
-        repository.flush();
+        try {
+            // 기존 권한 삭제
+            repository.deleteByUserId(userId);
+            repository.flush();
 
-        // 새 권한 생성
-        @SuppressWarnings("unchecked")
-        List<String> views = (List<String>) body.getOrDefault("views", Collections.emptyList());
+            // 새 권한 생성
+            @SuppressWarnings("unchecked")
+            List<String> views = (List<String>) body.getOrDefault("views", Collections.emptyList());
 
-        List<UserMenuPermission> saved = new ArrayList<>();
-        for (String viewId : views) {
-            UserMenuPermission perm = UserMenuPermission.builder()
-                    .userId(userId)
-                    .viewId(viewId)
-                    .allowed(true)
-                    .build();
-            saved.add(repository.save(perm));
+            List<UserMenuPermission> saved = new ArrayList<>();
+            for (String viewId : views) {
+                UserMenuPermission perm = UserMenuPermission.builder()
+                        .userId(userId)
+                        .viewId(viewId)
+                        .allowed(true)
+                        .build();
+                saved.add(repository.save(perm));
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("user_id", userId);
+            result.put("views", views);
+            result.put("count", saved.size());
+            return ResponseEntity.ok(ApiResponse.ok(result, "메뉴 권한이 저장되었습니다."));
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body(Map.of("success", false, "message", "권한 저장 중 오류: " + e.getMessage()));
         }
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("user_id", userId);
-        result.put("views", views);
-        result.put("count", saved.size());
-        return ResponseEntity.ok(ApiResponse.ok(result, "메뉴 권한이 저장되었습니다."));
     }
 }

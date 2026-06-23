@@ -41,3 +41,5 @@ module-sales/libs/*.jnilib
 *.jcoDestination
 snop-data-export.json
 mock-menu-permissions.json
+ss-*.png
+ss1.png

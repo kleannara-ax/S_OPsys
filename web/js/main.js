@@ -21276,7 +21276,14 @@ async function saveMenuPermissions() {
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            alert(err.message || '저장 실패');
+            // ApiResponse: { success, message, error } 또는 Controller 직접 반환: { success, message }
+            const errMsg = err.message || err.error || '저장 실패 (HTTP ' + res.status + ')';
+            alert(errMsg);
+            return;
+        }
+        const result = await res.json().catch(() => ({}));
+        if (result.success === false) {
+            alert(result.message || result.error || '저장 실패');
             return;
         }
         alert(`${userId} 사용자의 메뉴 권한이 저장되었습니다.\n해당 사용자가 다음 로그인 시 적용됩니다.`);

@@ -13969,7 +13969,9 @@ async function updateRecord(id, data) {
         body: JSON.stringify(payload),
     });
     if (!response.ok) {
-        throw new Error('생산계획 수정 실패');
+        const err = await response.json().catch(() => ({}));
+        const detail = err.message || err.error || 'HTTP ' + response.status;
+        throw new Error(detail);
     }
     return response.json();
 }
@@ -14710,7 +14712,7 @@ async function handleInlineManualInputChange(recordId, rawValue) {
         await updateRecord(record.id, { manual_input_quantity: newValue });
     } catch (error) {
         console.error('수작업 투입수량 저장 실패:', error);
-        alert('수작업 투입수량을 저장하는 중 오류가 발생했습니다.');
+        alert('수작업 투입수량 저장 오류: ' + error.message);
         await loadData();
         return;
     }

@@ -16,7 +16,7 @@ public interface UserMenuPermissionRepository extends JpaRepository<UserMenuPerm
     List<UserMenuPermission> findByUserId(String userId);
 
     /** 특정 사용자의 모든 권한 삭제 (재설정 시 사용) */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM UserMenuPermission p WHERE p.userId = :userId")
-    void deleteByUserId(@Param("userId") String userId);
+    void deleteAllByUserId(@Param("userId") String userId);
 }

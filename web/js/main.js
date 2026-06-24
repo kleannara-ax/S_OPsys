@@ -8218,7 +8218,7 @@ function renderBaseMaterialMasterTable() {
             const td = document.createElement('td');
             if (f.cls) td.className = f.cls;
             if (f.fmt && f.value != null && f.value !== '') {
-                td.textContent = Number(f.value).toFixed(3);
+                td.textContent = Math.round(Number(f.value)).toLocaleString('ko-KR');
             } else if (f.num && f.value != null && f.value !== '') {
                 td.textContent = Number(f.value).toLocaleString('ko-KR');
             } else {

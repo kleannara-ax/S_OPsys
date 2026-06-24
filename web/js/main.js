@@ -17078,16 +17078,7 @@ function mapRecentSalesUploadRow(row, index) {
         errors.push('item_code 누락');
     }
 
-    // 음수는 허용하지 않음 (빈칸·0은 허용 — toNumber가 0으로 변환)
-    if (m3Value < 0) {
-        errors.push('m3 값 오류 (음수 불가)');
-    }
-    if (m2Value < 0) {
-        errors.push('m2 값 오류 (음수 불가)');
-    }
-    if (m1Value < 0) {
-        errors.push('m1 값 오류 (음수 불가)');
-    }
+    // 빈칸→0, 음수·0·양수 모두 허용
 
     const total = (Number.isFinite(m3Value) ? m3Value : 0)
         + (Number.isFinite(m2Value) ? m2Value : 0)

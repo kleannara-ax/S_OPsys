@@ -30,6 +30,13 @@ public class RecentSalesAverageController {
                 .body(ApiResponse.ok(service.create(dto), "등록 완료"));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<RecentSalesAverage>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody RecentSalesAverageDto dto) {
+        return ResponseEntity.ok(ApiResponse.ok(service.update(id, dto), "수정 완료"));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         service.delete(id);

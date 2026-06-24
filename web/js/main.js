@@ -146,7 +146,7 @@ const LINE_MASTER_COLUMN_MAP = {
     hourly_capacity: 'hourly_throughput',
 };
 
-const RECENT_SALES_REQUIRED_FIELDS = ['item_code', 'm3', 'm2', 'm1'];
+const RECENT_SALES_REQUIRED_FIELDS = ['item_code'];
 
 const RECENT_SALES_COLUMN_MAP = {
     item_code: 'item_code',
@@ -999,12 +999,15 @@ function matchesCategoryFilter(categoryFilterValue, recordCategory) {
 
 // -------------------- 유틸리티 함수 --------------------
 function toNumber(value) {
-    const num = Number(value);
+    // 천단위 콤마 제거 후 숫자 변환 (엑셀 raw:false에서 "1,350" 형태로 읽힘)
+    const cleaned = typeof value === 'string' ? value.replace(/,/g, '') : value;
+    const num = Number(cleaned);
     return Number.isFinite(num) ? num : 0;
 }
 
 function toNullableNumber(value) {
-    const num = Number(value);
+    const cleaned = typeof value === 'string' ? value.replace(/,/g, '') : value;
+    const num = Number(cleaned);
     return Number.isFinite(num) ? num : null;
 }
 
@@ -17075,14 +17078,15 @@ function mapRecentSalesUploadRow(row, index) {
         errors.push('item_code 누락');
     }
 
-    if (!Number.isFinite(m3Value) || m3Value < 0) {
-        errors.push('m3 값 오류');
+    // 음수는 허용하지 않음 (빈칸·0은 허용 — toNumber가 0으로 변환)
+    if (m3Value < 0) {
+        errors.push('m3 값 오류 (음수 불가)');
     }
-    if (!Number.isFinite(m2Value) || m2Value < 0) {
-        errors.push('m2 값 오류');
+    if (m2Value < 0) {
+        errors.push('m2 값 오류 (음수 불가)');
     }
-    if (!Number.isFinite(m1Value) || m1Value < 0) {
-        errors.push('m1 값 오류');
+    if (m1Value < 0) {
+        errors.push('m1 값 오류 (음수 불가)');
     }
 
     const total = (Number.isFinite(m3Value) ? m3Value : 0)

@@ -3061,8 +3061,10 @@ tbody td {
     border-right: 1px solid rgba(148, 163, 184, 0.25) !important;
 }
 
+#plan-table th[data-field="inventory_status"],
 #plan-table td[data-field="inventory_status"] {
     min-width: 150px;
+    text-align: center;
 }
 
 #plan-table tbody td:last-child {

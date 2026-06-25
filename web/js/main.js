@@ -9162,7 +9162,12 @@ function renderTable() {
         const nameCell = row.querySelector('[data-field="item_name"]');
         if (nameCell) {
             const displayName = originalName || canonicalName || '-';
-            nameCell.textContent = displayName;
+            /* inner span으로 감싸서 -webkit-line-clamp 적용 (td에 display 변경하면 sticky 배경 깨짐) */
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'item-name-text';
+            nameSpan.textContent = displayName;
+            nameCell.textContent = '';
+            nameCell.appendChild(nameSpan);
             nameCell.title = displayName;
             if (canonicalName && originalName && canonicalName !== originalName) {
                 nameCell.title = `${originalName} (신규명: ${canonicalName})`;

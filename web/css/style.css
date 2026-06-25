@@ -3256,7 +3256,7 @@ th.col-priority {
     max-width: calc(var(--plan-col-name-width) + 60px);
 }
 
-#plan-table td.col-item-name {
+#plan-table td.col-item-name .item-name-text {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -3383,7 +3383,7 @@ td.number {
     max-width: 260px;
 }
 
-td.col-item-name {
+td.col-item-name .item-name-text {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;

@@ -10584,6 +10584,8 @@ function buildOptimalInventoryDataset(records, months, options = {}) {
             if (alreadyProcessed) return;
 
             const categoryKey = sanitizeText(mc.hierarchy_name).trim() || '미지정';
+            /* 제외 카테고리(원단/미지정) 스킵 */
+            if (isExcludedCategory(categoryKey)) return;
             const endingValue = Number.isFinite(mc.ending_inventory) ? mc.ending_inventory : 0;
 
             if (!categoryMap.has(categoryKey)) {

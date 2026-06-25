@@ -14715,7 +14715,11 @@ async function handleInlineManualInputChange(recordId, rawValue) {
 
     /* 서버에 즉시 저장 */
     try {
-        await updateRecord(record.id, { manual_input_quantity: newValue });
+        await updateRecord(record.id, {
+            item_code: record.item_code,
+            month: record.month,
+            manual_input_quantity: newValue,
+        });
     } catch (error) {
         console.error('수작업 투입수량 저장 실패:', error);
         alert('수작업 투입수량 저장 오류: ' + error.message);

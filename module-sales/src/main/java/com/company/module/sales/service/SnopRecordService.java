@@ -395,6 +395,20 @@ public class SnopRecordService {
         return null;
     }
 
+    /**
+     * 특정 계획월의 수작업 투입수량(manual_input_quantity)을 일괄 0으로 초기화.
+     * 매월 1일 자동 리셋 스케줄러에서 호출.
+     *
+     * @param planMonth 초기화 대상 계획월 (형식: YYYY-MM)
+     * @return 초기화된 레코드 수
+     */
+    @Transactional
+    public int resetManualInputForMonth(String planMonth) {
+        int updated = repository.resetManualInputQuantityByPlanMonth(planMonth);
+        log.info("[manual-input-reset] planMonth={} → {}건 초기화 완료", planMonth, updated);
+        return updated;
+    }
+
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

@@ -9086,6 +9086,80 @@ function handlePlanTableScrollButtons(event) {
     scrollPlanTableBy(direction === 'left' ? 'left' : 'right');
 }
 
+/* ── 생산계획 현황 테이블 컬럼 리사이즈 ── */
+function initPlanTableColumnResize() {
+    const table = document.getElementById('plan-table');
+    if (!table || table.dataset.resizeInit === '1') return;
+    table.dataset.resizeInit = '1';
+
+    /* sticky 컬럼 CSS 변수 매핑 (class → CSS custom property) */
+    const stickyVarMap = {
+        'col-month': '--plan-col-month-width',
+        'col-priority': '--plan-col-priority-width',
+        'col-category': '--plan-col-category-width',
+        'col-item-code': '--plan-col-code-width',
+        'col-item-name': '--plan-col-name-width',
+    };
+
+    /* header-row-1의 rowspan=2인 th들에만 리사이즈 핸들 추가 */
+    const headerRow1 = table.querySelector('tr.header-row-1');
+    if (!headerRow1) return;
+
+    const ths = Array.from(headerRow1.querySelectorAll('th'));
+    ths.forEach((th, idx) => {
+        /* 마지막 컬럼(관리)은 리사이즈 불필요 */
+        if (idx === ths.length - 1) return;
+        /* colspan이 있는 그룹 헤더도 리사이즈 핸들 추가 */
+
+        const handle = document.createElement('div');
+        handle.className = 'col-resize-handle';
+        th.style.position = 'relative';
+        th.appendChild(handle);
+
+        let startX = 0;
+        let startWidth = 0;
+        let targetTh = th;
+
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            startX = e.clientX;
+            startWidth = targetTh.offsetWidth;
+
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            const onMouseMove = (moveEvent) => {
+                const diff = moveEvent.clientX - startX;
+                const newWidth = Math.max(40, startWidth + diff);
+                targetTh.style.width = newWidth + 'px';
+                targetTh.style.minWidth = newWidth + 'px';
+                targetTh.style.maxWidth = newWidth + 'px';
+
+                /* sticky 컬럼이면 CSS 변수 업데이트 */
+                const matchedVar = Object.entries(stickyVarMap).find(
+                    ([cls]) => th.classList.contains(cls)
+                );
+                if (matchedVar) {
+                    table.style.setProperty(matchedVar[1], newWidth + 'px');
+                }
+
+                /* colspan 그룹 헤더인 경우 — 하위 서브 컬럼 너비에는 개입하지 않음 */
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
+}
+
 function renderTable() {
     dom.tableBody.innerHTML = '';
 
@@ -9653,6 +9727,9 @@ function renderTable() {
 
     /* 2단 헤더 sticky top 자동 계산 */
     updatePlanHeaderStickyTop();
+
+    /* 컬럼 리사이즈 핸들 초기화 (최초 1회) */
+    initPlanTableColumnResize();
 }
 
 function renderSummaries() {

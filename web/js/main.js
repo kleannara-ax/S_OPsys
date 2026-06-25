@@ -9161,13 +9161,11 @@ function renderTable() {
 
         const nameCell = row.querySelector('[data-field="item_name"]');
         if (nameCell) {
-            nameCell.textContent = originalName || canonicalName || '-';
+            const displayName = originalName || canonicalName || '-';
+            nameCell.textContent = displayName;
+            nameCell.title = displayName;
             if (canonicalName && originalName && canonicalName !== originalName) {
-                const badge = document.createElement('span');
-                badge.className = 'renewal-badge';
-                badge.textContent = `신규명: ${canonicalName}`;
-                nameCell.appendChild(document.createElement('br'));
-                nameCell.appendChild(badge);
+                nameCell.title = `${originalName} (신규명: ${canonicalName})`;
             }
         }
         row.querySelector('[data-field="production_line"]').textContent = sanitizeText(record.production_line) || '-';

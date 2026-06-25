@@ -2798,6 +2798,17 @@ tr.already-registered .base-material-row-check:disabled {
     font-size: 0.88rem;
 }
 
+/* 자재코드: 텍스트 길이에 맞게 축소, 자재명칭: 확대 */
+#inventory-risk-table .col-risk-code {
+    width: 120px;
+    min-width: 120px;
+    max-width: 140px;
+    white-space: nowrap;
+}
+#inventory-risk-table .col-risk-name {
+    min-width: 260px;
+}
+
 #inventory-risk-table tbody td.number {
     text-align: right;
     font-variant-numeric: tabular-nums;

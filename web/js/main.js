@@ -15221,10 +15221,12 @@ function renderAnalyticsRiskTable() {
         row.appendChild(monthCell);
 
         const codeCell = document.createElement('td');
+        codeCell.className = 'col-risk-code';
         codeCell.textContent = sanitizeText(record.item_code) || '-';
         row.appendChild(codeCell);
 
         const nameCell = document.createElement('td');
+        nameCell.className = 'col-risk-name';
         nameCell.textContent = sanitizeText(record.item_name) || '-';
         row.appendChild(nameCell);
 

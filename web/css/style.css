@@ -2543,15 +2543,23 @@ textarea.row-edit-input {
 
 /* ── 우선순위 인라인 입력 ── */
 .priority-input {
-    width: 52px !important;
-    min-width: 40px;
+    width: 100%;
+    box-sizing: border-box;
     text-align: center;
     font-variant-numeric: tabular-nums;
-    padding: 4px 6px;
+    padding: 4px 2px;
+    font-size: 0.85rem;
+    /* number 스피너 제거 (type=text로 변경했지만 호환성 보장) */
+    -moz-appearance: textfield;
+}
+.priority-input::-webkit-outer-spin-button,
+.priority-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .col-priority {
-    min-width: 70px;
+    min-width: 90px;
     text-align: center;
 }
 
@@ -2927,7 +2935,7 @@ tr.already-registered .base-material-row-check:disabled {
     border-spacing: 0;
     min-width: 1320px;
     --plan-col-month-width: 120px;
-    --plan-col-priority-width: 80px;
+    --plan-col-priority-width: 90px;
     --plan-col-category-width: 120px;
     --plan-col-code-width: 160px;
     --plan-col-name-width: 200px;
@@ -3253,6 +3261,8 @@ th.col-priority {
 #plan-table .col-priority {
     min-width: var(--plan-col-priority-width);
     width: var(--plan-col-priority-width);
+    padding-left: 4px;
+    padding-right: 4px;
 }
 
 #plan-table .col-category {

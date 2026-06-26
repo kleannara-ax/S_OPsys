@@ -2806,7 +2806,7 @@ tr.already-registered .base-material-row-check:disabled {
     white-space: nowrap;
 }
 #inventory-risk-table .col-risk-name {
-    min-width: 260px;
+    min-width: 180px;
 }
 
 #inventory-risk-table tbody td.number {

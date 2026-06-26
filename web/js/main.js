@@ -617,6 +617,7 @@ const dom = {
         riskTableBody: document.querySelector('#inventory-risk-table tbody'),
         riskTableEmpty: document.querySelector('#inventory-risk-empty'),
         monthFilter: document.querySelector('#analytics-month-filter'),
+        statusFilter: document.querySelector('#analytics-status-filter'),
     },
     lineCapa: {
         usagePanel: document.querySelector('#line-capa-usage-panel'),
@@ -15004,6 +15005,11 @@ function renderAnalyticsRiskTable() {
     const useAllMonths = !selectedMonth || selectedMonth === 'all';
     const baseMonth = useAllMonths ? '' : selectedMonth;
 
+    /* 재고 상태 필터 */
+    const selectedStatus = dom.analytics.statusFilter
+        ? sanitizeText(dom.analytics.statusFilter.value).trim() || 'all'
+        : 'all';
+
     const enrichedAll = Array.isArray(state.enrichedData) ? state.enrichedData : [];
     /* 제외 카테고리(원단/미지정) 필터링 */
     const enriched = enrichedAll.filter((record) => !isExcludedCategory(record.category));
@@ -15025,6 +15031,8 @@ function renderAnalyticsRiskTable() {
         if (!record || !record.inventoryStatus) return;
         const statusClass = record.inventoryStatus.className;
         if (statusClass !== 'alert' && statusClass !== 'overstock') return;
+        /* 재고 상태 필터 적용 */
+        if (selectedStatus !== 'all' && statusClass !== selectedStatus) return;
         const monthValue = sanitizeText(record.month).trim();
         if (!monthValue) return;
         if (!useAllMonths && monthValue !== baseMonth) return;
@@ -18688,6 +18696,14 @@ function bindEvents() {
             }
             renderAnalyticsRiskTable();
             updateChart();
+        });
+    }
+    if (dom.analytics && dom.analytics.statusFilter) {
+        dom.analytics.statusFilter.addEventListener('change', () => {
+            if (state.analyticsExpandedItems instanceof Set) {
+                state.analyticsExpandedItems.clear();
+            }
+            renderAnalyticsRiskTable();
         });
     }
     /* 판매 합계 — 자재코드 검색 드롭다운 초기화 */

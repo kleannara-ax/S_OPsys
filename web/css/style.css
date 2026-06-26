@@ -6396,8 +6396,6 @@ td.col-item-name .item-name-text {
 
 .plant-storage-card-body {
     padding: 8px 10px;
-    max-height: 260px;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 1px;

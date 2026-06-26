@@ -241,13 +241,17 @@ public class RfcReceiverService {
                                 itemCode, plantCode, storageLocation != null ? storageLocation : "", planMonth);
 
                 // seed 데이터(plan_month=null)에서 is_selected 조회 — 신규/기존 모두 동기화
-                String storageLoc = storageLocation != null ? storageLocation : "";
+                String storageLoc = storageLocation != null ? storageLocation.trim() : "";
                 List<PlantStorageLocation> seedRecords =
                         plantStorageLocationRepo.findByPlantCodeAndStorageLocationAndPlanMonthIsNull(
                                 plantCode, storageLoc);
                 Boolean seedIsSelected;
                 if (!seedRecords.isEmpty()) {
                     seedIsSelected = seedRecords.get(0).getIsSelected();
+                } else if (storageLoc.isEmpty()) {
+                    // 저장위치가 빈 값이면 seed 자동 생성 스킵 — 플랜트 레벨 합산 행 등
+                    log.debug("[RFC-002] 빈 저장위치 seed 생성 스킵: plant={}, item={}", plantCode, itemCode);
+                    seedIsSelected = true;
                 } else {
                     // seed가 없으면 자동 생성 (is_selected=true) — SAP에서 넘어온 저장위치는 기본 선택
                     String seedKey = plantCode + "|" + storageLoc;

@@ -9308,17 +9308,21 @@ function renderTable() {
         if (priorityCell) {
             priorityCell.textContent = '';
             const priInput = document.createElement('input');
-            priInput.type = 'number';
+            priInput.type = 'text';
+            priInput.inputMode = 'numeric';
+            priInput.pattern = '[0-9]*';
+            priInput.maxLength = 3;
             priInput.className = 'inline-input priority-input';
             priInput.dataset.recordId = record.id;
             priInput.value = Number.isFinite(record.priority) ? record.priority : '';
-            priInput.min = 1;
-            priInput.step = 1;
-            priInput.style.width = '52px';
             priInput.style.textAlign = 'center';
-            priInput.title = '카테고리 내 우선순위 (숫자가 낮을수록 높은 우선순위)';
+            priInput.title = '카테고리 내 우선순위 (숫자가 낮을수록 높은 우선순위, 최대 999)';
             priInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); priInput.blur(); }
+            });
+            /* 숫자 외 문자 입력 방지 */
+            priInput.addEventListener('input', () => {
+                priInput.value = priInput.value.replace(/[^0-9]/g, '').slice(0, 3);
             });
             priInput.addEventListener('change', () => {
                 handleInlinePriorityChange(record.id, priInput.value);

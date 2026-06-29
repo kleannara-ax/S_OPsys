@@ -6282,7 +6282,7 @@ td.col-item-name .item-name-text {
     cursor: pointer;
     font-size: 0.72rem;
     padding: 1px 4px;
-    margin-left: 4px;
+    margin-left: auto;
     border-radius: 3px;
     transition: all 0.15s;
     line-height: 1;

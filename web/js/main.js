@@ -5265,11 +5265,16 @@ function renderInventoryForecastTable(baseMonth, filteredRecords) {
         const productionPlan = parseNumberOrNull(record.adjusted_production_plan)
             ?? parseNumberOrNull(record.production_plan);
         const productionActual = parseNumberOrNull(record.production_actual);
-        const ending = parseNumberOrNull(record.ending_inventory);
+        /* 보정 예상월말재고 우선 사용 (생산계획 현황과 동일 기준) */
+        const adjEnding = parseNumberOrNull(record.adj_ending_inventory);
+        const origEnding = parseNumberOrNull(record.ending_inventory);
+        const ending = adjEnding !== null ? adjEnding : origEnding;
         const salesAccuracy = computeAccuracyRatio(salesPlan, salesActual);
         const productionAccuracy = computeAccuracyRatio(productionPlan, productionActual);
-        const inventoryStatus = record.inventoryStatus && record.inventoryStatus.className
-            ? sanitizeText(record.inventoryStatus.className).trim()
+        /* 보정 재고상태 우선 사용 */
+        const effectiveStatus = record.adj_inventory_status || record.inventoryStatus;
+        const inventoryStatus = effectiveStatus && effectiveStatus.className
+            ? sanitizeText(effectiveStatus.className).trim()
             : null;
 
         return {
@@ -5344,14 +5349,18 @@ function renderInventoryForecastTable(baseMonth, filteredRecords) {
                 hasProductionActual = true;
             }
 
-            const ending = parseNumberOrNull(record.ending_inventory);
+            /* 보정 예상월말재고 우선 사용 (생산계획 현황과 동일 기준) */
+            const adjEnding = parseNumberOrNull(record.adj_ending_inventory);
+            const origEnding = parseNumberOrNull(record.ending_inventory);
+            const ending = adjEnding !== null ? adjEnding : origEnding;
             if (Number.isFinite(ending)) {
                 endingTotal += ending;
                 hasEnding = true;
             }
 
-            if (record.inventoryStatus && record.inventoryStatus.className) {
-                const statusClass = sanitizeText(record.inventoryStatus.className).trim();
+            const effectiveStatus = record.adj_inventory_status || record.inventoryStatus;
+            if (effectiveStatus && effectiveStatus.className) {
+                const statusClass = sanitizeText(effectiveStatus.className).trim();
                 if (statusClass === 'alert') {
                     shortageDetected = true;
                 } else if (statusClass === 'overstock') {
@@ -15036,8 +15045,11 @@ function renderAnalyticsRiskTable() {
 
     const riskItemMap = new Map();
     enriched.forEach((record) => {
-        if (!record || !record.inventoryStatus) return;
-        const statusClass = record.inventoryStatus.className;
+        if (!record) return;
+        /* 보정 재고상태 우선, 없으면 원본 재고상태 사용 */
+        const effectiveStatus = record.adj_inventory_status || record.inventoryStatus;
+        if (!effectiveStatus) return;
+        const statusClass = effectiveStatus.className;
         if (statusClass !== 'alert' && statusClass !== 'overstock') return;
         /* 재고 상태 필터 적용 */
         if (selectedStatus !== 'all' && statusClass !== selectedStatus) return;
@@ -15118,6 +15130,14 @@ function renderAnalyticsRiskTable() {
             || getMaterialNameFromState(itemCode)
             || itemCode;
 
+        /* 보정 생산계획이 있으면 보정값 우선 사용 (생산계획 현황과 동일 기준) */
+        const adjPlan = parseNumberOrNull(safeRecord.adjusted_production_plan);
+        const origPlan = parseNumberOrNull(safeRecord.production_plan);
+        const adjEnding = parseNumberOrNull(safeRecord.adj_ending_inventory);
+        const origEnding = parseNumberOrNull(safeRecord.ending_inventory);
+        const adjStatus = safeRecord.adj_inventory_status || null;
+        const origStatus = safeRecord.inventoryStatus || null;
+
         return {
             item_code: itemCode,
             item_name: canonicalName,
@@ -15128,10 +15148,10 @@ function renderAnalyticsRiskTable() {
             parentCode,
             sales_plan: parseNumberOrNull(safeRecord.sales_plan),
             sales_actual: parseNumberOrNull(safeRecord.sales_actual),
-            production_plan: parseNumberOrNull(safeRecord.production_plan),
+            production_plan: adjPlan !== null ? adjPlan : origPlan,
             production_actual: parseNumberOrNull(safeRecord.production_actual),
-            ending_inventory: parseNumberOrNull(safeRecord.ending_inventory),
-            inventoryStatus: safeRecord.inventoryStatus || null,
+            ending_inventory: adjEnding !== null ? adjEnding : origEnding,
+            inventoryStatus: adjStatus || origStatus,
         };
     };
 

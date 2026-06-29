@@ -4575,8 +4575,11 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
 
 function matchesInventoryStatusFilter(record, filterValue) {
     if (filterValue === 'all') return true;
-    if (!record || !record.inventoryStatus) return false;
-    return record.inventoryStatus.className === filterValue;
+    if (!record) return false;
+    /* 보정 재고상태 우선 사용 (화면 표시와 동일 기준) */
+    const effectiveStatus = record.adj_inventory_status || record.inventoryStatus;
+    if (!effectiveStatus) return false;
+    return effectiveStatus.className === filterValue;
 }
 
 function matchesCapaStatusFilter(record, filterValue) {
@@ -8968,7 +8971,9 @@ function applyFilters() {
     }
     if (inventoryStatusFilter !== 'all') {
         filtered = filtered.filter((record) => {
-            const statusClass = record.inventoryStatus ? record.inventoryStatus.className : null;
+            /* 보정 재고상태 우선 사용 (화면 표시와 동일 기준) */
+            const effectiveStatus = record.adj_inventory_status || record.inventoryStatus;
+            const statusClass = effectiveStatus ? effectiveStatus.className : null;
             if (!statusClass) return false;
             return statusClass === inventoryStatusFilter;
         });

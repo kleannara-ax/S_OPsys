@@ -19901,18 +19901,11 @@ function renderPlantStorageGrid() {
         const locationsHtml = locations.map(loc => {
             const checked = loc.is_selected ? 'checked' : '';
             const checkedClass = loc.is_selected ? ' checked' : '';
-            const stockAvail = loc.available_stock != null ? loc.available_stock.toLocaleString() : '-';
-            const stockCurr = loc.current_stock != null ? loc.current_stock.toLocaleString() : '-';
-            const pendingClass = loc.sap_sync_at == null ? ' pending' : '';
             const isHighlightItem = plantStorageState.lastAddedStorageId === loc.id;
 
             return `<label class="plant-storage-item${checkedClass}${isHighlightItem ? ' highlight' : ''}" data-storage-id="${loc.id}">
                 <input type="checkbox" data-id="${loc.id}" data-plant="${plantCode}" ${checked}>
                 <span class="storage-code">${sanitizeText(loc.storage_location)}</span>
-                <span class="storage-stock">
-                    <span><span class="stock-label">가용</span> <span class="stock-value${pendingClass}">${stockAvail}</span></span>
-                    <span><span class="stock-label">현재</span> <span class="stock-value${pendingClass}">${stockCurr}</span></span>
-                </span>
                 <button type="button" class="btn-delete-storage" data-delete-id="${loc.id}" title="삭제">&#x2715;</button>
             </label>`;
         }).join('');

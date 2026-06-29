@@ -3504,6 +3504,10 @@ function sortRecordsForDisplay(records) {
         if (monthCompare !== 0) return monthCompare;
         const categoryCompare = sanitizeText(a.category).localeCompare(sanitizeText(b.category));
         if (categoryCompare !== 0) return categoryCompare;
+        /* 카테고리 내 우선순위 오름차순 (미입력은 맨 뒤) */
+        const priA = Number.isFinite(a.priority) ? a.priority : 999999;
+        const priB = Number.isFinite(b.priority) ? b.priority : 999999;
+        if (priA !== priB) return priA - priB;
         const lineCompare = sanitizeText(a.production_line).localeCompare(sanitizeText(b.production_line));
         if (lineCompare !== 0) return lineCompare;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));

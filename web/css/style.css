@@ -6457,34 +6457,7 @@ td.col-item-name .item-name-text {
     font-size: 0.8rem;
 }
 
-.plant-storage-item .storage-stock {
-    margin-left: auto;
-    font-size: 0.72rem;
-    color: var(--muted-text);
-    display: flex;
-    gap: 6px;
-}
-
-.plant-storage-item .storage-stock span {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.plant-storage-item .stock-label {
-    font-size: 0.72rem;
-    color: rgba(107, 114, 128, 0.7);
-}
-
-.plant-storage-item .stock-value {
-    font-weight: 500;
-    font-variant-numeric: tabular-nums;
-}
-
-.plant-storage-item .stock-value.pending {
-    color: #d97706;
-    font-style: italic;
-}
+/* storage-stock 배지 제거됨 (재고 데이터 미연결) */
 
 /* =========================================================================
    인터페이스 관리 - 테이블 전체 너비 확장 & 인라인 편집

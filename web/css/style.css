@@ -5306,9 +5306,16 @@ td.col-item-name .item-name-text {
     overflow-x: auto;
 }
 
+/* ── 자재별 3개월 재고 전망 테이블 wrapper: 스크롤 + 헤더 틀고정 ── */
+#inventory-forecast-wrapper {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
 #inventory-forecast-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     min-width: 1280px;
 }
 
@@ -5316,12 +5323,18 @@ td.col-item-name .item-name-text {
     background: rgba(37, 99, 235, 0.08);
     font-size: 0.88rem;
     color: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 3;
 }
 
 #inventory-forecast-table thead tr:nth-child(2) th {
     font-size: 0.78rem;
     color: var(--muted-text);
     background: rgba(15, 23, 42, 0.03);
+    position: sticky;
+    top: 37px;
+    z-index: 2;
 }
 
 #inventory-forecast-table th,

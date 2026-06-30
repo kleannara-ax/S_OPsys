@@ -5320,7 +5320,7 @@ td.col-item-name .item-name-text {
 }
 
 #inventory-forecast-table thead tr:first-child th {
-    background: rgba(37, 99, 235, 0.08);
+    background: #eef2fb;
     font-size: 0.88rem;
     color: var(--primary-dark);
     position: sticky;
@@ -5331,7 +5331,7 @@ td.col-item-name .item-name-text {
 #inventory-forecast-table thead tr:nth-child(2) th {
     font-size: 0.78rem;
     color: var(--muted-text);
-    background: rgba(15, 23, 42, 0.03);
+    background: #f8f9fa;
     position: sticky;
     top: 37px;
     z-index: 2;

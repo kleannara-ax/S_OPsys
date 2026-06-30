@@ -584,6 +584,8 @@ const dom = {
         categoryAllCheckbox: document.querySelector('#filter-category-menu .multi-select-option-all input'),
         month: document.querySelector('#filter-month'),
         line: document.querySelector('#filter-line'),
+        vendor: document.querySelector('#filter-vendor'),
+        vendorLabel: document.querySelector('#filter-vendor-label'),
         inventoryStatus: document.querySelector('#filter-inventory-status'),
         capaStatus: document.querySelector('#filter-capa-status'),
         apply: document.querySelector('#btn-apply-filters'),
@@ -7367,6 +7369,36 @@ function populateFilterOptions() {
     if (lines.includes(previousLine)) {
         dom.filters.line.value = previousLine;
     }
+
+    /* ── 협력업체명 필터 옵션 (OEM 자재 기준) ── */
+    if (dom.filters.vendor) {
+        const previousVendor = dom.filters.vendor.value;
+        const vendorSet = new Set();
+        (state.rawData || []).forEach((record) => {
+            const line = sanitizeText(record.production_line).trim().toUpperCase();
+            if (!line.includes('OEM')) return;
+            const v = sanitizeText(record.vendor_name).trim();
+            if (v) vendorSet.add(v);
+        });
+        /* 기본자재마스터에서도 vendor_name 수집 */
+        (state.baseMaterialMasters || []).forEach((master) => {
+            const line = sanitizeText(master.production_line || master.productionLine || '').trim().toUpperCase();
+            if (!line.includes('OEM')) return;
+            const v = sanitizeText(master.vendor_name || master.vendorName || '').trim();
+            if (v) vendorSet.add(v);
+        });
+        const vendors = [...vendorSet].sort((a, b) => a.localeCompare(b));
+        dom.filters.vendor.innerHTML = '<option value="all">전체</option>';
+        vendors.forEach((v) => {
+            const option = document.createElement('option');
+            option.value = v;
+            option.textContent = v;
+            dom.filters.vendor.appendChild(option);
+        });
+        if (vendors.includes(previousVendor)) {
+            dom.filters.vendor.value = previousVendor;
+        }
+    }
 }
 
 function updateLineCapaComputedField() {
@@ -8899,6 +8931,7 @@ function applyFilters() {
     const categoryFilter = getCategoryFilterValues();
     const monthFilter = dom.filters.month.value;
     const lineFilter = dom.filters.line.value;
+    const vendorFilter = dom.filters.vendor ? dom.filters.vendor.value : 'all';
     const inventoryStatusFilter = dom.filters.inventoryStatus ? dom.filters.inventoryStatus.value : 'all';
     const capaStatusFilter = dom.filters.capaStatus ? dom.filters.capaStatus.value : 'all';
 
@@ -8968,6 +9001,18 @@ function applyFilters() {
     }
     if (lineFilter !== 'all') {
         filtered = filtered.filter((record) => sanitizeText(record.production_line).trim() === lineFilter);
+    }
+    if (vendorFilter !== 'all') {
+        filtered = filtered.filter((record) => {
+            let v = sanitizeText(record.vendor_name).trim();
+            if (!v) {
+                /* record에 vendor_name이 없으면 기본자재마스터에서 조회 */
+                const code = getRecordCanonicalCode(record);
+                const master = (state.baseMaterialMasters || []).find((m) => sanitizeText(m.item_code || m.itemCode || '').trim() === code);
+                if (master) v = sanitizeText(master.vendor_name || master.vendorName || '').trim();
+            }
+            return v === vendorFilter;
+        });
     }
     if (inventoryStatusFilter !== 'all') {
         filtered = filtered.filter((record) => {
@@ -18662,6 +18707,13 @@ function bindEvents() {
             if (productionPlanTh) {
                 productionPlanTh.textContent = type === 'oem' ? '입고계획' : '제안 생산계획';
             }
+            /* OEM 탭 전환 시 협력업체명 필터 표시/숨김 */
+            if (dom.filters.vendorLabel) {
+                dom.filters.vendorLabel.style.display = isOem ? '' : 'none';
+            }
+            if (!isOem && dom.filters.vendor) {
+                dom.filters.vendor.value = 'all';
+            }
             /* OEM 탭 전환 시 협력업체명 컬럼 표시/숨김 */
             document.querySelectorAll('.col-vendor-name').forEach((el) => {
                 el.style.display = isOem ? '' : 'none';
@@ -18754,6 +18806,9 @@ function bindEvents() {
         resetCategoryFilter();
         dom.filters.month.value = 'all';
         dom.filters.line.value = 'all';
+        if (dom.filters.vendor) {
+            dom.filters.vendor.value = 'all';
+        }
         if (dom.filters.inventoryStatus) {
             dom.filters.inventoryStatus.value = 'all';
         }

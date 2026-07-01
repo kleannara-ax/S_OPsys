@@ -18140,6 +18140,10 @@ function exportProductionTableXlsx() {
         return;
     }
 
+    /* OEM 탭이면 판매 계획/실적 단위를 BOX로 표시 (실제 데이터가 BOX 단위) */
+    const isOemExport = state.activeProductType === 'oem';
+    const salesUnit = isOemExport ? 'BOX' : 'EA';
+
     const headers = [
         '계획 월',
         '우선순위',
@@ -18152,8 +18156,8 @@ function exportProductionTableXlsx() {
         '가용재고(EA)',
         '재고일수(현재고기준)',
         '소진일자(현재고기준)',
-        '판매 계획(EA)',
-        '판매 실적(EA)',
+        `판매 계획(${salesUnit})`,
+        `판매 실적(${salesUnit})`,
         '납품율(%)',
         '최근 3개월 판매실적 평균(EA)',
         '최근 3개월 판매실적 편차(EA)',
@@ -18221,8 +18225,8 @@ function exportProductionTableXlsx() {
                 }
                 return null;
             })(),
-            '판매 계획(EA)': Number.isFinite(record.sales_plan) ? record.sales_plan : null,
-            '판매 실적(EA)': Number.isFinite(record.sales_actual) ? record.sales_actual : null,
+            [`판매 계획(${salesUnit})`]: Number.isFinite(record.sales_plan) ? record.sales_plan : null,
+            [`판매 실적(${salesUnit})`]: Number.isFinite(record.sales_actual) ? record.sales_actual : null,
             '납품율(%)': Number.isFinite(record.delivery_rate) ? `${(record.delivery_rate * 100).toFixed(1)}%` : '',
             '최근 3개월 판매실적 평균(EA)': Number.isFinite(record.salesActualAvg3m) ? Math.round(record.salesActualAvg3m) : null,
             '최근 3개월 판매실적 편차(EA)': Number.isFinite(record.salesActualStdDev3m) ? Math.round(record.salesActualStdDev3m) : null,

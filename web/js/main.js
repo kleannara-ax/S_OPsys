@@ -280,6 +280,7 @@ const state = {
     rawData: [],
     enrichedData: [],
     filteredData: [],
+    summaryBaseData: [],
     salesUploads: [],
     salesUploadHistory: [],
     salesAggregates: {
@@ -9045,6 +9046,9 @@ function applyFilters() {
         });
     }
 
+    /* 통합계획 요약용: OEM/비OEM 탭 필터 적용 전 전체 데이터 저장 */
+    state.summaryBaseData = filtered;
+
     /* ── 제품 유형 탭 필터 (생산 / OEM) ── */
     if (state.activeProductType === 'oem') {
         filtered = filtered.filter((record) => {
@@ -9731,8 +9735,10 @@ function renderTable() {
 }
 
 function renderSummaries() {
-    const actualData = state.filteredData.filter((record) => !record.isProjected);
-    const data = actualData.length > 0 ? actualData : state.filteredData;
+    /* 통합계획 요약은 OEM + 비OEM 전체 자재 기준으로 표시 */
+    const baseData = Array.isArray(state.summaryBaseData) ? state.summaryBaseData : state.filteredData;
+    const actualData = baseData.filter((record) => !record.isProjected);
+    const data = actualData.length > 0 ? actualData : baseData;
 
     const totalMaterialIdentifiers = new Set();
     data.forEach((record, index) => {

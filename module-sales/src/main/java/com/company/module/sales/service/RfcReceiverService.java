@@ -399,6 +399,7 @@ public class RfcReceiverService {
         int snopUpdateCount = 0;
         int snopInsertCount = 0;
         int snopSkipCount = 0;
+        int snopScmSkipCount = 0;
         try {
             // 마스터 데이터에서 선택된 저장위치 목록 조회 (plan_month=null AND is_selected=true)
             // ※ Step 1에서 자동 생성된 seed(is_selected=true)도 포함됨
@@ -488,6 +489,15 @@ public class RfcReceiverService {
                                 }
                                 continue;
                             }
+                            // SCM 운영구분이 미등록이면 SnopRecord 신규 생성 skip
+                            String scmArea = masterCheck.get(0).getScmArea();
+                            if (scmArea == null || scmArea.trim().isEmpty() || "미등록".equals(scmArea.trim())) {
+                                snopScmSkipCount++;
+                                if (snopScmSkipCount <= 5) {
+                                    log.info("[RFC-002] SnopRecord 신규 생성 skip (SCM 운영구분 미등록): item={}, month={}, scmArea={}", itemCode, planMonth, scmArea);
+                                }
+                                continue;
+                            }
                             SnopRecord record = new SnopRecord();
                             record.setItemCode(itemCode);
                             record.setPlanMonth(planMonth);
@@ -503,8 +513,8 @@ public class RfcReceiverService {
                 }
             }
 
-            log.info("[RFC-002] SnopRecord 재고 반영 완료: 업데이트={}, 신규={}, skip(마스터미등록)={}",
-                    snopUpdateCount, snopInsertCount, snopSkipCount);
+            log.info("[RFC-002] SnopRecord 재고 반영 완료: 업데이트={}, 신규={}, skip(마스터미등록)={}, skip(SCM미등록)={}",
+                    snopUpdateCount, snopInsertCount, snopSkipCount, snopScmSkipCount);
 
         } catch (Exception e) {
             log.error("[RFC-002] SnopRecord 재고 반영 중 오류: {}", e.getMessage(), e);
@@ -558,6 +568,7 @@ public class RfcReceiverService {
         int insertCount = 0;
         int updateCount = 0;
         int skipCount = 0;
+        int scmSkipCount = 0;
         List<String> errors = new ArrayList<>();
 
         // RFC 실행시 등록자/수정자를 'IF'로 설정
@@ -632,6 +643,15 @@ public class RfcReceiverService {
                         }
                         continue;
                     }
+                    // SCM 운영구분이 미등록이면 SnopRecord 신규 생성 skip
+                    String scmArea = masterCheck.get(0).getScmArea();
+                    if (scmArea == null || scmArea.trim().isEmpty() || "미등록".equals(scmArea.trim())) {
+                        scmSkipCount++;
+                        if (scmSkipCount <= 5) {
+                            log.info("[RFC-003] SnopRecord 신규 생성 skip (SCM 운영구분 미등록): item={}, month={}, scmArea={}", itemCode, planMonth, scmArea);
+                        }
+                        continue;
+                    }
                     record = new SnopRecord();
                     record.setItemCode(itemCode);
                     record.setPlanMonth(planMonth);
@@ -658,8 +678,8 @@ public class RfcReceiverService {
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-003] 생산실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, skip(마스터미등록)={}, 에러={}",
-                processedCount, actualSum.size(), insertCount, updateCount, skipCount, errorCount);
+        log.info("[RFC-003] 생산실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, skip(마스터미등록)={}, skip(SCM미등록)={}, 에러={}",
+                processedCount, actualSum.size(), insertCount, updateCount, skipCount, scmSkipCount, errorCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);
@@ -692,6 +712,7 @@ public class RfcReceiverService {
         int insertCount = 0;
         int updateCount = 0;
         int skipCount = 0;
+        int scmSkipCount = 0;
         List<String> errors = new ArrayList<>();
 
         // RFC 실행시 등록자/수정자를 'IF'로 설정
@@ -781,6 +802,15 @@ public class RfcReceiverService {
                         }
                         continue;
                     }
+                    // SCM 운영구분이 미등록이면 SnopRecord 신규 생성 skip
+                    String scmArea = masterCheck.get(0).getScmArea();
+                    if (scmArea == null || scmArea.trim().isEmpty() || "미등록".equals(scmArea.trim())) {
+                        scmSkipCount++;
+                        if (scmSkipCount <= 5) {
+                            log.info("[RFC-004] SnopRecord 신규 생성 skip (SCM 운영구분 미등록): item={}, month={}, scmArea={}", itemCode, planMonth, scmArea);
+                        }
+                        continue;
+                    }
                     SnopRecord record = new SnopRecord();
                     record.setItemCode(itemCode);
                     record.setPlanMonth(planMonth);
@@ -807,8 +837,8 @@ public class RfcReceiverService {
         saveHistory(rfcId, rfcName, executionType, startTime, endTime, durationMs,
                 processedCount, errorCount, errors);
 
-        log.info("[RFC-004] 판매실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, skip(마스터미등록)={}, 에러={}",
-                processedCount, actualSum.size(), insertCount, updateCount, skipCount, errorCount);
+        log.info("[RFC-004] 판매실적 수신 완료: 처리={}, 합산={}개, 신규={}, 수정={}, skip(마스터미등록)={}, skip(SCM미등록)={}, 에러={}",
+                processedCount, actualSum.size(), insertCount, updateCount, skipCount, scmSkipCount, errorCount);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rfc_id", rfcId);

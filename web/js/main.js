@@ -1955,7 +1955,7 @@ function recordToPayload(record) {
         vendor_name: record.vendor_name != null ? sanitizeText(record.vendor_name).trim() : null,
         moq: toNullableNumber(record.moq),
         month: sanitizeText(record.month),
-        sales_plan: toNumber(record.sales_plan),
+        /* sales_plan 제외 — 판매계획은 업로드(mod_sales_plan_upload) 전용, 다른 필드 저장 시 DB 오염 방지 */
         sales_actual: toNullableNumber(record.sales_actual),
         production_plan: productionPlan,
         production_actual: productionActual,
@@ -3664,7 +3664,7 @@ function generateProjectedRawRecords(rawRecords, monthsAhead = PROJECTED_MONTH_E
                 vendor_name: sanitizeText(referenceRecord.vendor_name || '').trim(),
                 moq: referenceRecord.moq ?? null,
                 month: nextMonth,
-                sales_plan: toNumber(referenceRecord.sales_plan),
+                sales_plan: 0, /* 판매계획은 업로드 합산값으로만 결정 — projected에서 이전 월 복사하지 않음 */
                 sales_actual: null, // 미래 projected 레코드는 판매실적 없음
                 production_plan: toNumber(referenceRecord.production_plan),
                 production_actual: 0,
@@ -4165,7 +4165,9 @@ function buildLineStats(records) {
 }
 
 function enrichRecord(record, lineStats, overrides = {}) {
-    const salesPlan = toNumber(overrides.sales_plan ?? record.sales_plan);
+    /* 판매계획은 업로드 합산값(overrides.sales_plan)만 사용 — DB(record.sales_plan)는 무시 */
+    const salesPlan = overrides.sales_plan !== undefined && overrides.sales_plan !== null
+        ? toNumber(overrides.sales_plan) : 0;
 
     const overrideSalesActualRaw = overrides.sales_actual;
     const parsedOverrideSalesActual = overrides.sales_actual !== undefined
@@ -13921,7 +13923,7 @@ function serializeForm() {
         production_line: sanitizeText(dom.productionLine.value).trim(),
         month: sanitizeText(dom.planMonth.value),
         sales_actual: salesActualValue,
-        sales_plan: getSalesPlanValue(),
+        /* sales_plan 제외 — 판매계획은 업로드(mod_sales_plan_upload) 전용 */
         production_plan: planValue,
         production_actual: productionActual,
         production_remaining: productionRemaining,
@@ -17310,9 +17312,7 @@ async function handleBulkUploadStart() {
                         if (!provided.production_line && baseRecord.production_line) {
                             payload.production_line = baseRecord.production_line;
                         }
-                        if (!provided.sales_plan && Number.isFinite(baseRecord.sales_plan)) {
-                            payload.sales_plan = baseRecord.sales_plan;
-                        }
+                        /* sales_plan 복사 제거 — 판매계획은 업로드 전용 */
                         if (!provided.sales_actual && baseRecord.sales_actual !== undefined) {
                             const existingSalesActual = toNullableNumber(baseRecord.sales_actual);
                             payload.sales_actual = existingSalesActual;
@@ -17762,7 +17762,7 @@ async function handleTargetInventoryUploadStart() {
                         plant_code: matched.plant_code || '',
                         vendor_name: matched.vendor_name || '',
                         moq: matched.moq ?? null,
-                        sales_plan: matched.sales_plan ?? null,
+                        /* sales_plan 제외 — 판매계획은 업로드 전용 */
                         sales_actual: matched.sales_actual ?? null,
                         production_plan: matched.production_plan ?? null,
                         production_actual: matched.production_actual ?? null,

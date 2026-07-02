@@ -17702,6 +17702,7 @@ async function handleTargetInventoryUploadStart() {
         let successCount = 0;
         let failCount = 0;
         let notFoundCount = 0;
+        let createdCount = 0;
         const failDetails = [];
 
         /* 현재 로드된 레코드 인덱스 구축 (item_code + month → record id) */
@@ -17753,8 +17754,85 @@ async function handleTargetInventoryUploadStart() {
             const matchedRecords = recordIndex.get(key);
 
             if (!matchedRecords || matchedRecords.length === 0) {
-                notFoundCount++;
-                failDetails.push(`${item_code} (${month}): 해당 자재코드/계획월의 레코드를 찾을 수 없음`);
+                /* ── 해당 월 레코드 미존재 → 새 snop_record 생성(POST) ── */
+                /* 같은 item_code의 다른 월 레코드에서 자재정보 참조 */
+                let referenceRecord = null;
+                for (const [k, recs] of recordIndex.entries()) {
+                    if (k.startsWith(normalizedCode + '__') && recs.length > 0) {
+                        referenceRecord = recs[0];
+                        break;
+                    }
+                }
+                /* DB에 아예 없으면 baseMaterialMasters에서 조회 */
+                if (!referenceRecord) {
+                    const master = (state.baseMaterialMasters || []).find(
+                        m => getNormalizedItemCode(m.item_code) === normalizedCode
+                    );
+                    if (master) {
+                        referenceRecord = {
+                            item_code: (master.item_code || '').trim(),
+                            item_name: (master.item_name || '').trim(),
+                            category: (master.hierarchy_name || '').trim(),
+                            production_line: (master.production_unit || '').trim(),
+                            vendor_name: (master.vendor_name || '').trim(),
+                            moq: master.moq ?? null,
+                        };
+                    }
+                }
+                if (!referenceRecord) {
+                    notFoundCount++;
+                    failDetails.push(`${item_code} (${month}): 자재정보를 찾을 수 없어 등록 불가`);
+                    continue;
+                }
+                try {
+                    const createPayload = {
+                        item_code: referenceRecord.item_code || item_code,
+                        item_name: referenceRecord.item_name || '',
+                        category: referenceRecord.category || '',
+                        production_line: referenceRecord.production_line || '',
+                        vendor_name: referenceRecord.vendor_name || '',
+                        moq: referenceRecord.moq ?? null,
+                        plan_month: month,
+                        sales_plan: 0,
+                        sales_actual: null,
+                        production_plan: 0,
+                        production_actual: 0,
+                        production_remaining: 0,
+                        beginning_inventory: 0,
+                        target_ending_inventory: target_ending_inventory,
+                        capacity_limit: 0,
+                        notes: '',
+                    };
+                    await createRecord(createPayload);
+                    createdCount++;
+                    successCount++;
+                    console.info(`[적정재고 업로드] ${item_code} (${month}) 신규 생성 완료 (적정재고: ${target_ending_inventory})`);
+                } catch (createError) {
+                    if (createError.code === 'DUPLICATE' && createError.detail && createError.detail.existing_id) {
+                        /* 동시에 RFC 등으로 생성된 경우 — 기존 레코드에 적정재고 업데이트 */
+                        try {
+                            await fetch(`/sales-api/snop-records/${createError.detail.existing_id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    item_code: referenceRecord.item_code || item_code,
+                                    item_name: referenceRecord.item_name || '',
+                                    category: referenceRecord.category || '',
+                                    production_line: referenceRecord.production_line || '',
+                                    plan_month: month,
+                                    target_ending_inventory: target_ending_inventory,
+                                }),
+                            }).then(res => { if (!res.ok) throw new Error('적정재고 업데이트 실패'); });
+                            successCount++;
+                        } catch (fallbackError) {
+                            failCount++;
+                            failDetails.push(`${item_code} (${month}): ${fallbackError.message}`);
+                        }
+                    } else {
+                        failCount++;
+                        failDetails.push(`${item_code} (${month}): 신규 생성 실패 — ${createError.message}`);
+                    }
+                }
                 continue;
             }
 
@@ -17801,6 +17879,7 @@ async function handleTargetInventoryUploadStart() {
 
         /* 결과 메시지 */
         let resultMessage = `적정재고 업로드 완료: 성공 ${successCount}건`;
+        if (createdCount > 0) resultMessage += ` (신규생성 ${createdCount}건 포함)`;
         if (notFoundCount > 0) resultMessage += `, 미매칭 ${notFoundCount}건`;
         if (failCount > 0) resultMessage += `, 실패 ${failCount}건`;
 

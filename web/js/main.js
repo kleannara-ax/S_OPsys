@@ -4497,18 +4497,21 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
             /* 예상월말재고 → 다음달 가용재고로 연결 */
             if (previousEnding !== null) {
                 if (isProjected) {
+                    /* projected(DB 미존재) 레코드 → 전월 예상월말재고 연결 */
                     availableInventory = previousEnding;
                     linked = true;
-                } else if (Number.isFinite(previousEnding) && Number.isFinite(rawAvailable) && Math.abs(rawAvailable - previousEnding) < 1e-6) {
-                    availableInventory = previousEnding;
-                    linked = true;
-                } else if (!Number.isFinite(rawAvailable) && !Number.isFinite(rawBeginning)) {
-                    availableInventory = previousEnding;
-                    linked = true;
-                } else {
-                    /* SAP 가용재고가 있으면 그 값 유지, 없으면 현재고 */
-                    availableInventory = Number.isFinite(rawAvailable) ? rawAvailable : rawBeginning;
+                } else if (Number.isFinite(rawAvailable)) {
+                    /* SAP RFC로 받은 가용재고가 있으면 SAP 값 우선 사용 */
+                    availableInventory = rawAvailable;
                     linked = false;
+                } else if (Number.isFinite(rawBeginning)) {
+                    /* SAP 가용재고 없고 현재고만 있으면 현재고 사용 */
+                    availableInventory = rawBeginning;
+                    linked = false;
+                } else {
+                    /* 가용재고·현재고 둘 다 없으면 전월 연결 */
+                    availableInventory = previousEnding;
+                    linked = true;
                 }
             }
 

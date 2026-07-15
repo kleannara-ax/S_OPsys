@@ -584,8 +584,18 @@ const dom = {
         categoryOptions: document.querySelector('#filter-category-options'),
         categoryAllCheckbox: document.querySelector('#filter-category-menu .multi-select-option-all input'),
         month: document.querySelector('#filter-month'),
-        line: document.querySelector('#filter-line'),
-        vendor: document.querySelector('#filter-vendor'),
+        line: document.querySelector('#filter-line-toggle'),
+        lineDropdown: document.querySelector('#filter-line-dropdown'),
+        lineToggle: document.querySelector('#filter-line-toggle'),
+        lineMenu: document.querySelector('#filter-line-menu'),
+        lineOptions: document.querySelector('#filter-line-options'),
+        lineAllCheckbox: document.querySelector('#filter-line-menu .multi-select-option-all input'),
+        vendor: document.querySelector('#filter-vendor-toggle'),
+        vendorDropdown: document.querySelector('#filter-vendor-dropdown'),
+        vendorToggle: document.querySelector('#filter-vendor-toggle'),
+        vendorMenu: document.querySelector('#filter-vendor-menu'),
+        vendorOptions: document.querySelector('#filter-vendor-options'),
+        vendorAllCheckbox: document.querySelector('#filter-vendor-menu .multi-select-option-all input'),
         vendorLabel: document.querySelector('#filter-vendor-label'),
         inventoryStatus: document.querySelector('#filter-inventory-status'),
         capaStatus: document.querySelector('#filter-capa-status'),
@@ -1000,6 +1010,192 @@ function matchesCategoryFilter(categoryFilterValue, recordCategory) {
         return categoryFilterValue.includes(sanitized);
     }
     return sanitized === categoryFilterValue;
+}
+
+// -------------------- 생산라인 멀티셀렉트 드롭다운 --------------------
+function getLineFilterValues() {
+    const allCb = dom.filters.lineAllCheckbox;
+    const container = dom.filters.lineOptions;
+    if (!container) return 'all';
+    const cbs = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    if (cbs.length === 0) return 'all';
+    if (allCb && allCb.checked) return 'all';
+    const checked = cbs.filter(cb => cb.checked);
+    if (checked.length === 0) return 'all';
+    return checked.map(cb => cb.value);
+}
+
+function updateLineFilterDisplay() {
+    const text = dom.filters.lineToggle?.querySelector('.multi-select-text');
+    if (!text) return;
+    const values = getLineFilterValues();
+    if (values === 'all') { text.textContent = '전체'; return; }
+    text.textContent = values.length === 1 ? values[0] : `${values[0]} 외 ${values.length - 1}건`;
+}
+
+function syncLineAllCheckbox() {
+    const allCb = dom.filters.lineAllCheckbox;
+    const container = dom.filters.lineOptions;
+    if (!allCb || !container) return;
+    const cbs = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    const allChecked = cbs.length > 0 && cbs.every(cb => cb.checked);
+    const noneChecked = cbs.every(cb => !cb.checked);
+    if (allChecked) { allCb.checked = true; allCb.indeterminate = false; }
+    else if (noneChecked) { allCb.checked = false; allCb.indeterminate = false; }
+    else { allCb.checked = false; allCb.indeterminate = true; }
+}
+
+function toggleLineMenu(forceClose) {
+    const menu = dom.filters.lineMenu;
+    const toggle = dom.filters.lineToggle;
+    if (!menu || !toggle) return;
+    const shouldClose = forceClose === true || !menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', shouldClose);
+    toggle.classList.toggle('active', !shouldClose);
+}
+
+function resetLineFilter() {
+    const allCb = dom.filters.lineAllCheckbox;
+    const container = dom.filters.lineOptions;
+    if (!allCb || !container) return;
+    allCb.checked = true; allCb.indeterminate = false;
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+    updateLineFilterDisplay();
+}
+
+function populateLineFilterOptions(lines, previousSelections) {
+    const container = dom.filters.lineOptions;
+    const allCb = dom.filters.lineAllCheckbox;
+    if (!container || !allCb) return;
+    container.innerHTML = '';
+    const prevSet = Array.isArray(previousSelections) ? new Set(previousSelections) : null;
+
+    lines.forEach(line => {
+        const label = document.createElement('label');
+        label.className = 'multi-select-option';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = line;
+        if (prevSet && prevSet.has(line)) cb.checked = true;
+        cb.addEventListener('change', () => {
+            syncLineAllCheckbox(); updateLineFilterDisplay();
+            state.planTableReady = true; debouncedApplyFilters();
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + line));
+        container.appendChild(label);
+    });
+
+    if (prevSet && prevSet.size > 0) {
+        const valid = lines.filter(l => prevSet.has(l));
+        if (valid.length === 0 || valid.length === lines.length) {
+            allCb.checked = true; allCb.indeterminate = false;
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+        } else { allCb.checked = false; allCb.indeterminate = true; }
+    } else {
+        allCb.checked = true; allCb.indeterminate = false;
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+    }
+    updateLineFilterDisplay();
+}
+
+function matchesLineFilter(filterValue, recordLine) {
+    if (filterValue === 'all') return true;
+    const sanitized = sanitizeText(recordLine).trim();
+    if (Array.isArray(filterValue)) return filterValue.includes(sanitized);
+    return sanitized === filterValue;
+}
+
+// -------------------- 협력업체명 멀티셀렉트 드롭다운 --------------------
+function getVendorFilterValues() {
+    const allCb = dom.filters.vendorAllCheckbox;
+    const container = dom.filters.vendorOptions;
+    if (!container) return 'all';
+    const cbs = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    if (cbs.length === 0) return 'all';
+    if (allCb && allCb.checked) return 'all';
+    const checked = cbs.filter(cb => cb.checked);
+    if (checked.length === 0) return 'all';
+    return checked.map(cb => cb.value);
+}
+
+function updateVendorFilterDisplay() {
+    const text = dom.filters.vendorToggle?.querySelector('.multi-select-text');
+    if (!text) return;
+    const values = getVendorFilterValues();
+    if (values === 'all') { text.textContent = '전체'; return; }
+    text.textContent = values.length === 1 ? values[0] : `${values[0]} 외 ${values.length - 1}건`;
+}
+
+function syncVendorAllCheckbox() {
+    const allCb = dom.filters.vendorAllCheckbox;
+    const container = dom.filters.vendorOptions;
+    if (!allCb || !container) return;
+    const cbs = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    const allChecked = cbs.length > 0 && cbs.every(cb => cb.checked);
+    const noneChecked = cbs.every(cb => !cb.checked);
+    if (allChecked) { allCb.checked = true; allCb.indeterminate = false; }
+    else if (noneChecked) { allCb.checked = false; allCb.indeterminate = false; }
+    else { allCb.checked = false; allCb.indeterminate = true; }
+}
+
+function toggleVendorMenu(forceClose) {
+    const menu = dom.filters.vendorMenu;
+    const toggle = dom.filters.vendorToggle;
+    if (!menu || !toggle) return;
+    const shouldClose = forceClose === true || !menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', shouldClose);
+    toggle.classList.toggle('active', !shouldClose);
+}
+
+function resetVendorFilter() {
+    const allCb = dom.filters.vendorAllCheckbox;
+    const container = dom.filters.vendorOptions;
+    if (!allCb || !container) return;
+    allCb.checked = true; allCb.indeterminate = false;
+    container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+    updateVendorFilterDisplay();
+}
+
+function populateVendorFilterOptions(vendors, previousSelections) {
+    const container = dom.filters.vendorOptions;
+    const allCb = dom.filters.vendorAllCheckbox;
+    if (!container || !allCb) return;
+    container.innerHTML = '';
+    const prevSet = Array.isArray(previousSelections) ? new Set(previousSelections) : null;
+
+    vendors.forEach(v => {
+        const label = document.createElement('label');
+        label.className = 'multi-select-option';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = v;
+        if (prevSet && prevSet.has(v)) cb.checked = true;
+        cb.addEventListener('change', () => {
+            syncVendorAllCheckbox(); updateVendorFilterDisplay();
+            state.planTableReady = true; debouncedApplyFilters();
+        });
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' ' + v));
+        container.appendChild(label);
+    });
+
+    if (prevSet && prevSet.size > 0) {
+        const valid = vendors.filter(v => prevSet.has(v));
+        if (valid.length === 0 || valid.length === vendors.length) {
+            allCb.checked = true; allCb.indeterminate = false;
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+        } else { allCb.checked = false; allCb.indeterminate = true; }
+    } else {
+        allCb.checked = true; allCb.indeterminate = false;
+        container.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+    }
+    updateVendorFilterDisplay();
+}
+
+function matchesVendorFilter(filterValue, recordVendor) {
+    if (filterValue === 'all') return true;
+    const sanitized = sanitizeText(recordVendor).trim();
+    if (Array.isArray(filterValue)) return filterValue.includes(sanitized);
+    return sanitized === filterValue;
 }
 
 // -------------------- 유틸리티 함수 --------------------
@@ -4613,7 +4809,7 @@ function matchesCapaStatusFilter(record, filterValue) {
 function getDashboardFilteredRecords() {
     const itemFilter = dom.filters.item.value;
     const categoryFilter = getCategoryFilterValues();
-    const lineFilter = dom.filters.line.value;
+    const lineFilter = getLineFilterValues();
 
     return (state.enrichedData || []).filter((record) => {
         const canonicalCode = getRecordCanonicalCode(record);
@@ -4623,7 +4819,7 @@ function getDashboardFilteredRecords() {
         if (!matchesCategoryFilter(categoryFilter, record.category)) {
             return false;
         }
-        if (lineFilter !== 'all' && sanitizeText(record.production_line).trim() !== lineFilter) {
+        if (lineFilter !== 'all' && !matchesLineFilter(lineFilter, record.production_line)) {
             return false;
         }
         return true;
@@ -7523,7 +7719,8 @@ function populateFilterOptions() {
     const previousItem = dom.filters.item.value;
     const previousCategoryValues = getCategoryFilterValues();
     const previousMonth = dom.filters.month.value;
-    const previousLine = dom.filters.line.value;
+    const previousLineValues = getLineFilterValues();
+    const previousVendorValues = getVendorFilterValues();
 
     const itemOptions = getUniqueItems(state.rawData);
     /* 자재코드 검색 드롭다운 데이터 저장 */
@@ -7565,21 +7762,14 @@ function populateFilterOptions() {
         }
     }
 
-    const lines = getUniqueLines(state.rawData);
-    dom.filters.line.innerHTML = '<option value="all">전체</option>';
-    lines.forEach((line) => {
-        const option = document.createElement('option');
-        option.value = line;
-        option.textContent = line;
-        dom.filters.line.appendChild(option);
-    });
-    if (lines.includes(previousLine)) {
-        dom.filters.line.value = previousLine;
+    if (dom.filters.lineOptions) {
+        const lines = getUniqueLines(state.rawData);
+        const prevLineSelections = previousLineValues === 'all' ? null : previousLineValues;
+        populateLineFilterOptions(lines, prevLineSelections);
     }
 
     /* ── 협력업체명 필터 옵션 (OEM 자재 기준) ── */
-    if (dom.filters.vendor) {
-        const previousVendor = dom.filters.vendor.value;
+    if (dom.filters.vendorOptions) {
         const vendorSet = new Set();
         (state.rawData || []).forEach((record) => {
             const line = sanitizeText(record.production_line).trim().toUpperCase();
@@ -7587,7 +7777,6 @@ function populateFilterOptions() {
             const v = sanitizeText(record.vendor_name).trim();
             if (v) vendorSet.add(v);
         });
-        /* 기본자재마스터에서도 vendor_name 수집 */
         (state.baseMaterialMasters || []).forEach((master) => {
             const line = sanitizeText(master.production_line || master.productionLine || '').trim().toUpperCase();
             if (!line.includes('OEM')) return;
@@ -7595,16 +7784,8 @@ function populateFilterOptions() {
             if (v) vendorSet.add(v);
         });
         const vendors = [...vendorSet].sort((a, b) => a.localeCompare(b));
-        dom.filters.vendor.innerHTML = '<option value="all">전체</option>';
-        vendors.forEach((v) => {
-            const option = document.createElement('option');
-            option.value = v;
-            option.textContent = v;
-            dom.filters.vendor.appendChild(option);
-        });
-        if (vendors.includes(previousVendor)) {
-            dom.filters.vendor.value = previousVendor;
-        }
+        const prevVendorSelections = previousVendorValues === 'all' ? null : previousVendorValues;
+        populateVendorFilterOptions(vendors, prevVendorSelections);
     }
 }
 
@@ -9006,14 +9187,14 @@ function renderItemSearchList(query) {
 
     /* ── 현재 활성화된 필터(카테고리, 생산라인)에 맞는 자재만 표시 ── */
     const categoryFilter = getCategoryFilterValues();
-    const lineFilter = dom.filters.line ? dom.filters.line.value : 'all';
+    const lineFilter = getLineFilterValues();
 
     let baseRecords = state.rawData || [];
     if (categoryFilter !== 'all') {
         baseRecords = baseRecords.filter((r) => matchesCategoryFilter(categoryFilter, r.category));
     }
     if (lineFilter !== 'all') {
-        baseRecords = baseRecords.filter((r) => sanitizeText(r.production_line).trim() === lineFilter);
+        baseRecords = baseRecords.filter((r) => matchesLineFilter(lineFilter, r.production_line));
     }
     const options = getUniqueItems(baseRecords);
     const q = (query || '').trim().toUpperCase();
@@ -9137,8 +9318,8 @@ function applyFilters() {
     const itemFilter = dom.filters.item.value;
     const categoryFilter = getCategoryFilterValues();
     const monthFilter = dom.filters.month.value;
-    const lineFilter = dom.filters.line.value;
-    const vendorFilter = dom.filters.vendor ? dom.filters.vendor.value : 'all';
+    const lineFilter = getLineFilterValues();
+    const vendorFilter = getVendorFilterValues();
     const inventoryStatusFilter = dom.filters.inventoryStatus ? dom.filters.inventoryStatus.value : 'all';
     const capaStatusFilter = dom.filters.capaStatus ? dom.filters.capaStatus.value : 'all';
 
@@ -9207,7 +9388,7 @@ function applyFilters() {
         filtered = filtered.filter((record) => record.month === monthFilter);
     }
     if (lineFilter !== 'all') {
-        filtered = filtered.filter((record) => sanitizeText(record.production_line).trim() === lineFilter);
+        filtered = filtered.filter((record) => matchesLineFilter(lineFilter, record.production_line));
     }
     if (vendorFilter !== 'all') {
         filtered = filtered.filter((record) => {
@@ -9218,7 +9399,7 @@ function applyFilters() {
                 const master = (state.baseMaterialMasters || []).find((m) => sanitizeText(m.item_code || m.itemCode || '').trim() === code);
                 if (master) v = sanitizeText(master.vendor_name || master.vendorName || '').trim();
             }
-            return v === vendorFilter;
+            return matchesVendorFilter(vendorFilter, v);
         });
     }
     if (inventoryStatusFilter !== 'all') {
@@ -18926,15 +19107,70 @@ function bindEvents() {
             debouncedApplyFilters();
         });
     }
-    /* 외부 클릭 시 카테고리 드롭다운 닫기 */
+    /* 외부 클릭 시 카테고리/생산라인/협력업체 드롭다운 닫기 */
     document.addEventListener('click', (e) => {
-        const dropdown = dom.filters.categoryDropdown;
-        if (dropdown && !dropdown.contains(e.target)) {
+        const catDropdown = dom.filters.categoryDropdown;
+        if (catDropdown && !catDropdown.contains(e.target)) {
             toggleCategoryMenu(true);
+        }
+        const lineDropdown = dom.filters.lineDropdown;
+        if (lineDropdown && !lineDropdown.contains(e.target)) {
+            toggleLineMenu(true);
+        }
+        const vendorDropdown = dom.filters.vendorDropdown;
+        if (vendorDropdown && !vendorDropdown.contains(e.target)) {
+            toggleVendorMenu(true);
         }
     });
     dom.filters.month.addEventListener('change', () => { activatePlanTable(); handleFilterMonthChange(); });
-    dom.filters.line.addEventListener('change', () => { activatePlanTable(); applyFilters(); });
+    /* 생산라인 멀티셀렉트 이벤트 바인딩 */
+    if (dom.filters.lineToggle) {
+        dom.filters.lineToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleLineMenu();
+        });
+    }
+    if (dom.filters.lineAllCheckbox) {
+        dom.filters.lineAllCheckbox.addEventListener('change', (e) => {
+            const optionsContainer = dom.filters.lineOptions;
+            if (!optionsContainer) return;
+            const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
+            if (e.target.checked) {
+                checkboxes.forEach(cb => { cb.checked = true; });
+                e.target.indeterminate = false;
+            } else {
+                checkboxes.forEach(cb => { cb.checked = false; });
+                e.target.indeterminate = false;
+            }
+            updateLineFilterDisplay();
+            activatePlanTable();
+            debouncedApplyFilters();
+        });
+    }
+    /* 협력업체 멀티셀렉트 이벤트 바인딩 */
+    if (dom.filters.vendorToggle) {
+        dom.filters.vendorToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleVendorMenu();
+        });
+    }
+    if (dom.filters.vendorAllCheckbox) {
+        dom.filters.vendorAllCheckbox.addEventListener('change', (e) => {
+            const optionsContainer = dom.filters.vendorOptions;
+            if (!optionsContainer) return;
+            const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
+            if (e.target.checked) {
+                checkboxes.forEach(cb => { cb.checked = true; });
+                e.target.indeterminate = false;
+            } else {
+                checkboxes.forEach(cb => { cb.checked = false; });
+                e.target.indeterminate = false;
+            }
+            updateVendorFilterDisplay();
+            activatePlanTable();
+            debouncedApplyFilters();
+        });
+    }
     if (dom.filters.inventoryStatus) {
         dom.filters.inventoryStatus.addEventListener('change', () => { activatePlanTable(); applyFilters(); });
     }
@@ -19014,8 +19250,8 @@ function bindEvents() {
             if (dom.filters.vendorLabel) {
                 dom.filters.vendorLabel.style.display = isOem ? '' : 'none';
             }
-            if (!isOem && dom.filters.vendor) {
-                dom.filters.vendor.value = 'all';
+            if (!isOem) {
+                resetVendorFilter();
             }
             /* OEM 탭 전환 시 협력업체명 컬럼 표시/숨김 */
             document.querySelectorAll('.col-vendor-name').forEach((el) => {
@@ -19108,10 +19344,8 @@ function bindEvents() {
         if (dom.filters.itemInput) dom.filters.itemInput.value = '';
         resetCategoryFilter();
         dom.filters.month.value = 'all';
-        dom.filters.line.value = 'all';
-        if (dom.filters.vendor) {
-            dom.filters.vendor.value = 'all';
-        }
+        resetLineFilter();
+        resetVendorFilter();
         if (dom.filters.inventoryStatus) {
             dom.filters.inventoryStatus.value = 'all';
         }

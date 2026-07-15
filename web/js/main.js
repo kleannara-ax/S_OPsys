@@ -590,6 +590,7 @@ const dom = {
         inventoryStatus: document.querySelector('#filter-inventory-status'),
         capaStatus: document.querySelector('#filter-capa-status'),
         apply: document.querySelector('#btn-apply-filters'),
+        refresh: document.querySelector('#btn-refresh-data'),
         clear: document.querySelector('#btn-clear-filters'),
     },
     bulkConfirmButton: document.querySelector('#btn-confirm-production-changes'),
@@ -7309,6 +7310,206 @@ async function loadData() {
         console.error('loadData() 실행 중 오류가 발생했습니다.', error);
         alert('데이터를 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.\n\n자세한 오류 정보는 브라우저 콘솔(F12)에서 확인할 수 있습니다.');
         /* btnRefresh 제거됨 */
+    } finally {
+        toggleLoading(false);
+    }
+}
+
+/**
+ * 경량 새로고침 — 변경 가능성이 높은 데이터만 서버에서 다시 가져옴.
+ * 마스터성 데이터(채널, 라인자재마스터, 리뉴얼연결 등)는 기존 캐시 유지.
+ *
+ * 재호출 대상 (8개):
+ *   snop-records, sales-plan-uploads, sales-plan-upload-history,
+ *   line-capa-plans, optimal-inventory-baselines, base-material-masters,
+ *   monthly-closings, recent-sales-averages
+ */
+async function refreshData() {
+    try {
+        toggleLoading(true);
+        console.info('[refreshData] 경량 새로고침 시작');
+
+        const snopRecordsPromise = fetchAllPages('/sales-api/snop-records', 2000, 'S&OP (refresh)');
+
+        const [
+            salesResponse,
+            lineCapaResponse,
+            uploadHistoryResponse,
+            optimalBaselineResponse,
+            recentSalesResponse,
+            baseMaterialMasterResponse,
+            monthlyClosingResponse,
+        ] = await Promise.all([
+            fetch('/sales-api/sales-plan-uploads?limit=1000'),
+            fetch('/sales-api/line-capa-plans?limit=1000'),
+            fetch('/sales-api/sales-plan-upload-history?limit=1000&sort=-created_at'),
+            fetch('/sales-api/optimal-inventory-baselines?limit=1000&sort=year,category'),
+            fetch('/sales-api/recent-sales-averages?limit=1000&sort=-created_at'),
+            fetch('/sales-api/base-material-masters?limit=1000'),
+            fetch('/sales-api/monthly-closings?limit=5000'),
+        ]);
+
+        /* ── snop-records ── */
+        let snopRecords = await snopRecordsPromise;
+        if (!Array.isArray(snopRecords)) snopRecords = [];
+        const normalizedAll = snopRecords.map(normalizeRecord);
+        state.rawData = normalizedAll.filter((r) => {
+            const code = sanitizeText(r.item_code).trim();
+            const month = sanitizeText(r.month).trim();
+            return code && month;
+        });
+        console.info(`[refreshData] snop-records: ${snopRecords.length}건 → rawData ${state.rawData.length}건`);
+
+        state.originalProductionPlans = new Map();
+        state.rawData.forEach((r) => { if (r.id) state.originalProductionPlans.set(r.id, r.production_plan); });
+
+        restoreAdjustedOverrides();
+        if (state.adjustedPlanOverrides.size > 0) {
+            state.rawData.forEach((r) => {
+                if (state.adjustedPlanOverrides.has(r.id)) r.production_plan = state.adjustedPlanOverrides.get(r.id);
+            });
+        }
+
+        const prevFB = state.productionActualFallbacks instanceof Map ? state.productionActualFallbacks : new Map();
+        const keepFB = new Map();
+        state.rawData.forEach((r) => {
+            const bk = sanitizeText(r.id || r.item_code), mk = sanitizeText(r.month);
+            if (!bk || !mk) return;
+            const fk = `${bk}|${mk}|production`;
+            if (prevFB.has(fk)) keepFB.set(fk, prevFB.get(fk));
+        });
+        state.productionActualFallbacks = keepFB;
+
+        /* ── recent-sales-averages ── */
+        let recentSalesData = [];
+        if (recentSalesResponse && recentSalesResponse.ok) {
+            recentSalesData = extractData(await safeJson(recentSalesResponse, { data: [] }, { label: '판매실적 평균 (refresh)' }));
+        }
+        state.recentSalesRecords = recentSalesData;
+        state.recentSalesIndex = buildRecentSalesAverageIndex(recentSalesData);
+
+        /* ── line-capa-plans ── */
+        let lineCapaData = [];
+        if (lineCapaResponse && lineCapaResponse.ok) {
+            lineCapaData = extractData(await safeJson(lineCapaResponse, { data: [] }, { label: '라인 CAPA (refresh)' }));
+        }
+        state.lineDowntimePlans = lineCapaData.map(normalizeLineCapaPlan);
+        state.lineDowntimePlans.sort((a, b) => {
+            const md = sanitizeText(a.month).localeCompare(sanitizeText(b.month));
+            if (md !== 0) return md;
+            const cd = getLinePlanCategory(a).localeCompare(getLinePlanCategory(b));
+            if (cd !== 0) return cd;
+            return sanitizeText(a.production_line).localeCompare(sanitizeText(b.production_line));
+        });
+        state.lineDowntimeIndex = buildLineDowntimeIndex(state.lineDowntimePlans);
+        populateLineCapaFilters();
+        renderLineCapaTable();
+
+        /* ── base-material-masters ── */
+        let baseMaterialData = [];
+        if (baseMaterialMasterResponse && baseMaterialMasterResponse.ok) {
+            baseMaterialData = extractData(await safeJson(baseMaterialMasterResponse, { data: [] }, { label: '자재마스터 (refresh)' }));
+        }
+        state.baseMaterialMasters = baseMaterialData;
+        populateBaseMaterialMasterFilters();
+        renderBaseMaterialMasterTable();
+
+        /* ── monthly-closings ── */
+        let mcData = [];
+        if (monthlyClosingResponse && monthlyClosingResponse.ok) {
+            mcData = extractData(await safeJson(monthlyClosingResponse, { data: [] }, { label: '월말마감 (refresh)' }));
+        }
+        state.monthlyClosings = mcData;
+        state.monthlyClosingIndex = new Map();
+        mcData.forEach((mc) => {
+            const c = sanitizeText(mc.item_code).trim(), m = sanitizeText(mc.closing_month).trim();
+            if (c && m) state.monthlyClosingIndex.set(`${c}|${m}`, mc);
+        });
+        state.monthlyClosingByMonth = new Map();
+        mcData.forEach((mc) => {
+            const m = sanitizeText(mc.closing_month).trim();
+            if (m) {
+                if (!state.monthlyClosingByMonth.has(m)) state.monthlyClosingByMonth.set(m, []);
+                state.monthlyClosingByMonth.get(m).push(mc);
+            }
+        });
+
+        /* ── sales-plan-uploads ── */
+        let salesData = [];
+        if (salesResponse && salesResponse.ok) {
+            salesData = extractData(await safeJson(salesResponse, { data: [] }, { label: '판매계획 (refresh)' }));
+        }
+        state.salesUploads = salesData.map((r) => normalizeSalesUpload(r, state.salesChannelIndex));
+
+        state.rawData = annotateProductionRecordsWithCanonical(state.rawData, state.materialLinkageResolver);
+        state.salesUploads = annotateSalesUploadsWithCanonical(state.salesUploads, state.materialLinkageResolver);
+        state.itemCanonicalMap = buildItemCanonicalIndex([state.rawData, state.salesUploads], state.materialLinkageResolver);
+        state.materialCanonicalNameIndex = buildCanonicalNameIndex(state.rawData, state.materialLinkageResolver);
+        state.salesUploadIndex = buildSalesUploadIndex(state.salesUploads);
+
+        /* ── sales-plan-upload-history ── */
+        let uhData = [];
+        if (uploadHistoryResponse && uploadHistoryResponse.ok) {
+            uhData = extractData(await safeJson(uploadHistoryResponse, { data: [] }, { label: '업로드 이력 (refresh)' }));
+        }
+        state.salesUploadHistory = uhData.map((r) => normalizeSalesUploadHistory(r));
+        populateUploadHistoryItemFilter();
+        renderUploadHistoryTable();
+
+        /* ── optimal-inventory-baselines ── */
+        let obData = [];
+        if (optimalBaselineResponse && optimalBaselineResponse.ok) {
+            obData = extractData(await safeJson(optimalBaselineResponse, { data: [] }, { label: '적정재고 기준 (refresh)' }));
+        }
+        state.optimalInventoryBaselines = obData.map(normalizeOptimalBaseline);
+        state.optimalInventoryBaselines.sort((a, b) => {
+            const yc = sanitizeText(a.year).localeCompare(sanitizeText(b.year));
+            return yc !== 0 ? yc : sanitizeText(a.category).localeCompare(sanitizeText(b.category));
+        });
+        state.optimalInventoryBaselineIndex = buildOptimalBaselineIndex(state.optimalInventoryBaselines);
+        state.optimalInventoryBaselineById = buildOptimalBaselineIdIndex(state.optimalInventoryBaselines);
+        populateOptimalBaselineCategoryOptions();
+        renderOptimalBaselineManager();
+
+        /* ── salesAggregates 재구성 ── */
+        const itemNameMap = new Map(), itemCategoryMap = new Map();
+        (state.rawData || []).forEach((r) => {
+            if (!r) return;
+            const code = getRecordCanonicalCode(r) || sanitizeText(r.item_code).trim();
+            if (!code) return;
+            const name = getRecordCanonicalName(r);
+            if (name && !itemNameMap.has(code)) itemNameMap.set(code, name);
+            const cat = sanitizeText(r.category).trim();
+            if (cat && !itemCategoryMap.has(code)) itemCategoryMap.set(code, cat);
+        });
+        if (state.materialCanonicalNameIndex instanceof Map) {
+            state.materialCanonicalNameIndex.forEach((n, c) => { if (c && n && !itemNameMap.has(c)) itemNameMap.set(c, n); });
+        }
+        (state.baseMaterialMasters || []).forEach((m) => {
+            if (!m) return;
+            const c = sanitizeText(m.item_code).trim();
+            if (!c) return;
+            const lc = c.toLowerCase(), n = sanitizeText(m.item_name).trim(), cat = sanitizeText(m.hierarchy_name).trim();
+            if (n) { if (!itemNameMap.has(c)) itemNameMap.set(c, n); if (!itemNameMap.has(lc)) itemNameMap.set(lc, n); }
+            if (cat) { if (!itemCategoryMap.has(c)) itemCategoryMap.set(c, cat); if (!itemCategoryMap.has(lc)) itemCategoryMap.set(lc, cat); }
+        });
+        state.salesAggregates = buildSalesAggregates(state.salesUploads, { itemNameMap, itemCategoryMap, channelIndex: state.salesChannelIndex });
+
+        /* ── 화면 갱신 ── */
+        populateSalesSummaryFilters();
+        renderSalesSummaryTable();
+        renderSalesUploadsTable();
+        populateFilterOptions();
+        updateSharedLineResources();
+        updateChartSelectOptions();
+        applyFilters();
+        updateCapacityLimitFromLinePlan();
+        renderRecentSalesViewTable();
+
+        console.info('[refreshData] 경량 새로고침 완료');
+    } catch (error) {
+        console.error('[refreshData] 오류:', error);
+        alert('데이터 새로고침 중 오류가 발생했습니다.\n자세한 정보는 브라우저 콘솔(F12)에서 확인하세요.');
     } finally {
         toggleLoading(false);
     }
@@ -18771,6 +18972,20 @@ function bindEvents() {
     }
     if (dom.filters.apply) {
         dom.filters.apply.addEventListener('click', () => { activatePlanTable(); applyFilters(); });
+    }
+    if (dom.filters.refresh) {
+        dom.filters.refresh.addEventListener('click', async () => {
+            activatePlanTable();
+            /* 서버에서 변경 가능 데이터만 경량 새로고침 */
+            dom.filters.refresh.disabled = true;
+            dom.filters.refresh.textContent = '↻ 새로고침 중...';
+            try {
+                await refreshData();
+            } finally {
+                dom.filters.refresh.disabled = false;
+                dom.filters.refresh.textContent = '↻ 새로고침';
+            }
+        });
     }
 
     /* ── 제품 유형 탭 (전체 / OEM) ── */

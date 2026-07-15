@@ -857,17 +857,35 @@
                             </div>
                         </div>
                     </label>
-                    <label>
+                    <label class="multi-select-label">
                         생산 라인
-                        <select id="filter-line">
-                            <option value="all">전체</option>
-                        </select>
+                        <div class="multi-select-dropdown" id="filter-line-dropdown">
+                            <button type="button" class="multi-select-toggle" id="filter-line-toggle">
+                                <span class="multi-select-text">전체</span>
+                                <span class="multi-select-arrow">▾</span>
+                            </button>
+                            <div class="multi-select-menu hidden" id="filter-line-menu">
+                                <label class="multi-select-option multi-select-option-all">
+                                    <input type="checkbox" value="all" checked> 전체
+                                </label>
+                                <div class="multi-select-options" id="filter-line-options"></div>
+                            </div>
+                        </div>
                     </label>
-                    <label id="filter-vendor-label" style="display:none;">
+                    <label class="multi-select-label" id="filter-vendor-label" style="display:none;">
                         협력업체명
-                        <select id="filter-vendor">
-                            <option value="all">전체</option>
-                        </select>
+                        <div class="multi-select-dropdown" id="filter-vendor-dropdown">
+                            <button type="button" class="multi-select-toggle" id="filter-vendor-toggle">
+                                <span class="multi-select-text">전체</span>
+                                <span class="multi-select-arrow">▾</span>
+                            </button>
+                            <div class="multi-select-menu hidden" id="filter-vendor-menu">
+                                <label class="multi-select-option multi-select-option-all">
+                                    <input type="checkbox" value="all" checked> 전체
+                                </label>
+                                <div class="multi-select-options" id="filter-vendor-options"></div>
+                            </div>
+                        </div>
                     </label>
                     <label>
                         계획 월
@@ -1944,6 +1962,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260714a" defer></script>
+    <script src="js/main.js?v=20260715a" defer></script>
 </body>
 </html>

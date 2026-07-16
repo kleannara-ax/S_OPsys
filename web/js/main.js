@@ -18441,14 +18441,17 @@ const recentSalesViewDom = {
 };
 
 function buildRecentSalesViewData() {
-    const records = state.recentSalesRecords || [];
+    /* ── 월말마감(RFC005) 데이터 기반 판매실적 현황 ──
+     * state.monthlyClosings의 sales_actual을 item_code별·closing_month별로 표시.
+     * 각 행마다 해당 마감월 기준 최근 3/6/12개월 판매실적 평균을 계산. */
+    const closings = state.monthlyClosings || [];
     const masters = state.baseMaterialMasters || [];
     const snopRecords = state.rawData || [];
 
     /* item_code → category, item_name 매핑 */
     const itemInfoMap = new Map();
     masters.forEach((m) => {
-        const code = (m.item_code || '').trim().toUpperCase();
+        const code = sanitizeText(m.item_code).trim().toUpperCase();
         if (code && !itemInfoMap.has(code)) {
             itemInfoMap.set(code, {
                 category: m.hierarchy_name || '',
@@ -18466,19 +18469,41 @@ function buildRecentSalesViewData() {
         }
     });
 
-    return records.map((r) => {
-        const code = (r.item_code || '').trim().toUpperCase();
+    /* item_code → [{closing_month, sales_actual}] 맵 구축 (평균 계산용) */
+    const itemMonthlyMap = new Map();
+    closings.forEach((mc) => {
+        const code = sanitizeText(mc.item_code).trim().toUpperCase();
+        const month = sanitizeText(mc.closing_month).trim();
+        if (!code || !month) return;
+        if (!itemMonthlyMap.has(code)) itemMonthlyMap.set(code, []);
+        itemMonthlyMap.get(code).push({ month, salesActual: toNumber(mc.sales_actual) });
+    });
+    /* 각 자재별 월 오름차순 정렬 */
+    itemMonthlyMap.forEach((list) => list.sort((a, b) => a.month.localeCompare(b.month)));
+
+    /* N개월 평균 계산 헬퍼: targetMonth 이하 최근 N개월 */
+    function calcAvg(list, targetMonth, nMonths) {
+        const eligible = list.filter((e) => e.month <= targetMonth);
+        const recent = eligible.slice(-nMonths);
+        if (recent.length === 0) return 0;
+        const sum = recent.reduce((s, e) => s + e.salesActual, 0);
+        return Math.round(sum / recent.length);
+    }
+
+    return closings.map((mc) => {
+        const code = sanitizeText(mc.item_code).trim().toUpperCase();
+        const month = sanitizeText(mc.closing_month).trim();
         const info = itemInfoMap.get(code) || {};
+        const list = itemMonthlyMap.get(code) || [];
         return {
-            category: info.category || '미지정',
-            item_code: r.item_code || '',
-            item_name: info.item_name || '',
-            base_month: r.base_month || '',
-            m3: r.m3 ?? 0,
-            m2: r.m2 ?? 0,
-            m1: r.m1 ?? 0,
-            total: r.total ?? 0,
-            average: r.average ?? 0,
+            category: info.category || mc.hierarchy_name || '미지정',
+            item_code: mc.item_code || '',
+            item_name: info.item_name || mc.item_name || '',
+            closing_month: month,
+            sales_actual: toNumber(mc.sales_actual),
+            avg3: calcAvg(list, month, 3),
+            avg6: calcAvg(list, month, 6),
+            avg12: calcAvg(list, month, 12),
         };
     }).filter((d) => !isExcludedCategory(d.category));
 }
@@ -18493,7 +18518,7 @@ function populateRecentSalesViewFilters(viewData) {
     viewData.forEach((d) => {
         if (d.category) categorySet.add(d.category);
         if (d.item_code) itemSet.add(d.item_code);
-        if (d.base_month) monthSet.add(d.base_month);
+        if (d.closing_month) monthSet.add(d.closing_month);
     });
 
     const prevCategory = recentSalesViewDom.filterCategory.value;
@@ -18530,17 +18555,17 @@ function renderRecentSalesViewTable() {
     const filtered = viewData.filter((d) => {
         if (catFilter !== 'all' && d.category !== catFilter) return false;
         if (itemFilter !== 'all' && d.item_code !== itemFilter) return false;
-        if (monthFilter !== 'all' && d.base_month !== monthFilter) return false;
+        if (monthFilter !== 'all' && d.closing_month !== monthFilter) return false;
         return true;
     });
 
-    /* 정렬: 카테고리 → 자재코드 → 기준월 */
+    /* 정렬: 카테고리 → 자재코드 → 마감월 */
     filtered.sort((a, b) => {
         const c = a.category.localeCompare(b.category);
         if (c !== 0) return c;
         const i = a.item_code.localeCompare(b.item_code);
         if (i !== 0) return i;
-        return a.base_month.localeCompare(b.base_month);
+        return a.closing_month.localeCompare(b.closing_month);
     });
 
     recentSalesViewDom.tbody.innerHTML = '';
@@ -18563,12 +18588,11 @@ function renderRecentSalesViewTable() {
             { value: d.category, cls: '' },
             { value: d.item_code, cls: '' },
             { value: d.item_name, cls: '' },
-            { value: d.base_month, cls: '' },
-            { value: fmt(d.m3), cls: 'number' },
-            { value: fmt(d.m2), cls: 'number' },
-            { value: fmt(d.m1), cls: 'number' },
-            { value: fmt(d.total), cls: 'number' },
-            { value: fmt(d.average), cls: 'number' },
+            { value: d.closing_month, cls: '' },
+            { value: fmt(d.sales_actual), cls: 'number' },
+            { value: fmt(d.avg3), cls: 'number' },
+            { value: fmt(d.avg6), cls: 'number' },
+            { value: fmt(d.avg12), cls: 'number' },
         ];
         fields.forEach((f) => {
             const td = document.createElement('td');

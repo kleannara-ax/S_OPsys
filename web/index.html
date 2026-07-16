@@ -313,7 +313,7 @@
                 <!-- 업로드된 판매실적 현황 카드 -->
                 <div class="recent-sales-view-card">
                     <div class="recent-sales-view-header">
-                        <h4>업로드된 최근 3개월 판매실적 현황</h4>
+                        <h4>월별 판매실적 현황 (월말마감 기준)</h4>
                         <div class="recent-sales-view-filters">
                             <label>
                                 카테고리
@@ -328,7 +328,7 @@
                                 </select>
                             </label>
                             <label>
-                                기준월
+                                마감월
                                 <select id="recent-sales-view-filter-month">
                                     <option value="all">전체</option>
                                 </select>
@@ -342,17 +342,16 @@
                                     <th>카테고리</th>
                                     <th>자재코드</th>
                                     <th>자재명칭</th>
-                                    <th>기준월</th>
-                                    <th class="number">-3개월 (M3)</th>
-                                    <th class="number">-2개월 (M2)</th>
-                                    <th class="number">-1개월 (M1)</th>
-                                    <th class="number">합계</th>
-                                    <th class="number">평균</th>
+                                    <th>마감월</th>
+                                    <th class="number">판매실적<br><span class="unit-label">BOX</span></th>
+                                    <th class="number">3개월 평균<br><span class="unit-label">BOX</span></th>
+                                    <th class="number">6개월 평균<br><span class="unit-label">BOX</span></th>
+                                    <th class="number">12개월 평균<br><span class="unit-label">BOX</span></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
                         </table>
-                        <div id="recent-sales-view-empty" class="empty">업로드된 판매실적 데이터가 없습니다.</div>
+                        <div id="recent-sales-view-empty" class="empty">월말마감 판매실적 데이터가 없습니다.</div>
                     </div>
                 </div>
             </section>
@@ -1962,6 +1961,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260715a" defer></script>
+    <script src="js/main.js?v=20260716a" defer></script>
 </body>
 </html>

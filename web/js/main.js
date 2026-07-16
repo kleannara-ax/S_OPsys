@@ -70,9 +70,6 @@ const BULK_COLUMN_MAP = {
     notes: 'notes',
     memo: 'notes',
     비고: 'notes',
-    priority: 'priority',
-    '우선순위': 'priority',
-    sort_order: 'priority',
 };
 
 const BULK_TARGETS = {
@@ -362,10 +359,6 @@ const state = {
     monthlyClosings: [],
     monthlyClosingIndex: new Map(),
     monthlySalesRecords: [],
-    /** 카테고리별 자재 정렬순서 — Map<'category|item_code', sort_order> */
-    itemSortOrders: new Map(),
-    /** itemSortOrders 원본 배열 (API 응답) */
-    itemSortOrderList: [],
     /** 생산계획 현황 테이블 준비 상태 — 첫 로드 시 false, 필터 조작 후 true */
     planTableReady: false,
     /** 멀티탭 — 열린 탭 목록 (viewId 배열, 순서 = 탭 순서) */
@@ -1765,24 +1758,6 @@ function buildSalesUploadLogNameIndex(records) {
         index.get(nameKey).push(record);
     });
     return index;
-}
-
-/* ── 자재 정렬순서(ItemSortOrder) 인덱스 ── */
-function buildItemSortOrderIndex(list) {
-    const map = new Map();
-    (list || []).forEach((entry) => {
-        const cat = sanitizeText(entry.category).trim();
-        const code = sanitizeText(entry.item_code).trim();
-        if (cat && code) {
-            map.set(`${cat}|${code}`, entry.sort_order);
-        }
-    });
-    return map;
-}
-
-function getItemSortOrder(category, itemCode) {
-    const key = `${sanitizeText(category).trim()}|${sanitizeText(itemCode).trim()}`;
-    return state.itemSortOrders.has(key) ? state.itemSortOrders.get(key) : 999999;
 }
 
 function buildSampleSnopRecords() {
@@ -3726,10 +3701,10 @@ function sortRecordsForDisplay(records) {
         if (monthCompare !== 0) return monthCompare;
         const categoryCompare = sanitizeText(a.category).localeCompare(sanitizeText(b.category));
         if (categoryCompare !== 0) return categoryCompare;
-        /* 카테고리 내 정렬: ItemSortOrder 테이블 우선 → 기존 priority fallback */
-        const sortA = getItemSortOrder(a.category, a.item_code);
-        const sortB = getItemSortOrder(b.category, b.item_code);
-        if (sortA !== sortB) return sortA - sortB;
+        /* 카테고리 내 우선순위 오름차순 (미입력은 맨 뒤) */
+        const priA = Number.isFinite(a.priority) ? a.priority : 999999;
+        const priB = Number.isFinite(b.priority) ? b.priority : 999999;
+        if (priA !== priB) return priA - priB;
         const lineCompare = sanitizeText(a.production_line).localeCompare(sanitizeText(b.production_line));
         if (lineCompare !== 0) return lineCompare;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));
@@ -4029,12 +4004,8 @@ function mapProductionBulkRow(row, index) {
         errors.push('production_line은 필수입니다.');
     }
 
-    /* priority(우선순위) — 엑셀에 기재된 경우 추출, ItemSortOrder 일괄 반영에 사용 */
-    const rawPriority = parseNumberOrNull(normalizedRow.priority);
-
     return {
         payload,
-        priority: rawPriority,
         errors,
         rowNumber: index + 2, // assume header row is 1
         provided: providedFields,
@@ -7156,7 +7127,6 @@ async function loadData() {
             baseMaterialMasterResponse,
             monthlyClosingResponse,
             monthlySalesRecordResponse,
-            itemSortOrderResponse,
         ] = await Promise.all([
             fetch('/sales-api/sales-plan-uploads?limit=1000'),
             fetch('/sales-api/sales-channels?limit=500'),
@@ -7172,7 +7142,6 @@ async function loadData() {
             fetch('/sales-api/base-material-masters?limit=1000'),
             fetch('/sales-api/monthly-closings?limit=5000'),
             fetch('/sales-api/monthly-sales-records?limit=5000'),
-            fetch('/sales-api/item-sort-orders'),
         ]);
 
         let snopRecords = await snopRecordsPromise;
@@ -7396,18 +7365,6 @@ async function loadData() {
         }
         state.monthlySalesRecords = monthlySalesRecordData;
 
-        /* ── item-sort-orders (자재 정렬순서) ── */
-        let itemSortOrderData = [];
-        if (itemSortOrderResponse && itemSortOrderResponse.ok) {
-            const isoPayload = await safeJson(itemSortOrderResponse, { data: [] }, { label: '자재정렬순서' });
-            itemSortOrderData = extractData(isoPayload);
-        } else if (itemSortOrderResponse && !itemSortOrderResponse.ok) {
-            console.warn('자재 정렬순서 데이터를 불러오는 중 문제가 발생했습니다. 빈 목록을 사용합니다.');
-        }
-        state.itemSortOrderList = itemSortOrderData;
-        state.itemSortOrders = buildItemSortOrderIndex(itemSortOrderData);
-        console.info(`[loadData] item-sort-orders: ${itemSortOrderData.length}건`);
-
         let salesData = [];
         if (salesResponse && salesResponse.ok) {
             const salesPayload = await safeJson(salesResponse, { data: [] }, { label: '판매 계획 업로드' });
@@ -7567,11 +7524,10 @@ async function loadData() {
  * 경량 새로고침 — 변경 가능성이 높은 데이터만 서버에서 다시 가져옴.
  * 마스터성 데이터(채널, 라인자재마스터, 리뉴얼연결 등)는 기존 캐시 유지.
  *
- * 재호출 대상 (10개):
+ * 재호출 대상 (8개):
  *   snop-records, sales-plan-uploads, sales-plan-upload-history,
  *   line-capa-plans, optimal-inventory-baselines, base-material-masters,
- *   monthly-closings, monthly-sales-records, recent-sales-averages,
- *   item-sort-orders
+ *   monthly-closings, monthly-sales-records, recent-sales-averages
  */
 async function refreshData() {
     try {
@@ -7589,7 +7545,6 @@ async function refreshData() {
             baseMaterialMasterResponse,
             monthlyClosingResponse,
             monthlySalesRecordResponse,
-            itemSortOrderResponse,
         ] = await Promise.all([
             fetch('/sales-api/sales-plan-uploads?limit=1000'),
             fetch('/sales-api/line-capa-plans?limit=1000'),
@@ -7599,7 +7554,6 @@ async function refreshData() {
             fetch('/sales-api/base-material-masters?limit=1000'),
             fetch('/sales-api/monthly-closings?limit=5000'),
             fetch('/sales-api/monthly-sales-records?limit=5000'),
-            fetch('/sales-api/item-sort-orders'),
         ]);
 
         /* ── snop-records ── */
@@ -7693,13 +7647,6 @@ async function refreshData() {
             msrData = extractData(await safeJson(monthlySalesRecordResponse, { data: [] }, { label: '월별판매실적 (refresh)' }));
         }
         state.monthlySalesRecords = msrData;
-
-        /* ── item-sort-orders ── */
-        if (itemSortOrderResponse && itemSortOrderResponse.ok) {
-            const isoData = extractData(await safeJson(itemSortOrderResponse, { data: [] }, { label: '자재정렬순서 (refresh)' }));
-            state.itemSortOrderList = isoData;
-            state.itemSortOrders = buildItemSortOrderIndex(isoData);
-        }
 
         /* ── sales-plan-uploads ── */
         let salesData = [];
@@ -9641,8 +9588,6 @@ function renderTable() {
     }
 
     const fragment = document.createDocumentFragment();
-    /* 카테고리 내 item_code별 첫 행 추적 — 화살표 버튼은 첫 행에만 표시 */
-    const seenCategoryItems = new Set();
     state.filteredData.forEach((record) => {
         const row = dom.rowTemplate.content.firstElementChild.cloneNode(true);
         row.dataset.recordId = record.id;
@@ -9830,56 +9775,31 @@ function renderTable() {
         const monthCell = row.querySelector('[data-field="month"]');
         monthCell.textContent = sanitizeText(record.month);
 
-        /* ── 우선순위 셀 (카테고리별 순서, ↑↓ 화살표 + 순번 표시) ── */
+        /* ── 우선순위 셀 (카테고리별 순서, 인라인 편집) ── */
         const priorityCell = row.querySelector('[data-field="priority"]');
         if (priorityCell) {
             priorityCell.textContent = '';
-            const cat = sanitizeText(record.category).trim();
-            const code = sanitizeText(record.item_code).trim();
-            const catItemKey = `${cat}|${code}`;
-            const isFirstRow = !seenCategoryItems.has(catItemKey);
-            if (isFirstRow) seenCategoryItems.add(catItemKey);
-
-            const sortVal = getItemSortOrder(cat, code);
-            if (isFirstRow) {
-                /* 첫 행에만 ↑↓ 화살표 버튼 표시 */
-                const wrapper = document.createElement('div');
-                wrapper.className = 'sort-arrow-wrapper';
-
-                const upBtn = document.createElement('button');
-                upBtn.type = 'button';
-                upBtn.className = 'sort-arrow-btn sort-arrow-up';
-                upBtn.textContent = '▲';
-                upBtn.title = '위로 이동';
-                upBtn.dataset.category = cat;
-                upBtn.dataset.itemCode = code;
-                upBtn.addEventListener('click', () => handleSortOrderMove('up', cat, code));
-
-                const orderSpan = document.createElement('span');
-                orderSpan.className = 'sort-order-label';
-                orderSpan.textContent = sortVal < 999999 ? sortVal : '';
-                orderSpan.title = '카테고리 내 정렬 순서';
-
-                const downBtn = document.createElement('button');
-                downBtn.type = 'button';
-                downBtn.className = 'sort-arrow-btn sort-arrow-down';
-                downBtn.textContent = '▼';
-                downBtn.title = '아래로 이동';
-                downBtn.dataset.category = cat;
-                downBtn.dataset.itemCode = code;
-                downBtn.addEventListener('click', () => handleSortOrderMove('down', cat, code));
-
-                wrapper.appendChild(upBtn);
-                wrapper.appendChild(orderSpan);
-                wrapper.appendChild(downBtn);
-                priorityCell.appendChild(wrapper);
-            } else {
-                /* 같은 자재의 2행 이후 — 순번만 연하게 표시 */
-                const dimSpan = document.createElement('span');
-                dimSpan.className = 'sort-order-dim';
-                dimSpan.textContent = sortVal < 999999 ? sortVal : '';
-                priorityCell.appendChild(dimSpan);
-            }
+            const priInput = document.createElement('input');
+            priInput.type = 'text';
+            priInput.inputMode = 'numeric';
+            priInput.pattern = '[0-9]*';
+            priInput.maxLength = 3;
+            priInput.className = 'inline-input priority-input';
+            priInput.dataset.recordId = record.id;
+            priInput.value = Number.isFinite(record.priority) ? record.priority : '';
+            priInput.style.textAlign = 'center';
+            priInput.title = '카테고리 내 우선순위 (숫자가 낮을수록 높은 우선순위, 최대 999)';
+            priInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); priInput.blur(); }
+            });
+            /* 숫자 외 문자 입력 방지 */
+            priInput.addEventListener('input', () => {
+                priInput.value = priInput.value.replace(/[^0-9]/g, '').slice(0, 3);
+            });
+            priInput.addEventListener('change', () => {
+                handleInlinePriorityChange(record.id, priInput.value);
+            });
+            priorityCell.appendChild(priInput);
         }
 
         const salesCell = row.querySelector('[data-field="sales_plan"]');
@@ -15102,53 +15022,7 @@ async function handleInlineProductionChange(recordId, rawValue) {
     await loadData();
 }
 
-/* ── 자재 정렬순서 ↑↓ 이동 핸들러 ── */
-async function handleSortOrderMove(direction, category, itemCode) {
-    try {
-        /* 이동 전 — 해당 카테고리의 모든 자재를 sort_order 테이블에 자동 등록(미등록분) */
-        const catItemCodes = [];
-        const seen = new Set();
-        (state.filteredData || []).forEach((r) => {
-            const c = sanitizeText(r.category).trim();
-            const code = sanitizeText(r.item_code).trim();
-            if (c === category && code && !seen.has(code)) {
-                seen.add(code);
-                catItemCodes.push(code);
-            }
-        });
-        if (catItemCodes.length > 0) {
-            await fetch('/sales-api/item-sort-orders/ensure', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ category, item_codes: catItemCodes }),
-            });
-        }
-
-        const endpoint = direction === 'up' ? 'move-up' : 'move-down';
-        const resp = await fetch(
-            `/sales-api/item-sort-orders/${endpoint}?category=${encodeURIComponent(category)}&item_code=${encodeURIComponent(itemCode)}`,
-            { method: 'POST' }
-        );
-        if (!resp.ok) {
-            throw new Error('HTTP ' + resp.status);
-        }
-
-        /* 정렬순서만 다시 로드 → 테이블 재렌더 */
-        const refreshResp = await fetch('/sales-api/item-sort-orders');
-        if (refreshResp.ok) {
-            const payload = await refreshResp.json();
-            const data = extractData(payload);
-            state.itemSortOrderList = data;
-            state.itemSortOrders = buildItemSortOrderIndex(data);
-        }
-        applyFilters();
-    } catch (error) {
-        console.error('정렬순서 이동 실패:', error);
-        alert('정렬순서 변경에 실패했습니다.');
-    }
-}
-
-/* ── 우선순위 인라인 변경 핸들러 (레거시 — snop_record.priority) ──
+/* ── 우선순위 인라인 변경 핸들러 ──
    카테고리별 우선순위 숫자를 변경하면 API에 즉시 저장 */
 async function handleInlinePriorityChange(recordId, rawValue) {
     const record = state.rawData.find((r) => r && r.id == recordId);
@@ -17913,39 +17787,6 @@ async function handleBulkUploadStart() {
             }
         }
 
-        /* ── 생산계획 업로드 시 엑셀에 우선순위가 포함된 경우 ItemSortOrder 일괄 반영 ── */
-        if (target === BULK_TARGETS.PRODUCTION) {
-            const sortOrderDtos = [];
-            const seenSortKeys = new Set();
-            for (const record of validRecords) {
-                const pri = record.priority;
-                if (pri !== null && Number.isFinite(pri) && pri >= 1) {
-                    const cat = sanitizeText(record.payload.category).trim();
-                    const code = sanitizeText(record.payload.item_code).trim();
-                    const sortKey = `${cat}|${code}`;
-                    if (cat && code && !seenSortKeys.has(sortKey)) {
-                        seenSortKeys.add(sortKey);
-                        sortOrderDtos.push({ category: cat, item_code: code, sort_order: pri });
-                    }
-                }
-            }
-            if (sortOrderDtos.length > 0) {
-                try {
-                    const sortResp = await fetch('/sales-api/item-sort-orders/bulk', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(sortOrderDtos),
-                    });
-                    if (sortResp.ok) {
-                        const sortResult = await sortResp.json();
-                        console.info(`[엑셀 업로드] 정렬순서 ${sortOrderDtos.length}건 반영:`, sortResult);
-                    }
-                } catch (sortError) {
-                    console.warn('정렬순서 일괄 반영 실패 (무시):', sortError);
-                }
-            }
-        }
-
         if (target === BULK_TARGETS.LINE_CAPA) {
             await refreshLineCapaPlans();
         } else if (target === BULK_TARGETS.LINE_MASTER) {
@@ -18007,11 +17848,11 @@ function handleBulkTemplateDownload(event) {
             sheetName = 'Monthly Sales Template';
             filePrefix = 'snop_monthly_sales_template';
         } else {
-            header = ['item_code', 'item_name', 'category', 'production_line', 'month', '우선순위', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
+            header = ['item_code', 'item_name', 'category', 'production_line', 'month', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
             sampleRows = [
-                ['BAT-100', '배터리 모듈', '에너지저장', '라인 2', '2025-05', 10, 1680, 600, 520, 650, '신규 수요 대응'],
-                ['CNT-210', '컨트롤러', '제어시스템', '라인 1', '2025-05', 20, 840, 210, 250, 320, '서비스 부품 재고 확보'],
-                ['MOD-330', '파워 모듈', '전력변환', '라인 3', '2025-05', 30, 920, 430, 450, 500, '시즌 초기 물량'],
+                ['BAT-100', '배터리 모듈', '에너지저장', '라인 2', '2025-05', 1680, 600, 520, 650, '신규 수요 대응'],
+                ['CNT-210', '컨트롤러', '제어시스템', '라인 1', '2025-05', 840, 210, 250, 320, '서비스 부품 재고 확보'],
+                ['MOD-330', '파워 모듈', '전력변환', '라인 3', '2025-05', 920, 430, 450, 500, '시즌 초기 물량'],
             ];
             sheetName = 'Production Template';
             filePrefix = 'snop_production_template';
@@ -18965,14 +18806,14 @@ function exportProductionTableXlsx() {
         '비고',
     ];
 
-    /* 엑셀 내보내기 시 카테고리별 → ItemSortOrder 기반 정렬 */
+    /* 엑셀 내보내기 시 카테고리별 → 우선순위별 정렬 */
     const sortedRecords = [...tableRecords].sort((a, b) => {
         const catA = sanitizeText(a.category).trim();
         const catB = sanitizeText(b.category).trim();
         if (catA !== catB) return catA.localeCompare(catB, 'ko-KR');
-        const sortA = getItemSortOrder(a.category, a.item_code);
-        const sortB = getItemSortOrder(b.category, b.item_code);
-        if (sortA !== sortB) return sortA - sortB;
+        const priA = Number.isFinite(a.priority) ? a.priority : 999999;
+        const priB = Number.isFinite(b.priority) ? b.priority : 999999;
+        if (priA !== priB) return priA - priB;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));
     });
 
@@ -18989,10 +18830,7 @@ function exportProductionTableXlsx() {
 
         return {
             '계획 월': sanitizeText(record.month),
-            '우선순위': (() => {
-                const so = getItemSortOrder(record.category, record.item_code);
-                return so < 999999 ? so : null;
-            })(),
+            '우선순위': Number.isFinite(record.priority) ? record.priority : null,
             '카테고리': sanitizeText(record.category),
             '자재 코드': sanitizeText(record.item_code),
             '자재 명칭': sanitizeText(record.item_name),
@@ -19105,14 +18943,14 @@ function exportCsv() {
         '비고',
     ];
 
-    /* CSV 내보내기 시 카테고리별 → ItemSortOrder 기반 정렬 */
+    /* CSV 내보내기 시 카테고리별 → 우선순위별 정렬 */
     const sortedCsvData = [...state.filteredData].sort((a, b) => {
         const catA = sanitizeText(a.category).trim();
         const catB = sanitizeText(b.category).trim();
         if (catA !== catB) return catA.localeCompare(catB, 'ko-KR');
-        const sortA = getItemSortOrder(a.category, a.item_code);
-        const sortB = getItemSortOrder(b.category, b.item_code);
-        if (sortA !== sortB) return sortA - sortB;
+        const priA = Number.isFinite(a.priority) ? a.priority : 999999;
+        const priB = Number.isFinite(b.priority) ? b.priority : 999999;
+        if (priA !== priB) return priA - priB;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));
     });
 
@@ -19122,7 +18960,7 @@ function exportCsv() {
             : '';
         return [
             record.month,
-            (() => { const so = getItemSortOrder(record.category, record.item_code); return so < 999999 ? so : ''; })(),
+            Number.isFinite(record.priority) ? record.priority : '',
             record.category,
             record.item_code,
             record.item_name,

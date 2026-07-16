@@ -271,22 +271,22 @@
                 </div>
             </section>
 
-            <!-- [2] 최근 3개월 판매실적 엑셀 업로드 -->
+            <!-- [2] 월별 판매실적 업로드 (월말마감 수동 보정용) -->
             <section class="recent-sales-upload planner-sub-section" data-planner-sub="sub-recent-sales" aria-labelledby="recent-sales-upload-title">
                 <div class="section-subheader">
                     <div>
-                        <h3 id="recent-sales-upload-title">최근 3개월 판매실적 엑셀 업로드</h3>
-                        <p>선택한 기준월의 -3월, -2월, -1월 판매실적을 한 번에 업로드하여 생산계획 현황의 최근 3개월 판매실적 평균에 반영합니다.</p>
+                        <h3 id="recent-sales-upload-title">월별 판매실적 업로드</h3>
+                        <p>RFC005(월말마감실적)로 자동 수집되지만, 긴급 보정이 필요한 경우 특정 월의 판매실적을 수동으로 업로드할 수 있습니다.</p>
                     </div>
                 </div>
                 <div class="recent-sales-upload-body">
                     <div class="sales-upload-layout recent-sales-upload-layout">
                         <div class="sales-upload-card">
                         <h4>업로드 설정</h4>
-                        <p>업로드할 기준월을 먼저 선택한 뒤 엑셀 파일을 업로드하세요. 업로드 값은 각 자재의 3개월 평균으로 계산됩니다.</p>
+                        <p>마감월을 선택하고 해당 월의 자재별 판매실적 파일을 업로드하세요. 기존 데이터가 있으면 덮어씁니다.</p>
                         <div class="form-grid condensed">
                             <label>
-                                업로드 기준월
+                                마감월
                                 <input type="month" id="recent-sales-base-month" required>
                             </label>
                         </div>
@@ -296,15 +296,15 @@
                             <button type="button" id="btn-recent-sales-upload-start" class="primary">업로드 실행</button>
                             <button type="button" id="btn-recent-sales-template" class="secondary">템플릿 다운로드 (XLSX)</button>
                         </div>
-                        <div id="recent-sales-upload-status" class="sales-status" aria-live="polite">업로드할 기준월과 파일을 선택하세요.</div>
+                        <div id="recent-sales-upload-status" class="sales-status" aria-live="polite">마감월과 파일을 선택하세요.</div>
                     </div>
                         <div class="sales-upload-card">
                             <h4>엑셀 템플릿 안내</h4>
                             <ul>
-                                <li>필수 컬럼: <strong>item_code, m3, m2, m1</strong></li>
-                                <li>m3 = 기준월의 -3개월, m2 = 기준월의 -2개월, m1 = 기준월의 -1개월 판매실적 수량</li>
+                                <li>필수 컬럼: <strong>item_code, sales_actual</strong></li>
+                                <li>item_code = 자재코드, sales_actual = 해당 마감월 판매실적 수량</li>
                                 <li>수량은 숫자로 입력하고 비어있는 값은 0으로 처리됩니다.</li>
-                                <li>업로드된 수량의 합을 3으로 나눈 평균값이 생산계획 현황의 최근 3개월 판매실적 평균에 반영됩니다.</li>
+                                <li>업로드하면 선택한 마감월의 월말마감 데이터(monthly-closings)에 반영됩니다.</li>
                             </ul>
                         </div>
                     </div>
@@ -1961,6 +1961,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260716a" defer></script>
+    <script src="js/main.js?v=20260716b" defer></script>
 </body>
 </html>

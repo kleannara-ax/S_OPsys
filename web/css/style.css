@@ -2563,6 +2563,40 @@ textarea.row-edit-input {
     text-align: center;
 }
 
+/* ── 자재 정렬순서 ↑↓ 화살표 ── */
+.sort-arrow-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+.sort-arrow-btn {
+    background: none;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.65rem;
+    line-height: 1;
+    padding: 2px 4px;
+    color: var(--text-color, #1f2937);
+    transition: background 0.15s;
+}
+.sort-arrow-btn:hover {
+    background: var(--primary-light, #dbeafe);
+}
+.sort-order-label {
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    min-width: 20px;
+    text-align: center;
+    color: var(--text-color, #1f2937);
+}
+.sort-order-dim {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-variant-numeric: tabular-nums;
+}
+
 /* ── 기본 자재마스터 등록상태 배지 ── */
 .col-register-status {
     text-align: center;

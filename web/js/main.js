@@ -18423,14 +18423,31 @@ const recentSalesViewDom = {
     filterItem: document.querySelector('#recent-sales-view-filter-item'),
     filterMonth: document.querySelector('#recent-sales-view-filter-month'),
     table: document.querySelector('#recent-sales-view-table'),
+    thead: document.querySelector('#recent-sales-view-thead'),
     tbody: document.querySelector('#recent-sales-view-table tbody'),
     empty: document.querySelector('#recent-sales-view-empty'),
 };
 
-function buildRecentSalesViewData() {
+/* ── 월 연산 헬퍼 ── */
+function subtractMonths(yyyyMM, n) {
+    /* 'YYYY-MM' 문자열에서 n개월 전 'YYYY-MM' 반환 */
+    const [y, m] = yyyyMM.split('-').map(Number);
+    const d = new Date(y, m - 1 - n, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function generateMonthColumns(baseMonth, count) {
+    /* baseMonth(기준년월)의 n-1 ~ n-count 까지 count개월 리스트 (오래된순) */
+    const cols = [];
+    for (let i = count; i >= 1; i--) {
+        cols.push(subtractMonths(baseMonth, i));
+    }
+    return cols;
+}
+
+function buildRecentSalesViewData(baseMonth) {
     /* ── 월말마감(RFC005) 데이터 기반 판매실적 현황 ──
-     * state.monthlyClosings의 sales_actual을 item_code별·closing_month별로 표시.
-     * 각 행마다 해당 마감월 기준 최근 3/6/12개월 판매실적 평균을 계산. */
+     * baseMonth 기준 이전 12개월(n-12 ~ n-1)의 월별 판매실적을 품목별 1행으로 집계.
+     * 각 행에 3/6/12개월 평균 포함. */
     const closings = state.monthlyClosings || [];
     const masters = state.baseMaterialMasters || [];
     const snopRecords = state.rawData || [];
@@ -18456,65 +18473,99 @@ function buildRecentSalesViewData() {
         }
     });
 
-    /* item_code → [{closing_month, sales_actual}] 맵 구축 (평균 계산용) */
+    /* item_code → { month → salesActual } 맵 구축 */
     const itemMonthlyMap = new Map();
     closings.forEach((mc) => {
         const code = sanitizeText(mc.item_code).trim().toUpperCase();
         const month = sanitizeText(mc.closing_month).trim();
         if (!code || !month) return;
-        if (!itemMonthlyMap.has(code)) itemMonthlyMap.set(code, []);
-        itemMonthlyMap.get(code).push({ month, salesActual: toNumber(mc.sales_actual) });
+        if (!itemMonthlyMap.has(code)) itemMonthlyMap.set(code, new Map());
+        /* 동일 item_code + month 중복 시 합산 */
+        const mMap = itemMonthlyMap.get(code);
+        mMap.set(month, (mMap.get(month) || 0) + toNumber(mc.sales_actual));
     });
-    /* 각 자재별 월 오름차순 정렬 */
-    itemMonthlyMap.forEach((list) => list.sort((a, b) => a.month.localeCompare(b.month)));
 
-    /* N개월 평균 계산 헬퍼: targetMonth 이하 최근 N개월 */
-    function calcAvg(list, targetMonth, nMonths) {
-        const eligible = list.filter((e) => e.month <= targetMonth);
-        const recent = eligible.slice(-nMonths);
+    /* 표시할 12개월 컬럼 */
+    const monthCols = generateMonthColumns(baseMonth, 12);
+    /* 평균 계산에 사용할 가장 최근 월 = baseMonth의 n-1 */
+    const latestMonth = monthCols[monthCols.length - 1];
+
+    /* N개월 평균 계산 헬퍼 */
+    function calcAvg(monthMap, refMonth, nMonths) {
+        /* refMonth 이하 최근 nMonths개월 평균 */
+        const allMonths = Array.from(monthMap.keys()).filter((m) => m <= refMonth).sort();
+        const recent = allMonths.slice(-nMonths);
         if (recent.length === 0) return 0;
-        const sum = recent.reduce((s, e) => s + e.salesActual, 0);
+        const sum = recent.reduce((s, m) => s + (monthMap.get(m) || 0), 0);
         return Math.round(sum / recent.length);
     }
 
-    return closings.map((mc) => {
-        const code = sanitizeText(mc.item_code).trim().toUpperCase();
-        const month = sanitizeText(mc.closing_month).trim();
+    /* 품목별 행 생성 — 12개월 중 최소 1개월 데이터가 있는 품목만 */
+    const rows = [];
+    itemMonthlyMap.forEach((monthMap, code) => {
+        const hasDataInRange = monthCols.some((m) => monthMap.has(m));
+        if (!hasDataInRange) return;
+
         const info = itemInfoMap.get(code) || {};
-        const list = itemMonthlyMap.get(code) || [];
-        return {
-            category: info.category || mc.hierarchy_name || '미지정',
-            item_code: mc.item_code || '',
-            item_name: info.item_name || mc.item_name || '',
-            closing_month: month,
-            sales_actual: toNumber(mc.sales_actual),
-            avg3: calcAvg(list, month, 3),
-            avg6: calcAvg(list, month, 6),
-            avg12: calcAvg(list, month, 12),
-        };
-    }).filter((d) => !isExcludedCategory(d.category));
+        const category = info.category || '미지정';
+        if (isExcludedCategory(category)) return;
+
+        const monthlySales = {};
+        monthCols.forEach((m) => {
+            monthlySales[m] = monthMap.get(m) ?? null;
+        });
+
+        rows.push({
+            category,
+            item_code: code,
+            item_name: info.item_name || '',
+            monthlySales,
+            avg3: calcAvg(monthMap, latestMonth, 3),
+            avg6: calcAvg(monthMap, latestMonth, 6),
+            avg12: calcAvg(monthMap, latestMonth, 12),
+        });
+    });
+    return { rows, monthCols };
 }
 
-function populateRecentSalesViewFilters(viewData) {
+function populateRecentSalesViewFilters() {
     if (!recentSalesViewDom.filterCategory) return;
 
+    const closings = state.monthlyClosings || [];
+    const masters = state.baseMaterialMasters || [];
+    const snopRecords = state.rawData || [];
+
+    /* 카테고리 / 자재코드 옵션은 전체 데이터에서 추출 */
     const categorySet = new Set();
     const itemSet = new Set();
     const monthSet = new Set();
 
-    viewData.forEach((d) => {
-        if (d.category) categorySet.add(d.category);
-        if (d.item_code) itemSet.add(d.item_code);
-        if (d.closing_month) monthSet.add(d.closing_month);
+    const itemInfoMap = new Map();
+    masters.forEach((m) => {
+        const code = sanitizeText(m.item_code).trim().toUpperCase();
+        if (code) itemInfoMap.set(code, m.hierarchy_name || '');
+    });
+    snopRecords.forEach((r) => {
+        const code = sanitizeText(r.item_code).trim().toUpperCase();
+        if (code && !itemInfoMap.has(code)) itemInfoMap.set(code, r.category || '');
+    });
+
+    closings.forEach((mc) => {
+        const code = sanitizeText(mc.item_code).trim().toUpperCase();
+        const month = sanitizeText(mc.closing_month).trim();
+        const cat = itemInfoMap.get(code) || mc.hierarchy_name || '';
+        if (cat && !isExcludedCategory(cat)) categorySet.add(cat);
+        if (code) itemSet.add(code);
+        if (month) monthSet.add(month);
     });
 
     const prevCategory = recentSalesViewDom.filterCategory.value;
     const prevItem = recentSalesViewDom.filterItem.value;
     const prevMonth = recentSalesViewDom.filterMonth.value;
 
-    const fillSelect = (sel, options, prev) => {
+    const fillSelect = (sel, options, prev, defaultLabel) => {
         const sorted = Array.from(options).sort((a, b) => a.localeCompare(b));
-        sel.innerHTML = '<option value="all">전체</option>';
+        sel.innerHTML = `<option value="all">${defaultLabel || '전체'}</option>`;
         sorted.forEach((v) => {
             const opt = document.createElement('option');
             opt.value = v;
@@ -18524,41 +18575,116 @@ function populateRecentSalesViewFilters(viewData) {
         if (prev && sorted.includes(prev)) sel.value = prev;
     };
 
-    fillSelect(recentSalesViewDom.filterCategory, categorySet, prevCategory);
-    fillSelect(recentSalesViewDom.filterItem, itemSet, prevItem);
-    fillSelect(recentSalesViewDom.filterMonth, monthSet, prevMonth);
+    fillSelect(recentSalesViewDom.filterCategory, categorySet, prevCategory, '전체');
+    fillSelect(recentSalesViewDom.filterItem, itemSet, prevItem, '전체');
+
+    /* 기준년월: 월 목록에서 +1개월 한 값들을 옵션으로 표시 (선택 시 이전 12개월 표시) */
+    const baseMonthSet = new Set();
+    monthSet.forEach((m) => {
+        /* 데이터가 있는 각 월 m → m+1을 기준년월 후보로 추가 */
+        const [y, mo] = m.split('-').map(Number);
+        const d = new Date(y, mo, 1); /* mo는 0-indexed+1이므로 다음 달 */
+        const bm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        baseMonthSet.add(bm);
+    });
+    /* 현재 년월도 추가 */
+    const now = new Date();
+    const currentYM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    baseMonthSet.add(currentYM);
+
+    const sortedMonths = Array.from(baseMonthSet).sort((a, b) => b.localeCompare(a));
+    recentSalesViewDom.filterMonth.innerHTML = '<option value="">선택</option>';
+    sortedMonths.forEach((v) => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        recentSalesViewDom.filterMonth.appendChild(opt);
+    });
+    /* 이전 선택값 복원, 없으면 최신 월 자동 선택 */
+    if (prevMonth && sortedMonths.includes(prevMonth)) {
+        recentSalesViewDom.filterMonth.value = prevMonth;
+    } else if (sortedMonths.length > 0) {
+        recentSalesViewDom.filterMonth.value = sortedMonths[0];
+    }
 }
 
 function renderRecentSalesViewTable() {
     if (!recentSalesViewDom.tbody) return;
 
-    const viewData = buildRecentSalesViewData();
-    populateRecentSalesViewFilters(viewData);
+    populateRecentSalesViewFilters();
+
+    const baseMonth = recentSalesViewDom.filterMonth ? recentSalesViewDom.filterMonth.value : '';
+    if (!baseMonth) {
+        recentSalesViewDom.tbody.innerHTML = '';
+        if (recentSalesViewDom.thead) recentSalesViewDom.thead.innerHTML = '';
+        if (recentSalesViewDom.empty) {
+            recentSalesViewDom.empty.textContent = '기준년월을 선택하세요.';
+            recentSalesViewDom.empty.classList.remove('hidden');
+        }
+        if (recentSalesViewDom.table) recentSalesViewDom.table.style.display = 'none';
+        return;
+    }
+
+    const { rows, monthCols } = buildRecentSalesViewData(baseMonth);
 
     const catFilter = recentSalesViewDom.filterCategory ? recentSalesViewDom.filterCategory.value : 'all';
     const itemFilter = recentSalesViewDom.filterItem ? recentSalesViewDom.filterItem.value : 'all';
-    const monthFilter = recentSalesViewDom.filterMonth ? recentSalesViewDom.filterMonth.value : 'all';
 
-    const filtered = viewData.filter((d) => {
+    const filtered = rows.filter((d) => {
         if (catFilter !== 'all' && d.category !== catFilter) return false;
         if (itemFilter !== 'all' && d.item_code !== itemFilter) return false;
-        if (monthFilter !== 'all' && d.closing_month !== monthFilter) return false;
         return true;
     });
 
-    /* 정렬: 카테고리 → 자재코드 → 마감월 */
+    /* 정렬: 카테고리 → 자재코드 */
     filtered.sort((a, b) => {
         const c = a.category.localeCompare(b.category);
         if (c !== 0) return c;
-        const i = a.item_code.localeCompare(b.item_code);
-        if (i !== 0) return i;
-        return a.closing_month.localeCompare(b.closing_month);
+        return a.item_code.localeCompare(b.item_code);
     });
 
+    /* ── thead 동적 생성 ── */
+    if (recentSalesViewDom.thead) {
+        const tr = document.createElement('tr');
+        const fixedHeaders = [
+            { text: '카테고리', cls: '' },
+            { text: '자재코드', cls: '' },
+            { text: '자재명칭', cls: '' },
+        ];
+        fixedHeaders.forEach((h) => {
+            const th = document.createElement('th');
+            th.textContent = h.text;
+            if (h.cls) th.className = h.cls;
+            tr.appendChild(th);
+        });
+        /* 월별 컬럼 헤더 */
+        monthCols.forEach((m) => {
+            const th = document.createElement('th');
+            th.className = 'number';
+            /* 'YYYY-MM' → 'YY.MM' 형태로 간결하게 표시 */
+            const [y, mo] = m.split('-');
+            th.innerHTML = `${y.slice(2)}.${mo}<br><span class="unit-label">BOX</span>`;
+            tr.appendChild(th);
+        });
+        /* 평균 컬럼 헤더 */
+        ['3개월<br>평균', '6개월<br>평균', '12개월<br>평균'].forEach((label) => {
+            const th = document.createElement('th');
+            th.className = 'number';
+            th.innerHTML = `${label}<br><span class="unit-label">BOX</span>`;
+            tr.appendChild(th);
+        });
+        recentSalesViewDom.thead.innerHTML = '';
+        recentSalesViewDom.thead.appendChild(tr);
+    }
+
+    /* ── tbody ── */
     recentSalesViewDom.tbody.innerHTML = '';
 
     if (filtered.length === 0) {
-        if (recentSalesViewDom.empty) recentSalesViewDom.empty.classList.remove('hidden');
+        if (recentSalesViewDom.empty) {
+            recentSalesViewDom.empty.textContent = '월말마감 판매실적 데이터가 없습니다.';
+            recentSalesViewDom.empty.classList.remove('hidden');
+        }
         if (recentSalesViewDom.table) recentSalesViewDom.table.style.display = 'none';
         return;
     }
@@ -18566,25 +18692,29 @@ function renderRecentSalesViewTable() {
     if (recentSalesViewDom.empty) recentSalesViewDom.empty.classList.add('hidden');
     if (recentSalesViewDom.table) recentSalesViewDom.table.style.display = '';
 
-    const fmt = (v) => Number.isFinite(v) ? v.toLocaleString('ko-KR') : String(v ?? 0);
+    const fmt = (v) => (v !== null && Number.isFinite(v)) ? v.toLocaleString('ko-KR') : '-';
 
     const fragment = document.createDocumentFragment();
     filtered.forEach((d) => {
         const tr = document.createElement('tr');
-        const fields = [
-            { value: d.category, cls: '' },
-            { value: d.item_code, cls: '' },
-            { value: d.item_name, cls: '' },
-            { value: d.closing_month, cls: '' },
-            { value: fmt(d.sales_actual), cls: 'number' },
-            { value: fmt(d.avg3), cls: 'number' },
-            { value: fmt(d.avg6), cls: 'number' },
-            { value: fmt(d.avg12), cls: 'number' },
-        ];
-        fields.forEach((f) => {
+        /* 고정 컬럼 */
+        [d.category, d.item_code, d.item_name].forEach((v) => {
             const td = document.createElement('td');
-            td.textContent = f.value || '-';
-            if (f.cls) td.className = f.cls;
+            td.textContent = v || '-';
+            tr.appendChild(td);
+        });
+        /* 월별 판매실적 */
+        monthCols.forEach((m) => {
+            const td = document.createElement('td');
+            td.className = 'number';
+            td.textContent = fmt(d.monthlySales[m]);
+            tr.appendChild(td);
+        });
+        /* 평균 */
+        [d.avg3, d.avg6, d.avg12].forEach((v) => {
+            const td = document.createElement('td');
+            td.className = 'number';
+            td.textContent = fmt(v);
             tr.appendChild(td);
         });
         fragment.appendChild(tr);

@@ -19757,7 +19757,7 @@ function bindEvents() {
     updateLineCapaComputedField();
 
     if (dom.bulk.open) {
-        dom.bulk.open.addEventListener('click', () => openBulkUploadModal(BULK_TARGETS.PRODUCTION));
+        dom.bulk.open.addEventListener('click', () => openBulkUploadModal(BULK_TARGETS.PRODUCTION, { singleMode: true }));
     }
     if (dom.bulk.openLineCapa) {
         dom.bulk.openLineCapa.addEventListener('click', () => openBulkUploadModal(BULK_TARGETS.LINE_CAPA, { singleMode: true }));

@@ -358,6 +358,7 @@ const state = {
     baseMaterialMasterFilters: { scm: 'all' },
     monthlyClosings: [],
     monthlyClosingIndex: new Map(),
+    monthlySalesRecords: [],
     /** 생산계획 현황 테이블 준비 상태 — 첫 로드 시 false, 필터 조작 후 true */
     planTableReady: false,
     /** 멀티탭 — 열린 탭 목록 (viewId 배열, 순서 = 탭 순서) */
@@ -7125,6 +7126,7 @@ async function loadData() {
             recentSalesResponse,
             baseMaterialMasterResponse,
             monthlyClosingResponse,
+            monthlySalesRecordResponse,
         ] = await Promise.all([
             fetch('/sales-api/sales-plan-uploads?limit=1000'),
             fetch('/sales-api/sales-channels?limit=500'),
@@ -7139,6 +7141,7 @@ async function loadData() {
             fetch('/sales-api/recent-sales-averages?limit=1000&sort=-created_at'),
             fetch('/sales-api/base-material-masters?limit=1000'),
             fetch('/sales-api/monthly-closings?limit=5000'),
+            fetch('/sales-api/monthly-sales-records?limit=5000'),
         ]);
 
         let snopRecords = await snopRecordsPromise;
@@ -7352,6 +7355,16 @@ async function loadData() {
             }
         });
 
+        /* ── 월별 판매실적 (monthly-sales-records) 로드 ── */
+        let monthlySalesRecordData = [];
+        if (monthlySalesRecordResponse && monthlySalesRecordResponse.ok) {
+            const msrPayload = await safeJson(monthlySalesRecordResponse, { data: [] }, { label: '월별판매실적' });
+            monthlySalesRecordData = extractData(msrPayload);
+        } else if (monthlySalesRecordResponse && !monthlySalesRecordResponse.ok) {
+            console.warn('월별 판매실적 데이터를 불러오는 중 문제가 발생했습니다. 빈 목록을 사용합니다.');
+        }
+        state.monthlySalesRecords = monthlySalesRecordData;
+
         let salesData = [];
         if (salesResponse && salesResponse.ok) {
             const salesPayload = await safeJson(salesResponse, { data: [] }, { label: '판매 계획 업로드' });
@@ -7514,7 +7527,7 @@ async function loadData() {
  * 재호출 대상 (8개):
  *   snop-records, sales-plan-uploads, sales-plan-upload-history,
  *   line-capa-plans, optimal-inventory-baselines, base-material-masters,
- *   monthly-closings, recent-sales-averages
+ *   monthly-closings, monthly-sales-records, recent-sales-averages
  */
 async function refreshData() {
     try {
@@ -7531,6 +7544,7 @@ async function refreshData() {
             recentSalesResponse,
             baseMaterialMasterResponse,
             monthlyClosingResponse,
+            monthlySalesRecordResponse,
         ] = await Promise.all([
             fetch('/sales-api/sales-plan-uploads?limit=1000'),
             fetch('/sales-api/line-capa-plans?limit=1000'),
@@ -7539,6 +7553,7 @@ async function refreshData() {
             fetch('/sales-api/recent-sales-averages?limit=1000&sort=-created_at'),
             fetch('/sales-api/base-material-masters?limit=1000'),
             fetch('/sales-api/monthly-closings?limit=5000'),
+            fetch('/sales-api/monthly-sales-records?limit=5000'),
         ]);
 
         /* ── snop-records ── */
@@ -7625,6 +7640,13 @@ async function refreshData() {
                 state.monthlyClosingByMonth.get(m).push(mc);
             }
         });
+
+        /* ── monthly-sales-records ── */
+        let msrData = [];
+        if (monthlySalesRecordResponse && monthlySalesRecordResponse.ok) {
+            msrData = extractData(await safeJson(monthlySalesRecordResponse, { data: [] }, { label: '월별판매실적 (refresh)' }));
+        }
+        state.monthlySalesRecords = msrData;
 
         /* ── sales-plan-uploads ── */
         let salesData = [];
@@ -18333,7 +18355,7 @@ async function handleRecentSalesUploadStart() {
             setRecentSalesUploadStatus(`총 ${validRecords.length}건의 데이터를 업로드합니다.`);
         }
 
-        /* ── monthly-closings bulk upsert API 호출 ── */
+        /* ── monthly-sales-records bulk upsert API 호출 ── */
         const masters = state.baseMaterialMasters || [];
         const masterMap = new Map();
         masters.forEach((m) => {
@@ -18351,10 +18373,11 @@ async function handleRecentSalesUploadStart() {
                 closing_month: closingMonth,
                 sales_actual: r.payload.sales_actual,
                 unit: 'BOX',
+                source: 'UPLOAD',
             };
         });
 
-        const bulkResponse = await fetch(`/sales-api/monthly-closings/bulk/${closingMonth}`, {
+        const bulkResponse = await fetch(`/sales-api/monthly-sales-records/bulk/${closingMonth}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(bulkPayload),
@@ -18362,7 +18385,7 @@ async function handleRecentSalesUploadStart() {
 
         if (!bulkResponse.ok) {
             const errText = await bulkResponse.text().catch(() => '');
-            throw new Error(`월말마감 데이터 업로드 실패 (${bulkResponse.status}): ${errText}`);
+            throw new Error(`판매실적 데이터 업로드 실패 (${bulkResponse.status}): ${errText}`);
         }
 
         const result = await safeJson(bulkResponse, {}, { label: '판매실적 업로드' });
@@ -18445,10 +18468,10 @@ function generateMonthColumns(baseMonth, count) {
 }
 
 function buildRecentSalesViewData(baseMonth) {
-    /* ── 월말마감(RFC005) 데이터 기반 판매실적 현황 ──
+    /* ── 월별 판매실적(monthly-sales-records) 기반 현황 ──
      * baseMonth 기준 이전 12개월(n-12 ~ n-1)의 월별 판매실적을 품목별 1행으로 집계.
      * 각 행에 3/6/12개월 평균 포함. */
-    const closings = state.monthlyClosings || [];
+    const closings = state.monthlySalesRecords || [];
     const masters = state.baseMaterialMasters || [];
     const snopRecords = state.rawData || [];
 
@@ -18531,7 +18554,7 @@ function buildRecentSalesViewData(baseMonth) {
 function populateRecentSalesViewFilters() {
     if (!recentSalesViewDom.filterCategory) return;
 
-    const closings = state.monthlyClosings || [];
+    const closings = state.monthlySalesRecords || [];
     const masters = state.baseMaterialMasters || [];
     const snopRecords = state.rawData || [];
 

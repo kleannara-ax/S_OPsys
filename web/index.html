@@ -328,27 +328,16 @@
                                 </select>
                             </label>
                             <label>
-                                마감월
+                                기준년월
                                 <select id="recent-sales-view-filter-month">
-                                    <option value="all">전체</option>
+                                    <option value="">선택</option>
                                 </select>
                             </label>
                         </div>
                     </div>
                     <div class="table-wrapper compact recent-sales-view-table-wrapper">
                         <table id="recent-sales-view-table">
-                            <thead>
-                                <tr>
-                                    <th>카테고리</th>
-                                    <th>자재코드</th>
-                                    <th>자재명칭</th>
-                                    <th>마감월</th>
-                                    <th class="number">판매실적<br><span class="unit-label">BOX</span></th>
-                                    <th class="number">3개월 평균<br><span class="unit-label">BOX</span></th>
-                                    <th class="number">6개월 평균<br><span class="unit-label">BOX</span></th>
-                                    <th class="number">12개월 평균<br><span class="unit-label">BOX</span></th>
-                                </tr>
-                            </thead>
+                            <thead id="recent-sales-view-thead"></thead>
                             <tbody></tbody>
                         </table>
                         <div id="recent-sales-view-empty" class="empty">월말마감 판매실적 데이터가 없습니다.</div>
@@ -1961,6 +1950,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260716b" defer></script>
+    <script src="js/main.js?v=20260716c" defer></script>
 </body>
 </html>

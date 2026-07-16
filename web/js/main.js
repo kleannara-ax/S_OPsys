@@ -146,24 +146,20 @@ const LINE_MASTER_COLUMN_MAP = {
     hourly_capacity: 'hourly_throughput',
 };
 
-const RECENT_SALES_REQUIRED_FIELDS = ['item_code'];
+const RECENT_SALES_REQUIRED_FIELDS = ['item_code', 'sales_actual'];
 
 const RECENT_SALES_COLUMN_MAP = {
     item_code: 'item_code',
     'item code': 'item_code',
     '자재코드': 'item_code',
-    m3: 'm3',
-    '-3월': 'm3',
-    '3개월전': 'm3',
-    'three months ago': 'm3',
-    m2: 'm2',
-    '-2월': 'm2',
-    '2개월전': 'm2',
-    'two months ago': 'm2',
-    m1: 'm1',
-    '-1월': 'm1',
-    '1개월전': 'm1',
-    'one month ago': 'm1',
+    sales_actual: 'sales_actual',
+    'sales actual': 'sales_actual',
+    '판매실적': 'sales_actual',
+    '판매수량': 'sales_actual',
+    salesactual: 'sales_actual',
+    /* 하위호환: 기존 m3/m2/m1 컬럼도 인식 (단월 업로드 시 m1만 사용) */
+    m1: 'sales_actual',
+    '-1월': 'sales_actual',
 };
 
 const SALES_UPLOAD_REQUIRED_FIELDS = ['month', 'item_code', 'channel'];
@@ -17548,41 +17544,25 @@ function mapRecentSalesUploadRow(row, index) {
         const normalizedKey = normalizeBulkKey(rawKey);
         const mappedKey = RECENT_SALES_COLUMN_MAP[normalizedKey];
         if (!mappedKey) return;
-        normalizedRow[mappedKey] = value;
-    });
-
-    const errors = [];
-    RECENT_SALES_REQUIRED_FIELDS.forEach((field) => {
-        const value = sanitizeText(normalizedRow[field]).trim();
-        if (!value) {
-            errors.push(`${field} 누락`);
+        /* 같은 매핑 키가 여러 컬럼에 연결될 수 있으므로 첫 유효값 우선 */
+        if (normalizedRow[mappedKey] === undefined || normalizedRow[mappedKey] === null || normalizedRow[mappedKey] === '') {
+            normalizedRow[mappedKey] = value;
         }
     });
 
+    const errors = [];
     const itemCode = sanitizeText(normalizedRow.item_code).trim();
-    const m3Value = toNumber(normalizedRow.m3);
-    const m2Value = toNumber(normalizedRow.m2);
-    const m1Value = toNumber(normalizedRow.m1);
-
     if (!itemCode) {
         errors.push('item_code 누락');
     }
-
-    // 빈칸→0, 음수·0·양수 모두 허용
-
-    const total = (Number.isFinite(m3Value) ? m3Value : 0)
-        + (Number.isFinite(m2Value) ? m2Value : 0)
-        + (Number.isFinite(m1Value) ? m1Value : 0);
-    const average = total / 3;
+    const salesActual = toNumber(normalizedRow.sales_actual);
+    if (!Number.isFinite(salesActual) && !normalizedRow.sales_actual && normalizedRow.sales_actual !== 0) {
+        errors.push('sales_actual 누락');
+    }
 
     const payload = {
         item_code: itemCode,
-        base_month: '',
-        m3: Number.isFinite(m3Value) ? m3Value : 0,
-        m2: Number.isFinite(m2Value) ? m2Value : 0,
-        m1: Number.isFinite(m1Value) ? m1Value : 0,
-        total,
-        average,
+        sales_actual: Number.isFinite(salesActual) ? salesActual : 0,
     };
 
     return {
@@ -17838,13 +17818,13 @@ function handleBulkTemplateDownload(event) {
             sheetName = 'Line Master Template';
             filePrefix = 'snop_line_master_template';
         } else if (target === BULK_TARGETS.RECENT_SALES) {
-            header = ['item_code', 'm3', 'm2', 'm1'];
+            header = ['item_code', 'sales_actual'];
             sampleRows = [
-                ['BAT-100', 1200, 980, 1100],
-                ['CNT-210', 720, 680, 760],
+                ['BAT-100', 1200],
+                ['CNT-210', 720],
             ];
-            sheetName = 'Recent Sales Template';
-            filePrefix = 'snop_recent_sales_template';
+            sheetName = 'Monthly Sales Template';
+            filePrefix = 'snop_monthly_sales_template';
         } else {
             header = ['item_code', 'item_name', 'category', 'production_line', 'month', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
             sampleRows = [
@@ -18290,6 +18270,7 @@ async function handleTargetInventoryUploadStart() {
 
 // -------------------- 기타 기능 --------------------
 async function persistRecentSalesAverageRecord(payload, recordId) {
+    /* 하위호환: 기존 recent-sales-averages API가 남아있는 경우 대비 */
     const endpoint = recordId ? `/sales-api/recent-sales-averages/${recordId}` : '/sales-api/recent-sales-averages';
     const method = recordId ? 'PUT' : 'POST';
     const response = await fetch(endpoint, {
@@ -18305,9 +18286,9 @@ async function persistRecentSalesAverageRecord(payload, recordId) {
 
 async function handleRecentSalesUploadStart() {
     if (!dom.recentSalesUpload) return;
-    const baseMonth = dom.recentSalesUpload.baseMonth ? dom.recentSalesUpload.baseMonth.value : '';
-    if (!baseMonth) {
-        setRecentSalesUploadStatus('업로드할 기준월을 선택하세요.', 'error');
+    const closingMonth = dom.recentSalesUpload.baseMonth ? dom.recentSalesUpload.baseMonth.value : '';
+    if (!closingMonth) {
+        setRecentSalesUploadStatus('마감월을 선택하세요.', 'error');
         return;
     }
     if (!dom.recentSalesUpload.fileInput || !dom.recentSalesUpload.fileInput.files.length) {
@@ -18347,51 +18328,57 @@ async function handleRecentSalesUploadStart() {
                 .slice(0, 5)
                 .map((error) => `Row ${error.rowNumber}: ${error.errors.join(', ')}`)
                 .join('\n');
-            setRecentSalesUploadStatus(`총 ${errors.length}건의 행에서 오류가 발생하여 제외됩니다.\n${errorMessages}`, 'warning');
+            setRecentSalesUploadStatus(`${errors.length}건 오류 제외, ${validRecords.length}건 업로드합니다.\n${errorMessages}`, 'warning');
         } else {
             setRecentSalesUploadStatus(`총 ${validRecords.length}건의 데이터를 업로드합니다.`);
         }
 
-        const existingIndex = state.recentSalesIndex instanceof Map
-            ? new Map(state.recentSalesIndex)
-            : new Map();
+        /* ── monthly-closings bulk upsert API 호출 ── */
+        const masters = state.baseMaterialMasters || [];
+        const masterMap = new Map();
+        masters.forEach((m) => {
+            const code = sanitizeText(m.item_code).trim();
+            if (code) masterMap.set(code, m);
+        });
 
-        let successCount = 0;
-        let failCount = 0;
-        const failDetails = [];
-
-        for (const record of validRecords) {
-            const payload = {
-                ...record.payload,
-                base_month: baseMonth,
+        const bulkPayload = validRecords.map((r) => {
+            const code = r.payload.item_code;
+            const master = masterMap.get(code) || {};
+            return {
+                item_code: code,
+                item_name: master.item_name || '',
+                hierarchy_name: master.hierarchy_name || '',
+                closing_month: closingMonth,
+                sales_actual: r.payload.sales_actual,
+                unit: 'BOX',
             };
-            const key = getRecentSalesAverageKey(payload.item_code, baseMonth);
-            const existing = key ? existingIndex.get(key) : null;
-            const existingId = existing ? existing.id : null;
-            try {
-                const saved = await persistRecentSalesAverageRecord(payload, existingId);
-                if (key && saved && saved.id) {
-                    existingIndex.set(key, saved);
-                }
-                successCount += 1;
-            } catch (error) {
-                failCount += 1;
-                failDetails.push(`Row ${record.rowNumber}: ${error.message}`);
-            }
+        });
+
+        const bulkResponse = await fetch(`/sales-api/monthly-closings/bulk/${closingMonth}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bulkPayload),
+        });
+
+        if (!bulkResponse.ok) {
+            const errText = await bulkResponse.text().catch(() => '');
+            throw new Error(`월말마감 데이터 업로드 실패 (${bulkResponse.status}): ${errText}`);
         }
 
-        state.recentSalesIndex = existingIndex;
+        const result = await safeJson(bulkResponse, {}, { label: '판매실적 업로드' });
+        const resultData = result.data || result;
+        const insertCount = resultData.insert_count || resultData.insertCount || 0;
+        const updateCount = resultData.update_count || resultData.updateCount || 0;
+
         await loadData();
 
-        if (failCount === 0) {
-            setRecentSalesUploadStatus(`총 ${successCount}건의 최근 3개월 판매실적 평균이 업로드되었습니다.`, 'success');
-        } else {
-            const detail = failDetails.slice(0, 5).join('\n');
-            setRecentSalesUploadStatus(`총 ${successCount}건 성공, ${failCount}건 실패했습니다.\n${detail}`, 'error');
-        }
+        setRecentSalesUploadStatus(
+            `${closingMonth} 판매실적 업로드 완료 — 신규 ${insertCount}건, 갱신 ${updateCount}건 (총 ${validRecords.length}건)`,
+            'success'
+        );
     } catch (error) {
         console.error(error);
-        setRecentSalesUploadStatus('업로드 처리 중 오류가 발생했습니다. 파일 형식을 확인하세요.', 'error');
+        setRecentSalesUploadStatus(`업로드 처리 중 오류가 발생했습니다: ${error.message}`, 'error');
     } finally {
         if (dom.recentSalesUpload.uploadButton) {
             dom.recentSalesUpload.uploadButton.removeAttribute('disabled');
@@ -18402,26 +18389,26 @@ async function handleRecentSalesUploadStart() {
 
 function handleRecentSalesTemplateDownload() {
     try {
-        const header = ['item_code', 'm3', 'm2', 'm1'];
+        const header = ['item_code', 'sales_actual'];
         const sampleRows = [
-            ['BAT-100', 1200, 980, 1100],
-            ['CNT-210', 720, 680, 760],
-            ['MOD-330', 540, 500, 610],
+            ['BAT-100', 1200],
+            ['CNT-210', 720],
+            ['MOD-330', 540],
         ];
         const worksheet = XLSX.utils.aoa_to_sheet([header, ...sampleRows]);
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'RecentSales');
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'MonthlySales');
         const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
         const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `recent_sales_3m_template_${Date.now()}.xlsx`;
+        link.download = `monthly_sales_template_${Date.now()}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        setRecentSalesUploadStatus('최근 3개월 판매실적 템플릿을 다운로드했습니다.', 'success');
+        setRecentSalesUploadStatus('월별 판매실적 업로드 템플릿을 다운로드했습니다.', 'success');
     } catch (error) {
         console.error(error);
         setRecentSalesUploadStatus('템플릿 생성 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.', 'error');
@@ -18429,7 +18416,7 @@ function handleRecentSalesTemplateDownload() {
 }
 
 /* ══════════════════════════════════════
-   업로드된 최근 3개월 판매실적 현황 뷰
+   월별 판매실적 현황 뷰 (월말마감 기준)
    ══════════════════════════════════════ */
 const recentSalesViewDom = {
     filterCategory: document.querySelector('#recent-sales-view-filter-category'),

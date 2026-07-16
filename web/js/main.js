@@ -18513,14 +18513,14 @@ function buildRecentSalesViewData(baseMonth) {
     /* 평균 계산에 사용할 가장 최근 월 = baseMonth의 n-1 */
     const latestMonth = monthCols[monthCols.length - 1];
 
-    /* N개월 평균 계산 헬퍼 */
+    /* N개월 평균 계산 헬퍼 — 항상 nMonths로 나눔 (데이터 없는 월은 0 취급) */
     function calcAvg(monthMap, refMonth, nMonths) {
-        /* refMonth 이하 최근 nMonths개월 평균 */
+        /* refMonth 이하 최근 nMonths개월 합산 후 nMonths로 나눔 */
         const allMonths = Array.from(monthMap.keys()).filter((m) => m <= refMonth).sort();
         const recent = allMonths.slice(-nMonths);
         if (recent.length === 0) return 0;
         const sum = recent.reduce((s, m) => s + (monthMap.get(m) || 0), 0);
-        return Math.round(sum / recent.length);
+        return Math.round(sum / nMonths);
     }
 
     /* 품목별 행 생성 — 12개월 중 최소 1개월 데이터가 있는 품목만 */

@@ -4029,8 +4029,12 @@ function mapProductionBulkRow(row, index) {
         errors.push('production_line은 필수입니다.');
     }
 
+    /* priority(우선순위) — 엑셀에 기재된 경우 추출, ItemSortOrder 일괄 반영에 사용 */
+    const rawPriority = parseNumberOrNull(normalizedRow.priority);
+
     return {
         payload,
+        priority: rawPriority,
         errors,
         rowNumber: index + 2, // assume header row is 1
         provided: providedFields,
@@ -17909,6 +17913,39 @@ async function handleBulkUploadStart() {
             }
         }
 
+        /* ── 생산계획 업로드 시 엑셀에 우선순위가 포함된 경우 ItemSortOrder 일괄 반영 ── */
+        if (target === BULK_TARGETS.PRODUCTION) {
+            const sortOrderDtos = [];
+            const seenSortKeys = new Set();
+            for (const record of validRecords) {
+                const pri = record.priority;
+                if (pri !== null && Number.isFinite(pri) && pri >= 1) {
+                    const cat = sanitizeText(record.payload.category).trim();
+                    const code = sanitizeText(record.payload.item_code).trim();
+                    const sortKey = `${cat}|${code}`;
+                    if (cat && code && !seenSortKeys.has(sortKey)) {
+                        seenSortKeys.add(sortKey);
+                        sortOrderDtos.push({ category: cat, item_code: code, sort_order: pri });
+                    }
+                }
+            }
+            if (sortOrderDtos.length > 0) {
+                try {
+                    const sortResp = await fetch('/sales-api/item-sort-orders/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(sortOrderDtos),
+                    });
+                    if (sortResp.ok) {
+                        const sortResult = await sortResp.json();
+                        console.info(`[엑셀 업로드] 정렬순서 ${sortOrderDtos.length}건 반영:`, sortResult);
+                    }
+                } catch (sortError) {
+                    console.warn('정렬순서 일괄 반영 실패 (무시):', sortError);
+                }
+            }
+        }
+
         if (target === BULK_TARGETS.LINE_CAPA) {
             await refreshLineCapaPlans();
         } else if (target === BULK_TARGETS.LINE_MASTER) {
@@ -17970,11 +18007,11 @@ function handleBulkTemplateDownload(event) {
             sheetName = 'Monthly Sales Template';
             filePrefix = 'snop_monthly_sales_template';
         } else {
-            header = ['item_code', 'item_name', 'category', 'production_line', 'month', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
+            header = ['item_code', 'item_name', 'category', 'production_line', 'month', '우선순위', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
             sampleRows = [
-                ['BAT-100', '배터리 모듈', '에너지저장', '라인 2', '2025-05', 1680, 600, 520, 650, '신규 수요 대응'],
-                ['CNT-210', '컨트롤러', '제어시스템', '라인 1', '2025-05', 840, 210, 250, 320, '서비스 부품 재고 확보'],
-                ['MOD-330', '파워 모듈', '전력변환', '라인 3', '2025-05', 920, 430, 450, 500, '시즌 초기 물량'],
+                ['BAT-100', '배터리 모듈', '에너지저장', '라인 2', '2025-05', 10, 1680, 600, 520, 650, '신규 수요 대응'],
+                ['CNT-210', '컨트롤러', '제어시스템', '라인 1', '2025-05', 20, 840, 210, 250, 320, '서비스 부품 재고 확보'],
+                ['MOD-330', '파워 모듈', '전력변환', '라인 3', '2025-05', 30, 920, 430, 450, 500, '시즌 초기 물량'],
             ];
             sheetName = 'Production Template';
             filePrefix = 'snop_production_template';
@@ -18952,7 +18989,10 @@ function exportProductionTableXlsx() {
 
         return {
             '계획 월': sanitizeText(record.month),
-            '우선순위': Number.isFinite(record.priority) ? record.priority : null,
+            '우선순위': (() => {
+                const so = getItemSortOrder(record.category, record.item_code);
+                return so < 999999 ? so : null;
+            })(),
             '카테고리': sanitizeText(record.category),
             '자재 코드': sanitizeText(record.item_code),
             '자재 명칭': sanitizeText(record.item_name),
@@ -19065,14 +19105,14 @@ function exportCsv() {
         '비고',
     ];
 
-    /* CSV 내보내기 시 카테고리별 → 우선순위별 정렬 */
+    /* CSV 내보내기 시 카테고리별 → ItemSortOrder 기반 정렬 */
     const sortedCsvData = [...state.filteredData].sort((a, b) => {
         const catA = sanitizeText(a.category).trim();
         const catB = sanitizeText(b.category).trim();
         if (catA !== catB) return catA.localeCompare(catB, 'ko-KR');
-        const priA = Number.isFinite(a.priority) ? a.priority : 999999;
-        const priB = Number.isFinite(b.priority) ? b.priority : 999999;
-        if (priA !== priB) return priA - priB;
+        const sortA = getItemSortOrder(a.category, a.item_code);
+        const sortB = getItemSortOrder(b.category, b.item_code);
+        if (sortA !== sortB) return sortA - sortB;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));
     });
 
@@ -19082,7 +19122,7 @@ function exportCsv() {
             : '';
         return [
             record.month,
-            Number.isFinite(record.priority) ? record.priority : '',
+            (() => { const so = getItemSortOrder(record.category, record.item_code); return so < 999999 ? so : ''; })(),
             record.category,
             record.item_code,
             record.item_name,

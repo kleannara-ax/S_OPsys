@@ -70,6 +70,8 @@ const BULK_COLUMN_MAP = {
     notes: 'notes',
     memo: 'notes',
     비고: 'notes',
+    priority: 'priority',
+    '우선순위': 'priority',
 };
 
 const BULK_TARGETS = {
@@ -3973,6 +3975,7 @@ function mapProductionBulkRow(row, index) {
         optimal_inventory_2025: toNullableNumber(normalizedRow.optimal_inventory_2025),
         capacity_limit: toNumber(normalizedRow.capacity_limit),
         notes: sanitizeText(normalizedRow.notes).trim(),
+        priority: parseNumberOrNull(normalizedRow.priority),
     };
 
     const providedCategory = payload.category;
@@ -17744,6 +17747,10 @@ async function handleBulkUploadStart() {
                         if (!provided.notes && baseRecord.notes) {
                             payload.notes = baseRecord.notes;
                         }
+                        /* 우선순위: 엑셀에 값이 있으면 반영, 없으면 기존값 보존 */
+                        if (!provided.priority && Number.isFinite(baseRecord.priority)) {
+                            payload.priority = baseRecord.priority;
+                        }
                     }
 
                     if (!existingId) {
@@ -17848,11 +17855,11 @@ function handleBulkTemplateDownload(event) {
             sheetName = 'Monthly Sales Template';
             filePrefix = 'snop_monthly_sales_template';
         } else {
-            header = ['item_code', 'item_name', 'category', 'production_line', 'month', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
+            header = ['item_code', 'item_name', 'category', 'production_line', 'month', '우선순위', 'production_plan', 'beginning_inventory', 'target_ending_inventory', 'optimal_inventory_2025', 'notes'];
             sampleRows = [
-                ['BAT-100', '배터리 모듈', '에너지저장', '라인 2', '2025-05', 1680, 600, 520, 650, '신규 수요 대응'],
-                ['CNT-210', '컨트롤러', '제어시스템', '라인 1', '2025-05', 840, 210, 250, 320, '서비스 부품 재고 확보'],
-                ['MOD-330', '파워 모듈', '전력변환', '라인 3', '2025-05', 920, 430, 450, 500, '시즌 초기 물량'],
+                ['BAT-100', '배터리 모듈', '에너지저장', '라인 2', '2025-05', 10, 1680, 600, 520, 650, '신규 수요 대응'],
+                ['CNT-210', '컨트롤러', '제어시스템', '라인 1', '2025-05', 20, 840, 210, 250, 320, '서비스 부품 재고 확보'],
+                ['MOD-330', '파워 모듈', '전력변환', '라인 3', '2025-05', 30, 920, 430, 450, 500, '시즌 초기 물량'],
             ];
             sheetName = 'Production Template';
             filePrefix = 'snop_production_template';

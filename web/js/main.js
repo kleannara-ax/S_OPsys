@@ -4660,6 +4660,21 @@ function enrichRecord(record, lineStats, overrides = {}) {
 function buildChainedRecords(rawRecords, lineStats, options = {}) {
     const salesAggregates = options.salesAggregates instanceof Map ? options.salesAggregates : new Map();
     const recentSalesIndex = options.recentSalesIndex instanceof Map ? options.recentSalesIndex : new Map();
+    const monthlySalesRecords = Array.isArray(options.monthlySalesRecords) ? options.monthlySalesRecords : [];
+
+    /* ── 월별 판매실적(monthly-sales-records) 인덱스 구축 ──
+     * item_code(대문자) → Map(closing_month → sales_actual 합산)
+     * RFC_005로 수신한 실적 데이터로, salesActualAvg3m의 최우선 소스로 사용 */
+    const msrItemMonthMap = new Map();
+    monthlySalesRecords.forEach((msr) => {
+        const code = sanitizeText(msr.item_code).trim().toUpperCase();
+        const month = sanitizeText(msr.closing_month).trim();
+        if (!code || !month) return;
+        if (!msrItemMonthMap.has(code)) msrItemMonthMap.set(code, new Map());
+        const mMap = msrItemMonthMap.get(code);
+        mMap.set(month, (mMap.get(month) || 0) + toNumber(msr.sales_actual));
+    });
+
     const grouped = new Map();
 
     rawRecords.forEach((record) => {
@@ -4774,8 +4789,45 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
 
             const enriched = enrichRecord(record, lineStats, overrides);
             let salesAvg3m = null;
+            let salesStdDev3mValues = null;
+
+            /* ── salesActualAvg3m 계산 우선순위 ──
+             * 1순위: 월별 판매실적(monthly-sales-records = RFC_005 데이터)의 이전 3개월 평균
+             * 2순위: 엑셀 업로드 데이터 (recent-sales-averages)
+             * 3순위: 이전 3개월 snop_record의 sales_actual 자동 계산 */
+
+            /* 1순위: monthly-sales-records (RFC_005) 기반 3개월 평균 */
+            const msrCode = sanitizeText(record.item_code).trim().toUpperCase();
+            const msrMonthMap = msrItemMonthMap.get(msrCode);
+            if (msrMonthMap && msrMonthMap.size > 0) {
+                const recordMonth = sanitizeText(record.month).trim();
+                /* recordMonth 이전 3개월 계산 (예: 2026-07 → 2026-06, 2026-05, 2026-04) */
+                const prev3months = [];
+                if (recordMonth && recordMonth.length >= 7) {
+                    const [baseY, baseM] = recordMonth.split('-').map(Number);
+                    for (let i = 1; i <= 3; i++) {
+                        const d = new Date(baseY, baseM - 1 - i, 1);
+                        const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                        prev3months.push(ym);
+                    }
+                }
+                const msrValues = prev3months.map((m) => msrMonthMap.has(m) ? msrMonthMap.get(m) : null);
+                const validMsrValues = msrValues.filter((v) => v !== null && Number.isFinite(v));
+                if (validMsrValues.length > 0) {
+                    /* 데이터가 있는 월만 합산 후 3으로 나눔 (데이터 없는 월은 0 취급과 동일하게 3 고정 분모) */
+                    const msrSum = validMsrValues.reduce((s, v) => s + v, 0);
+                    salesAvg3m = Math.round(msrSum / 3);
+                    enriched.salesActualAvg3mSource = 'monthly_closing';
+                    /* 표준편차 계산용 값 저장 */
+                    if (validMsrValues.length >= 2) {
+                        salesStdDev3mValues = validMsrValues;
+                    }
+                }
+            }
+
+            /* 2순위: 엑셀 업로드 데이터 (recent-sales-averages) */
             const recentKey = getRecentSalesAverageKey(record.item_code, record.month);
-            if (recentKey && recentSalesIndex.has(recentKey)) {
+            if (salesAvg3m === null && recentKey && recentSalesIndex.has(recentKey)) {
                 const recentRecord = recentSalesIndex.get(recentKey);
                 const uploadedAvg = Number(recentRecord?.average);
                 if (Number.isFinite(uploadedAvg)) {
@@ -4783,15 +4835,24 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
                     enriched.salesActualAvg3mSource = 'uploaded';
                 }
             }
+            /* 3순위: 이전 3개월 snop_record sales_actual 자동 계산 */
             if (salesAvg3m === null && recentSalesActuals.length === 3 && recentSalesActuals.every((value) => Number.isFinite(value))) {
                 const sum = recentSalesActuals.reduce((total, value) => total + value, 0);
                 salesAvg3m = sum / 3;
             }
             enriched.salesActualAvg3m = salesAvg3m;
+
             /* 최근 3개월 판매실적 표준편차 계산 (STDEV.S = 표본 표준편차, N-1) */
             let salesStdDev3m = null;
-            /* 1) 업로드된 m1, m2, m3 데이터가 있으면 우선 사용 */
-            if (recentKey && recentSalesIndex.has(recentKey)) {
+            /* 1) monthly-sales-records 기반 값이 있으면 우선 사용 */
+            if (salesStdDev3mValues && salesStdDev3mValues.length >= 2) {
+                const n = salesStdDev3mValues.length;
+                const mean = salesStdDev3mValues.reduce((s, v) => s + v, 0) / n;
+                const variance = salesStdDev3mValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
+                salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
+            }
+            /* 2) 업로드된 m1, m2, m3 데이터가 있으면 사용 */
+            if (salesStdDev3m === null && recentKey && recentSalesIndex.has(recentKey)) {
                 const rr = recentSalesIndex.get(recentKey);
                 const uploadedValues = [Number(rr?.m3), Number(rr?.m2), Number(rr?.m1)];
                 if (uploadedValues.length >= 2 && uploadedValues.every((v) => Number.isFinite(v))) {
@@ -4801,7 +4862,7 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
                     salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
                 }
             }
-            /* 2) 업로드 데이터가 없으면 이전 3개월 판매실적 자동 계산 */
+            /* 3) 이전 3개월 판매실적 자동 계산 */
             if (salesStdDev3m === null && recentSalesActuals.length >= 2 && recentSalesActuals.every((v) => Number.isFinite(v))) {
                 const n = recentSalesActuals.length;
                 const mean = recentSalesActuals.reduce((s, v) => s + v, 0) / n;
@@ -9406,6 +9467,7 @@ function applyFilters() {
     const enriched = buildChainedRecords(extendedRaw, lineStats, {
         salesAggregates: salesAggregatesMap,
         recentSalesIndex: state.recentSalesIndex,
+        monthlySalesRecords: state.monthlySalesRecords,
     });
     /* ── 제외 카테고리(원단/미지정) 필터링 — enrichedData 단계에서 적용 ── */
     const enrichedFiltered = enriched.filter((record) => !isExcludedCategory(record.category));

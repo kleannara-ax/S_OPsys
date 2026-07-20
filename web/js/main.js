@@ -553,6 +553,16 @@ const dom = {
         panels: Array.from(document.querySelectorAll('.bulk-panel')),
         templateButtons: Array.from(document.querySelectorAll('[data-bulk-template]')),
     },
+    priorityUpload: {
+        openButton: document.querySelector('#btn-open-priority-upload'),
+        modal: document.querySelector('#priority-upload-modal'),
+        closeButton: document.querySelector('#btn-close-priority-upload'),
+        backdrop: document.querySelector('#priority-upload-modal .modal-backdrop'),
+        fileInput: document.querySelector('#priority-file-input'),
+        startButton: document.querySelector('#btn-start-priority-upload'),
+        templateButton: document.querySelector('#btn-priority-template'),
+        status: document.querySelector('#priority-upload-status'),
+    },
     targetInventoryUpload: {
         openButton: document.querySelector('#btn-open-target-inventory-upload'),
         modal: document.querySelector('#target-inventory-upload-modal'),
@@ -3698,19 +3708,58 @@ function sortByMonth(records) {
 }
 
 function sortRecordsForDisplay(records) {
+    /*
+     * 우선순위 계승 맵 구축:
+     * 해당 레코드에 priority가 없으면 같은 item_code의 다른 월 중
+     * 가장 최근(month 내림차순) priority를 가져온다.
+     * 그래도 없으면 999999 (카테고리 내 맨 아래).
+     */
+    const priorityByItem = new Map();
+    for (const r of records) {
+        if (!Number.isFinite(r.priority)) continue;
+        const code = sanitizeText(r.item_code);
+        const month = sanitizeText(r.month);
+        const existing = priorityByItem.get(code);
+        if (!existing || month > existing.month) {
+            priorityByItem.set(code, { month, priority: r.priority });
+        }
+    }
+    const getEffectivePriority = (record) => {
+        if (Number.isFinite(record.priority)) return record.priority;
+        const inherited = priorityByItem.get(sanitizeText(record.item_code));
+        return inherited ? inherited.priority : 999999;
+    };
+
     return [...records].sort((a, b) => {
         const monthCompare = sanitizeText(a.month).localeCompare(sanitizeText(b.month));
         if (monthCompare !== 0) return monthCompare;
         const categoryCompare = sanitizeText(a.category).localeCompare(sanitizeText(b.category));
         if (categoryCompare !== 0) return categoryCompare;
-        /* 카테고리 내 우선순위 오름차순 (미입력은 맨 뒤) */
-        const priA = Number.isFinite(a.priority) ? a.priority : 999999;
-        const priB = Number.isFinite(b.priority) ? b.priority : 999999;
+        /* 카테고리 내 우선순위 오름차순 (미입력·신규자재는 맨 뒤) */
+        const priA = getEffectivePriority(a);
+        const priB = getEffectivePriority(b);
         if (priA !== priB) return priA - priB;
         const lineCompare = sanitizeText(a.production_line).localeCompare(sanitizeText(b.production_line));
         if (lineCompare !== 0) return lineCompare;
         return sanitizeText(a.item_code).localeCompare(sanitizeText(b.item_code));
     });
+}
+
+/**
+ * 같은 item_code를 가진 다른 월 레코드에서 가장 최근 우선순위를 가져온다.
+ * 해당 자재에 설정된 우선순위가 전혀 없으면 null 반환.
+ */
+function getInheritedPriority(itemCode) {
+    const code = sanitizeText(itemCode);
+    let best = null;
+    for (const r of state.rawData) {
+        if (!r || sanitizeText(r.item_code) !== code) continue;
+        if (!Number.isFinite(r.priority)) continue;
+        if (!best || sanitizeText(r.month) > best.month) {
+            best = { month: sanitizeText(r.month), priority: r.priority };
+        }
+    }
+    return best ? best.priority : null;
 }
 
 function normalizeBulkKey(key) {
@@ -9789,9 +9838,20 @@ function renderTable() {
             priInput.maxLength = 3;
             priInput.className = 'inline-input priority-input';
             priInput.dataset.recordId = record.id;
-            priInput.value = Number.isFinite(record.priority) ? record.priority : '';
+            /* 직접 설정된 값이면 그대로, 없으면 다른 월에서 계승된 값을 회색으로 표시 */
+            const hasOwnPriority = Number.isFinite(record.priority);
+            if (hasOwnPriority) {
+                priInput.value = record.priority;
+                priInput.style.color = '';
+            } else {
+                const inherited = getInheritedPriority(record.item_code);
+                priInput.value = inherited !== null ? inherited : '';
+                priInput.style.color = inherited !== null ? '#999' : '';
+            }
             priInput.style.textAlign = 'center';
-            priInput.title = '카테고리 내 우선순위 (숫자가 낮을수록 높은 우선순위, 최대 999)';
+            priInput.title = hasOwnPriority
+                ? '카테고리 내 우선순위 (숫자가 낮을수록 높은 우선순위, 최대 999)'
+                : '다른 월에서 계승된 우선순위 (수정하면 이 월에 직접 저장됩니다)';
             priInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); priInput.blur(); }
             });
@@ -15056,6 +15116,200 @@ async function handleInlinePriorityChange(recordId, rawValue) {
     }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   우선순위 전용 업로드 기능
+   - 자재코드 + 우선순위만 엑셀로 업로드
+   - 해당 자재의 모든 월 레코드에 일괄 적용
+   ══════════════════════════════════════════════════════════════ */
+
+function openPriorityUploadModal() {
+    if (dom.priorityUpload.modal) {
+        dom.priorityUpload.modal.classList.remove('hidden');
+        dom.priorityUpload.modal.setAttribute('aria-hidden', 'false');
+        if (dom.priorityUpload.fileInput) dom.priorityUpload.fileInput.value = '';
+        setPriorityUploadStatus('');
+    }
+}
+
+function closePriorityUploadModal() {
+    if (dom.priorityUpload.modal) {
+        dom.priorityUpload.modal.classList.add('hidden');
+        dom.priorityUpload.modal.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function setPriorityUploadStatus(msg, isError = false) {
+    if (!dom.priorityUpload.status) return;
+    dom.priorityUpload.status.textContent = msg;
+    dom.priorityUpload.status.style.color = isError ? '#c0392b' : '';
+}
+
+/** 우선순위 템플릿 다운로드 — 현재 자재 목록 + 기존 우선순위 포함 */
+function handlePriorityTemplateDownload() {
+    try {
+        /* 자재코드별 최신 우선순위 & 카테고리 & 자재명 수집 */
+        const itemMap = new Map();
+        for (const r of state.rawData) {
+            if (!r) continue;
+            const code = sanitizeText(r.item_code);
+            if (!code) continue;
+            const existing = itemMap.get(code);
+            if (!existing) {
+                itemMap.set(code, {
+                    item_code: code,
+                    item_name: sanitizeText(r.item_name),
+                    category: sanitizeText(r.category),
+                    priority: Number.isFinite(r.priority) ? r.priority : null,
+                    month: sanitizeText(r.month),
+                });
+            } else {
+                /* 더 최근 월의 priority가 있으면 갱신 */
+                if (Number.isFinite(r.priority) && sanitizeText(r.month) > existing.month) {
+                    existing.priority = r.priority;
+                    existing.month = sanitizeText(r.month);
+                }
+                /* priority가 아직 null이고 다른 월에 있으면 가져오기 */
+                if (existing.priority === null && Number.isFinite(r.priority)) {
+                    existing.priority = r.priority;
+                }
+            }
+        }
+
+        const header = ['item_code', 'item_name', 'category', '우선순위'];
+        const rows = [];
+        /* 카테고리 → priority → item_code 순 정렬 */
+        const sorted = [...itemMap.values()].sort((a, b) => {
+            const catCmp = (a.category || '').localeCompare(b.category || '');
+            if (catCmp !== 0) return catCmp;
+            const priA = a.priority !== null ? a.priority : 999999;
+            const priB = b.priority !== null ? b.priority : 999999;
+            if (priA !== priB) return priA - priB;
+            return a.item_code.localeCompare(b.item_code);
+        });
+        for (const item of sorted) {
+            rows.push([item.item_code, item.item_name, item.category, item.priority !== null ? item.priority : '']);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+        ws['!cols'] = [{ wch: 18 }, { wch: 25 }, { wch: 15 }, { wch: 10 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '우선순위');
+        XLSX.writeFile(wb, '우선순위_템플릿.xlsx');
+    } catch (err) {
+        console.error('우선순위 템플릿 다운로드 실패:', err);
+        alert('템플릿 다운로드에 실패했습니다.');
+    }
+}
+
+/** 우선순위 업로드 처리 — item_code별 우선순위를 모든 월 레코드에 일괄 적용 */
+async function handlePriorityUploadStart() {
+    const file = dom.priorityUpload.fileInput ? dom.priorityUpload.fileInput.files[0] : null;
+    if (!file) {
+        setPriorityUploadStatus('파일을 선택해주세요.', true);
+        return;
+    }
+
+    setPriorityUploadStatus('파일을 읽는 중...');
+    try {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!rows.length) {
+            setPriorityUploadStatus('엑셀 파일에 데이터가 없습니다.', true);
+            return;
+        }
+
+        /* 컬럼 매핑: item_code, 우선순위 */
+        const priorityMap = new Map();
+        for (const row of rows) {
+            const normalizedRow = {};
+            for (const [key, val] of Object.entries(row)) {
+                const nk = sanitizeText(key).trim().toLowerCase().replace(/\s+/g, '_');
+                normalizedRow[nk] = val;
+            }
+            const itemCode = sanitizeText(
+                normalizedRow.item_code || normalizedRow['자재_코드'] || normalizedRow['자재코드'] || ''
+            ).trim().toUpperCase();
+            if (!itemCode) continue;
+
+            const rawPri = normalizedRow['우선순위'] !== undefined
+                ? normalizedRow['우선순위']
+                : (normalizedRow.priority !== undefined ? normalizedRow.priority : undefined);
+
+            if (rawPri === undefined) continue;
+
+            const priStr = String(rawPri).trim();
+            const priority = priStr === '' ? null : Number(priStr);
+
+            if (priority !== null && (!Number.isFinite(priority) || priority < 1)) {
+                setPriorityUploadStatus(`자재 ${itemCode}의 우선순위 값이 올바르지 않습니다: "${rawPri}"`, true);
+                return;
+            }
+            priorityMap.set(itemCode, priority);
+        }
+
+        if (priorityMap.size === 0) {
+            setPriorityUploadStatus('유효한 자재코드+우선순위 데이터가 없습니다. 컬럼명을 확인하세요.', true);
+            return;
+        }
+
+        setPriorityUploadStatus(`${priorityMap.size}개 자재의 우선순위를 적용 중...`);
+
+        /* 해당 자재의 모든 월 레코드를 찾아 priority 업데이트 */
+        let updatedCount = 0;
+        let errorCount = 0;
+        const recordsToUpdate = [];
+
+        for (const record of state.rawData) {
+            if (!record) continue;
+            const code = sanitizeText(record.item_code).toUpperCase();
+            if (!priorityMap.has(code)) continue;
+            const newPriority = priorityMap.get(code);
+            /* 현재 값과 동일하면 skip */
+            const currentPri = Number.isFinite(record.priority) ? record.priority : null;
+            if (currentPri === newPriority) continue;
+            recordsToUpdate.push({ record, newPriority });
+        }
+
+        if (recordsToUpdate.length === 0) {
+            setPriorityUploadStatus(`변경할 레코드가 없습니다 (${priorityMap.size}개 자재 확인, 모두 동일한 우선순위).`);
+            return;
+        }
+
+        setPriorityUploadStatus(`${recordsToUpdate.length}건의 레코드를 업데이트 중... (0/${recordsToUpdate.length})`);
+
+        for (let i = 0; i < recordsToUpdate.length; i++) {
+            const { record, newPriority } = recordsToUpdate[i];
+            try {
+                record.priority = newPriority;
+                const payload = recordToPayload(record);
+                await updateRecord(record.id, payload);
+                updatedCount++;
+            } catch (err) {
+                console.error(`우선순위 업데이트 실패 (${record.item_code}, ${record.month}):`, err);
+                errorCount++;
+            }
+            /* 진행률 표시 (10건마다) */
+            if ((i + 1) % 10 === 0 || i === recordsToUpdate.length - 1) {
+                setPriorityUploadStatus(`${recordsToUpdate.length}건의 레코드를 업데이트 중... (${i + 1}/${recordsToUpdate.length})`);
+            }
+        }
+
+        const resultMsg = errorCount > 0
+            ? `완료: ${updatedCount}건 성공, ${errorCount}건 실패 (${priorityMap.size}개 자재)`
+            : `완료: ${updatedCount}건 업데이트 (${priorityMap.size}개 자재)`;
+        setPriorityUploadStatus(resultMsg, errorCount > 0);
+
+        /* 화면 갱신 */
+        applyFilters();
+    } catch (err) {
+        console.error('우선순위 업로드 실패:', err);
+        setPriorityUploadStatus('파일 처리 중 오류가 발생했습니다: ' + err.message, true);
+    }
+}
+
 /* ── 보정 생산계획 인라인 변경 핸들러 ──
    사용자가 보정 생산계획 input을 수정하면 호출됨.
    1) adjustedPlanOverrides에 값 저장 → enrichRecord가 보정 기준 파생 지표 재계산
@@ -19756,9 +20010,29 @@ function bindEvents() {
     attachLineCapaUsageFilterListeners();
     updateLineCapaComputedField();
 
-    if (dom.bulk.open) {
-        dom.bulk.open.addEventListener('click', () => openBulkUploadModal(BULK_TARGETS.PRODUCTION, { singleMode: true }));
+    /* ── 우선순위 업로드 모달 이벤트 바인딩 ── */
+    if (dom.priorityUpload.openButton) {
+        dom.priorityUpload.openButton.addEventListener('click', openPriorityUploadModal);
     }
+    if (dom.priorityUpload.closeButton) {
+        dom.priorityUpload.closeButton.addEventListener('click', closePriorityUploadModal);
+    }
+    if (dom.priorityUpload.backdrop) {
+        dom.priorityUpload.backdrop.addEventListener('click', closePriorityUploadModal);
+    }
+    if (dom.priorityUpload.templateButton) {
+        dom.priorityUpload.templateButton.addEventListener('click', handlePriorityTemplateDownload);
+    }
+    if (dom.priorityUpload.startButton) {
+        dom.priorityUpload.startButton.addEventListener('click', handlePriorityUploadStart);
+    }
+    if (dom.priorityUpload.fileInput) {
+        dom.priorityUpload.fileInput.addEventListener('change', () => {
+            const file = dom.priorityUpload.fileInput.files[0];
+            if (file) setPriorityUploadStatus(`선택된 파일: ${sanitizeText(file.name)}`);
+        });
+    }
+
     if (dom.bulk.openLineCapa) {
         dom.bulk.openLineCapa.addEventListener('click', () => openBulkUploadModal(BULK_TARGETS.LINE_CAPA, { singleMode: true }));
     }

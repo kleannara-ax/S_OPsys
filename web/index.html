@@ -909,7 +909,7 @@
                 <div class="table-toolbar" aria-live="polite">
                     <div class="toolbar-actions">
                         <button id="btn-export-xlsx" type="button" class="secondary">엑셀 내보내기 (XLSX)</button>
-                        <button id="btn-open-bulk-upload" type="button" class="secondary">엑셀 일괄 업로드</button>
+                        <button id="btn-open-priority-upload" type="button" class="secondary">우선순위 업로드</button>
                         <button id="btn-confirm-production-changes" type="button" class="primary" disabled aria-disabled="true">변경 로그 확정 (0건)</button>
                         <button id="btn-open-target-inventory-upload" type="button" class="secondary">SKU별 적정재고 업로드</button>
                         <button id="btn-sync-from-master" type="button" class="secondary">자재마스터 동기화</button>
@@ -1810,6 +1810,40 @@
         </div>
     </div>
 
+    <!-- 우선순위 업로드 모달 -->
+    <div id="priority-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="priority-upload-title">
+        <div class="modal-backdrop" data-close-priority-modal></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="priority-upload-title">우선순위 업로드</h3>
+                <button class="ghost modal-close" type="button" id="btn-close-priority-upload">닫기</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">
+                    자재별 우선순위를 엑셀로 업로드하면 카테고리 내 정렬 순서가 일괄 적용됩니다.<br>
+                    아래 템플릿을 내려받아 우선순위 숫자를 입력한 뒤 업로드하세요.
+                </p>
+                <div class="modal-instructions">
+                    <button type="button" class="secondary small" id="btn-priority-template">우선순위 템플릿 다운로드 (XLSX)</button>
+                    <ul>
+                        <li>필수 컬럼: <strong>item_code (자재 코드), 우선순위</strong></li>
+                        <li>우선순위는 <strong>1 이상의 정수</strong>로 입력하세요 (숫자가 낮을수록 높은 우선순위).</li>
+                        <li>한 번 설정하면 해당 자재의 <strong>모든 월</strong>에 동일하게 적용됩니다.</li>
+                        <li>빈 칸으로 두면 기존 우선순위가 초기화(삭제)됩니다.</li>
+                    </ul>
+                </div>
+                <div class="modal-upload">
+                    <label class="upload-label" for="priority-file-input">
+                        파일 선택 (xlsx, xls, csv)
+                    </label>
+                    <input type="file" id="priority-file-input" accept=".xlsx,.xls,.csv">
+                    <button type="button" id="btn-start-priority-upload" class="primary">업로드 시작</button>
+                </div>
+                <div id="priority-upload-status" class="bulk-status" aria-live="polite"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- SKU별 적정재고 업로드 모달 -->
     <div id="target-inventory-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="target-inventory-upload-title">
         <div class="modal-backdrop" data-close-target-inv-modal></div>
@@ -1951,6 +1985,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260716j" defer></script>
+    <script src="js/main.js?v=20260720a" defer></script>
 </body>
 </html>

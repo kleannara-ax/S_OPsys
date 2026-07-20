@@ -355,7 +355,7 @@ const state = {
     },
     bulkUploadTarget: BULK_TARGETS.PRODUCTION,
     recentSalesRecords: [],
-    recentSalesIndex: new Map(),
+    /* recentSalesIndex 제거 — salesActualAvg3m는 monthly-sales-records(RFC_005)만 사용 */
     baseMaterialMasters: [],
     baseMaterialMasterFilters: { scm: 'all' },
     monthlyClosings: [],
@@ -4659,7 +4659,6 @@ function enrichRecord(record, lineStats, overrides = {}) {
 
 function buildChainedRecords(rawRecords, lineStats, options = {}) {
     const salesAggregates = options.salesAggregates instanceof Map ? options.salesAggregates : new Map();
-    const recentSalesIndex = options.recentSalesIndex instanceof Map ? options.recentSalesIndex : new Map();
     const monthlySalesRecords = Array.isArray(options.monthlySalesRecords) ? options.monthlySalesRecords : [];
 
     /* ── 월별 판매실적(monthly-sales-records) 인덱스 구축 ──
@@ -4747,7 +4746,6 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
 
         mergedRecords.sort((a, b) => sanitizeText(a.month).localeCompare(sanitizeText(b.month)));
         let previousEnding = null;
-        const recentSalesActuals = [];
         mergedRecords.forEach((record) => {
             const rawBeginning = toNumber(record.beginning_inventory);
             const rawAvailable = record.available_inventory != null ? toNumber(record.available_inventory) : null;
@@ -4788,20 +4786,15 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
             }
 
             const enriched = enrichRecord(record, lineStats, overrides);
+
+            /* ── salesActualAvg3m: monthly-sales-records (RFC_005) 이전 3개월 평균 ── */
             let salesAvg3m = null;
-            let salesStdDev3mValues = null;
-
-            /* ── salesActualAvg3m 계산 우선순위 ──
-             * 1순위: 월별 판매실적(monthly-sales-records = RFC_005 데이터)의 이전 3개월 평균
-             * 2순위: 엑셀 업로드 데이터 (recent-sales-averages)
-             * 3순위: 이전 3개월 snop_record의 sales_actual 자동 계산 */
-
-            /* 1순위: monthly-sales-records (RFC_005) 기반 3개월 평균 */
+            let salesStdDev3m = null;
             const msrCode = sanitizeText(record.item_code).trim().toUpperCase();
             const msrMonthMap = msrItemMonthMap.get(msrCode);
             if (msrMonthMap && msrMonthMap.size > 0) {
                 const recordMonth = sanitizeText(record.month).trim();
-                /* recordMonth 이전 3개월 계산 (예: 2026-07 → 2026-06, 2026-05, 2026-04) */
+                /* recordMonth 이전 3개월 계산 (예: 2026-07 → 2026-04, 2026-05, 2026-06) */
                 const prev3months = [];
                 if (recordMonth && recordMonth.length >= 7) {
                     const [baseY, baseM] = recordMonth.split('-').map(Number);
@@ -4818,57 +4811,16 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
                     const msrSum = validMsrValues.reduce((s, v) => s + v, 0);
                     salesAvg3m = Math.round(msrSum / 3);
                     enriched.salesActualAvg3mSource = 'monthly_closing';
-                    /* 표준편차 계산용 값 저장 */
+                    /* 표준편차 계산 (STDEV.S = 표본 표준편차, N-1) — 2개월 이상 데이터 필요 */
                     if (validMsrValues.length >= 2) {
-                        salesStdDev3mValues = validMsrValues;
+                        const n = validMsrValues.length;
+                        const mean = validMsrValues.reduce((s, v) => s + v, 0) / n;
+                        const variance = validMsrValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
+                        salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
                     }
                 }
             }
-
-            /* 2순위: 엑셀 업로드 데이터 (recent-sales-averages) */
-            const recentKey = getRecentSalesAverageKey(record.item_code, record.month);
-            if (salesAvg3m === null && recentKey && recentSalesIndex.has(recentKey)) {
-                const recentRecord = recentSalesIndex.get(recentKey);
-                const uploadedAvg = Number(recentRecord?.average);
-                if (Number.isFinite(uploadedAvg)) {
-                    salesAvg3m = uploadedAvg;
-                    enriched.salesActualAvg3mSource = 'uploaded';
-                }
-            }
-            /* 3순위: 이전 3개월 snop_record sales_actual 자동 계산 */
-            if (salesAvg3m === null && recentSalesActuals.length === 3 && recentSalesActuals.every((value) => Number.isFinite(value))) {
-                const sum = recentSalesActuals.reduce((total, value) => total + value, 0);
-                salesAvg3m = sum / 3;
-            }
             enriched.salesActualAvg3m = salesAvg3m;
-
-            /* 최근 3개월 판매실적 표준편차 계산 (STDEV.S = 표본 표준편차, N-1) */
-            let salesStdDev3m = null;
-            /* 1) monthly-sales-records 기반 값이 있으면 우선 사용 */
-            if (salesStdDev3mValues && salesStdDev3mValues.length >= 2) {
-                const n = salesStdDev3mValues.length;
-                const mean = salesStdDev3mValues.reduce((s, v) => s + v, 0) / n;
-                const variance = salesStdDev3mValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
-                salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
-            }
-            /* 2) 업로드된 m1, m2, m3 데이터가 있으면 사용 */
-            if (salesStdDev3m === null && recentKey && recentSalesIndex.has(recentKey)) {
-                const rr = recentSalesIndex.get(recentKey);
-                const uploadedValues = [Number(rr?.m3), Number(rr?.m2), Number(rr?.m1)];
-                if (uploadedValues.length >= 2 && uploadedValues.every((v) => Number.isFinite(v))) {
-                    const n = uploadedValues.length;
-                    const mean = uploadedValues.reduce((s, v) => s + v, 0) / n;
-                    const variance = uploadedValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
-                    salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
-                }
-            }
-            /* 3) 이전 3개월 판매실적 자동 계산 */
-            if (salesStdDev3m === null && recentSalesActuals.length >= 2 && recentSalesActuals.every((v) => Number.isFinite(v))) {
-                const n = recentSalesActuals.length;
-                const mean = recentSalesActuals.reduce((s, v) => s + v, 0) / n;
-                const variance = recentSalesActuals.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
-                salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
-            }
             enriched.salesActualStdDev3m = salesStdDev3m;
             enriched.available_inventory_linked = linked;
             enriched.beginning_inventory_linked = linked;
@@ -4877,11 +4829,6 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
             enriched.salesPlanBreakdown = salesAggregate ? salesAggregate.channelBreakdown : null;
             chained.push(enriched);
             previousEnding = enriched.ending_inventory;
-
-            recentSalesActuals.push(Number.isFinite(enriched.sales_actual) ? enriched.sales_actual : null);
-            if (recentSalesActuals.length > 3) {
-                recentSalesActuals.shift();
-            }
         });
     });
 
@@ -7236,7 +7183,6 @@ async function loadData() {
             changeLogResponse,
             uploadHistoryResponse,
             optimalBaselineResponse,
-            recentSalesResponse,
             baseMaterialMasterResponse,
             monthlyClosingResponse,
             monthlySalesRecordResponse,
@@ -7251,7 +7197,6 @@ async function loadData() {
             fetch('/sales-api/production-change-logs?limit=1000'),
             fetch('/sales-api/sales-plan-upload-history?limit=1000&sort=-created_at'),
             fetch('/sales-api/optimal-inventory-baselines?limit=1000&sort=year,category'),
-            fetch('/sales-api/recent-sales-averages?limit=1000&sort=-created_at'),
             fetch('/sales-api/base-material-masters?limit=1000'),
             fetch('/sales-api/monthly-closings?limit=5000'),
             fetch('/sales-api/monthly-sales-records?limit=5000'),
@@ -7318,16 +7263,6 @@ async function loadData() {
         }
         state.salesChannels = channelData.map(normalizeSalesChannel);
         state.salesChannelIndex = buildSalesChannelIndex(state.salesChannels);
-
-        let recentSalesData = [];
-        if (recentSalesResponse && recentSalesResponse.ok) {
-            const recentSalesPayload = await safeJson(recentSalesResponse, { data: [] }, { label: '최근 3개월 판매실적 평균' });
-            recentSalesData = extractData(recentSalesPayload);
-        } else if (recentSalesResponse && !recentSalesResponse.ok) {
-            console.warn('최근 3개월 판매실적 평균 데이터를 불러오는 중 문제가 발생했습니다. 빈 목록을 사용합니다.');
-        }
-        state.recentSalesRecords = recentSalesData;
-        state.recentSalesIndex = buildRecentSalesAverageIndex(recentSalesData);
 
         let lineCapaData = [];
         if (lineCapaResponse && lineCapaResponse.ok) {
@@ -7637,10 +7572,10 @@ async function loadData() {
  * 경량 새로고침 — 변경 가능성이 높은 데이터만 서버에서 다시 가져옴.
  * 마스터성 데이터(채널, 라인자재마스터, 리뉴얼연결 등)는 기존 캐시 유지.
  *
- * 재호출 대상 (8개):
+ * 재호출 대상 (7개):
  *   snop-records, sales-plan-uploads, sales-plan-upload-history,
  *   line-capa-plans, optimal-inventory-baselines, base-material-masters,
- *   monthly-closings, monthly-sales-records, recent-sales-averages
+ *   monthly-closings, monthly-sales-records
  */
 async function refreshData() {
     try {
@@ -7654,7 +7589,6 @@ async function refreshData() {
             lineCapaResponse,
             uploadHistoryResponse,
             optimalBaselineResponse,
-            recentSalesResponse,
             baseMaterialMasterResponse,
             monthlyClosingResponse,
             monthlySalesRecordResponse,
@@ -7663,7 +7597,6 @@ async function refreshData() {
             fetch('/sales-api/line-capa-plans?limit=1000'),
             fetch('/sales-api/sales-plan-upload-history?limit=1000&sort=-created_at'),
             fetch('/sales-api/optimal-inventory-baselines?limit=1000&sort=year,category'),
-            fetch('/sales-api/recent-sales-averages?limit=1000&sort=-created_at'),
             fetch('/sales-api/base-material-masters?limit=1000'),
             fetch('/sales-api/monthly-closings?limit=5000'),
             fetch('/sales-api/monthly-sales-records?limit=5000'),
@@ -7699,14 +7632,6 @@ async function refreshData() {
             if (prevFB.has(fk)) keepFB.set(fk, prevFB.get(fk));
         });
         state.productionActualFallbacks = keepFB;
-
-        /* ── recent-sales-averages ── */
-        let recentSalesData = [];
-        if (recentSalesResponse && recentSalesResponse.ok) {
-            recentSalesData = extractData(await safeJson(recentSalesResponse, { data: [] }, { label: '판매실적 평균 (refresh)' }));
-        }
-        state.recentSalesRecords = recentSalesData;
-        state.recentSalesIndex = buildRecentSalesAverageIndex(recentSalesData);
 
         /* ── line-capa-plans ── */
         let lineCapaData = [];
@@ -9466,7 +9391,6 @@ function applyFilters() {
         : new Map();
     const enriched = buildChainedRecords(extendedRaw, lineStats, {
         salesAggregates: salesAggregatesMap,
-        recentSalesIndex: state.recentSalesIndex,
         monthlySalesRecords: state.monthlySalesRecords,
     });
     /* ── 제외 카테고리(원단/미지정) 필터링 — enrichedData 단계에서 적용 ── */
@@ -17852,23 +17776,8 @@ async function parseBulkFile(file) {
     return rows.filter((row) => Object.values(row).some((value) => sanitizeText(value)));
 }
 
-function getRecentSalesAverageKey(itemCode, baseMonth) {
-    const monthKey = sanitizeText(baseMonth).trim();
-    const codeKey = getNormalizedItemCode(itemCode);
-    if (!monthKey || !codeKey) return '';
-    return `${codeKey}__${monthKey}`;
-}
-
-function buildRecentSalesAverageIndex(records) {
-    const index = new Map();
-    (records || []).forEach((record) => {
-        if (!record) return;
-        const key = getRecentSalesAverageKey(record.item_code, record.base_month);
-        if (!key) return;
-        index.set(key, record);
-    });
-    return index;
-}
+/* getRecentSalesAverageKey / buildRecentSalesAverageIndex 제거 —
+ * salesActualAvg3m는 monthly-sales-records(RFC_005)만 사용 */
 
 function setRecentSalesUploadStatus(message, type = '') {
     if (!dom.recentSalesUpload || !dom.recentSalesUpload.status) return;
@@ -18614,20 +18523,7 @@ async function handleTargetInventoryUploadStart() {
 }
 
 // -------------------- 기타 기능 --------------------
-async function persistRecentSalesAverageRecord(payload, recordId) {
-    /* 하위호환: 기존 recent-sales-averages API가 남아있는 경우 대비 */
-    const endpoint = recordId ? `/sales-api/recent-sales-averages/${recordId}` : '/sales-api/recent-sales-averages';
-    const method = recordId ? 'PUT' : 'POST';
-    const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-        throw new Error(recordId ? '최근 3개월 판매실적 평균 수정 실패' : '최근 3개월 판매실적 평균 등록 실패');
-    }
-    return response.json();
-}
+/* persistRecentSalesAverageRecord 제거 — recent-sales-averages API 미사용 */
 
 async function handleRecentSalesUploadStart() {
     if (!dom.recentSalesUpload) return;

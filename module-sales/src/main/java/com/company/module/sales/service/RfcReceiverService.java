@@ -3,12 +3,14 @@ package com.company.module.sales.service;
 import com.company.module.sales.entity.BaseMaterialMaster;
 import com.company.module.sales.entity.InterfaceHistory;
 import com.company.module.sales.entity.MonthlyClosing;
+import com.company.module.sales.entity.MonthlySalesRecord;
 import com.company.module.sales.entity.PlantStorageLocation;
 import com.company.module.sales.entity.RenewalMaterialLinkage;
 import com.company.module.sales.entity.SnopRecord;
 import com.company.module.sales.repository.BaseMaterialMasterRepository;
 import com.company.module.sales.repository.InterfaceHistoryRepository;
 import com.company.module.sales.repository.MonthlyClosingRepository;
+import com.company.module.sales.repository.MonthlySalesRecordRepository;
 import com.company.module.sales.repository.PlantStorageLocationRepository;
 import com.company.module.sales.repository.RenewalMaterialLinkageRepository;
 import com.company.module.sales.repository.SnopRecordRepository;
@@ -30,6 +32,7 @@ import java.util.*;
  * SNOP_RFC_003: 생산실적         → MOD_SALES_SNOP_RECORD (production_actual)
  * SNOP_RFC_004: 판매실적         → MOD_SALES_SNOP_RECORD (sales_actual)
  * SNOP_RFC_005: 월말마감실적     → MOD_SALES_MONTHLY_CLOSING (ending_inventory, production_actual, sales_actual)
+ *                                   + MOD_SALES_MONTHLY_SALES_RECORD (sales_actual 자동 동기화)
  * SNOP_RFC_006: 리뉴얼자재연결  → MOD_SALES_RENEWAL_MATERIAL_LINKAGE
  */
 @Service
@@ -41,6 +44,7 @@ public class RfcReceiverService {
     private final PlantStorageLocationRepository plantStorageLocationRepo;
     private final SnopRecordRepository snopRecordRepo;
     private final MonthlyClosingRepository monthlyClosingRepo;
+    private final MonthlySalesRecordRepository monthlySalesRecordRepo;
     private final RenewalMaterialLinkageRepository renewalMaterialLinkageRepo;
     private final InterfaceHistoryRepository historyRepo;
 
@@ -1253,6 +1257,16 @@ public class RfcReceiverService {
                 insertCount++;
                 processedCount++;
 
+                // ── monthly_sales_record 자동 동기화 ──
+                // RFC_005로 수신된 sales_actual을 월별 판매실적 테이블에도 반영
+                try {
+                    syncToMonthlySalesRecord(record);
+                } catch (Exception syncEx) {
+                    log.warn("[RFC-005] monthly_sales_record 동기화 실패 (item_code={}, closing_month={}): {}",
+                            itemCode, closingMonth, syncEx.getMessage());
+                    // 동기화 실패는 전체 처리를 중단하지 않음
+                }
+
             } catch (Exception e) {
                 errors.add("Row " + (i + 1) + ": " + e.getMessage());
                 errorCount++;
@@ -1281,6 +1295,47 @@ public class RfcReceiverService {
         result.put("duration_ms", durationMs);
         result.put("closing_month", defaultClosingMonth);
         return result;
+    }
+
+    /**
+     * MonthlyClosing → MonthlySalesRecord 자동 동기화
+     * RFC_005로 수신된 sales_actual을 월별 판매실적 테이블에 upsert 한다.
+     * - 동일 item_code + closing_month가 있으면 sales_actual 업데이트
+     * - 없으면 신규 INSERT (source = "RFC005")
+     */
+    private void syncToMonthlySalesRecord(MonthlyClosing closing) {
+        String itemCode = closing.getItemCode();
+        String closingMonth = closing.getClosingMonth();
+        Long salesActual = closing.getSalesActual();
+
+        Optional<MonthlySalesRecord> optExisting =
+                monthlySalesRecordRepo.findByItemCodeAndClosingMonth(itemCode, closingMonth);
+
+        if (optExisting.isPresent()) {
+            // 기존 건 업데이트
+            MonthlySalesRecord existing = optExisting.get();
+            existing.setSalesActual(salesActual);
+            if (closing.getItemName() != null) existing.setItemName(closing.getItemName());
+            if (closing.getHierarchyName() != null) existing.setHierarchyName(closing.getHierarchyName());
+            if (closing.getUnit() != null) existing.setUnit(closing.getUnit());
+            existing.setSource("RFC005");
+            monthlySalesRecordRepo.save(existing);
+            log.info("[RFC-005] monthly_sales_record 업데이트: item_code={}, closing_month={}, sales_actual={}",
+                    itemCode, closingMonth, salesActual);
+        } else {
+            // 신규 INSERT
+            MonthlySalesRecord newRecord = new MonthlySalesRecord();
+            newRecord.setItemCode(itemCode);
+            newRecord.setClosingMonth(closingMonth);
+            newRecord.setSalesActual(salesActual);
+            newRecord.setItemName(closing.getItemName());
+            newRecord.setHierarchyName(closing.getHierarchyName());
+            newRecord.setUnit(closing.getUnit());
+            newRecord.setSource("RFC005");
+            monthlySalesRecordRepo.save(newRecord);
+            log.info("[RFC-005] monthly_sales_record 신규 등록: item_code={}, closing_month={}, sales_actual={}",
+                    itemCode, closingMonth, salesActual);
+        }
     }
 
     /**

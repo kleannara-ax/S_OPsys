@@ -18987,6 +18987,7 @@ function exportProductionTableXlsx() {
         return;
     }
 
+    const isOemExport = state.activeProductType === 'oem';
     const headers = [
         '계획 월',
         '우선순위',
@@ -19005,9 +19006,9 @@ function exportProductionTableXlsx() {
         '최근 3개월 판매실적 평균(BOX)',
         '최근 3개월 판매실적 편차(BOX)',
         '잔여 판매(BOX)',
-        '제안 생산계획(BOX)',
+        isOemExport ? '제안 입고계획(BOX)' : '제안 생산계획(BOX)',
         '적정재고 대비 필요량(BOX)',
-        '보정 생산계획(BOX)',
+        isOemExport ? '보정 입고계획(BOX)' : '보정 생산계획(BOX)',
         '차량대수',
         '수작업 투입수량(BOX)',
         'MOQ(BOX)',
@@ -19074,9 +19075,9 @@ function exportProductionTableXlsx() {
             '최근 3개월 판매실적 평균(BOX)': Number.isFinite(record.salesActualAvg3m) ? Math.round(record.salesActualAvg3m) : null,
             '최근 3개월 판매실적 편차(BOX)': Number.isFinite(record.salesActualStdDev3m) ? Math.round(record.salesActualStdDev3m) : null,
             '잔여 판매(BOX)': Number.isFinite(record.sales_remaining) ? record.sales_remaining : null,
-            '제안 생산계획(BOX)': Number.isFinite(record.suggested_production) ? record.suggested_production : null,
+            [isOemExport ? '제안 입고계획(BOX)' : '제안 생산계획(BOX)']: Number.isFinite(record.suggested_production) ? record.suggested_production : null,
             '적정재고 대비 필요량(BOX)': Number.isFinite(record.required_quantity) ? record.required_quantity : null,
-            '보정 생산계획(BOX)': Number.isFinite(record.adjusted_production_plan) ? record.adjusted_production_plan : null,
+            [isOemExport ? '보정 입고계획(BOX)' : '보정 생산계획(BOX)']: Number.isFinite(record.adjusted_production_plan) ? record.adjusted_production_plan : null,
             '차량대수': (() => {
                 const adjBox = Number.isFinite(record.adjusted_production_plan) ? record.adjusted_production_plan : null;
                 let moqBoxVal = (Number.isFinite(record.moq) && record.moq > 0) ? record.moq : null;
@@ -19629,7 +19630,7 @@ function bindEvents() {
             /* OEM 탭 전환 시 제안 생산계획 → 입고계획 헤더 변경 */
             const productionPlanTh = document.querySelector('#plan-table th.col-production-plan');
             if (productionPlanTh) {
-                productionPlanTh.textContent = type === 'oem' ? '입고계획' : '제안 생산계획';
+                productionPlanTh.textContent = type === 'oem' ? '제안 입고계획' : '제안 생산계획';
             }
             /* OEM 탭 전환 시 협력업체명 필터 표시/숨김 */
             if (dom.filters.vendorLabel) {
@@ -19663,6 +19664,11 @@ function bindEvents() {
             const productionProgressTh = document.querySelector('#plan-table th.col-production-progress');
             if (productionProgressTh) {
                 productionProgressTh.textContent = isOem ? '입고진행현황(%)' : '생산진행현황(%)';
+            }
+            /* OEM 탭 전환 시 보정 생산계획 → 보정 입고계획 헤더 변경 */
+            const adjustedPlanTh = document.querySelector('#plan-table th.col-adjusted-plan');
+            if (adjustedPlanTh) {
+                adjustedPlanTh.textContent = isOem ? '보정 입고계획' : '보정 생산계획';
             }
             applyFilters();
         });

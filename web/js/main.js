@@ -19354,17 +19354,19 @@ async function handleOemVendorMoqUploadStart() {
         }
 
         const result = await response.json();
-        const msgs = [`업로드 완료: ${result.updated}건 업데이트`];
-        if (result.skipped > 0) msgs.push(`${result.skipped}건 건너뜀`);
-        if (result.not_found > 0) msgs.push(`${result.not_found}건 자재 미발견`);
+        /* ApiResponse 래퍼 처리: { data: { updated, skipped, ... } } */
+        const resultData = result.data || result;
+        const msgs = [`업로드 완료: ${resultData.updated ?? 0}건 업데이트`];
+        if (resultData.skipped > 0) msgs.push(`${resultData.skipped}건 건너뜀`);
+        if (resultData.not_found > 0) msgs.push(`${resultData.not_found}건 자재 미발견`);
         if (allErrors.length > 0) msgs.push(`파일 오류 ${allErrors.length}건`);
-        if (result.errors && result.errors.length > 0) {
-            result.errors.forEach((e) => {
+        if (resultData.errors && resultData.errors.length > 0) {
+            resultData.errors.forEach((e) => {
                 msgs.push(`  - ${e.item_code}: ${e.reason}`);
             });
         }
 
-        const statusType = result.updated > 0 ? 'success' : 'warning';
+        const statusType = resultData.updated > 0 ? 'success' : 'warning';
         setOemUploadStatus(msgs.join('\n'), statusType);
 
         /* 데이터 다시 불러오기 */

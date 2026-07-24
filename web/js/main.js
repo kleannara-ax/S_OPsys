@@ -19006,11 +19006,11 @@ function exportProductionTableXlsx() {
         '최근 3개월 판매실적 평균(BOX)',
         '최근 3개월 판매실적 편차(BOX)',
         '잔여 판매(BOX)',
+        '수작업 투입수량(BOX)',
         isOemExport ? '제안 입고계획(BOX)' : '제안 생산계획(BOX)',
         '적정재고 대비 필요량(BOX)',
         isOemExport ? '보정 입고계획(BOX)' : '보정 생산계획(BOX)',
         '차량대수',
-        '수작업 투입수량(BOX)',
         'MOQ(BOX)',
         '라인 총생산(BOX)',
         '생산실적(BOX)',
@@ -19075,6 +19075,7 @@ function exportProductionTableXlsx() {
             '최근 3개월 판매실적 평균(BOX)': Number.isFinite(record.salesActualAvg3m) ? Math.round(record.salesActualAvg3m) : null,
             '최근 3개월 판매실적 편차(BOX)': Number.isFinite(record.salesActualStdDev3m) ? Math.round(record.salesActualStdDev3m) : null,
             '잔여 판매(BOX)': Number.isFinite(record.sales_remaining) ? record.sales_remaining : null,
+            '수작업 투입수량(BOX)': (Number.isFinite(record.manual_input_quantity) && record.manual_input_quantity > 0) ? record.manual_input_quantity : null,
             [isOemExport ? '제안 입고계획(BOX)' : '제안 생산계획(BOX)']: Number.isFinite(record.suggested_production) ? record.suggested_production : null,
             '적정재고 대비 필요량(BOX)': Number.isFinite(record.required_quantity) ? record.required_quantity : null,
             [isOemExport ? '보정 입고계획(BOX)' : '보정 생산계획(BOX)']: Number.isFinite(record.adjusted_production_plan) ? record.adjusted_production_plan : null,
@@ -19090,7 +19091,6 @@ function exportProductionTableXlsx() {
                 }
                 return null;
             })(),
-            '수작업 투입수량(BOX)': (Number.isFinite(record.manual_input_quantity) && record.manual_input_quantity > 0) ? record.manual_input_quantity : null,
             'MOQ(BOX)': Number.isFinite(record.moq) ? record.moq : null,
             'MOQ(EA)': (() => { const r = getConversionRates(record.item_code); const u = convertFromBox(record.moq, r); return Number.isFinite(u.ea) ? u.ea : null; })(),  /* headers에는 미포함 — 별도 열 */
             'MOQ(BAG)': (() => { const r = getConversionRates(record.item_code); const u = convertFromBox(record.moq, r); return Number.isFinite(u.bag) ? u.bag : null; })(),

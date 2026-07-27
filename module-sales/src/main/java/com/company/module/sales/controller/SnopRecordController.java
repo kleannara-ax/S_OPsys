@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -103,6 +104,16 @@ public class SnopRecordController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         service.delete(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "삭제 완료"));
+    }
+
+    /**
+     * 수작업 투입수량 일괄 업로드.
+     * Body: [ { "item_code": "...", "plan_month": "2026-07", "manual_input_quantity": 100 }, ... ]
+     */
+    @PutMapping("/manual-input-bulk")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> bulkUpdateManualInput(
+            @RequestBody List<Map<String, Object>> items) {
+        return ResponseEntity.ok(ApiResponse.ok(service.bulkUpdateManualInputQuantity(items)));
     }
 
     /**

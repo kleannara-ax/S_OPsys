@@ -228,6 +228,26 @@ const OEM_VENDOR_MOQ_COLUMN_MAP = {
     'minimum order quantity': 'moq',
 };
 
+/* 수작업 투입수량 일괄 업로드 컬럼 매핑 */
+const MANUAL_INPUT_COLUMN_MAP = {
+    'item_code': 'item_code',
+    'item code': 'item_code',
+    '자재코드': 'item_code',
+    '자재 코드': 'item_code',
+    'material_code': 'item_code',
+    'sku': 'item_code',
+    'SKU': 'item_code',
+    'manual_input_quantity': 'manual_input_quantity',
+    '수작업투입수량': 'manual_input_quantity',
+    '수작업 투입수량': 'manual_input_quantity',
+    '수작업투입수량(box)': 'manual_input_quantity',
+    '수작업 투입수량(box)': 'manual_input_quantity',
+    '투입수량': 'manual_input_quantity',
+    '투입수량(box)': 'manual_input_quantity',
+    'manual input quantity': 'manual_input_quantity',
+    'manual_input': 'manual_input_quantity',
+};
+
 function deriveCategoryFromItemName(itemName) {
     const name = sanitizeText(itemName).trim();
     if (!name) return '';
@@ -562,6 +582,16 @@ const dom = {
         startButton: document.querySelector('#btn-start-priority-upload'),
         templateButton: document.querySelector('#btn-priority-template'),
         status: document.querySelector('#priority-upload-status'),
+    },
+    manualInputUpload: {
+        openButton: document.querySelector('#btn-open-manual-input-upload'),
+        modal: document.querySelector('#manual-input-upload-modal'),
+        closeButton: document.querySelector('#btn-close-manual-input-upload'),
+        backdrop: document.querySelector('#manual-input-upload-modal [data-close-manual-input-modal]'),
+        templateButton: document.querySelector('#btn-manual-input-template'),
+        fileInput: document.querySelector('#manual-input-file-input'),
+        startButton: document.querySelector('#btn-start-manual-input-upload'),
+        status: document.querySelector('#manual-input-upload-status'),
     },
     targetInventoryUpload: {
         openButton: document.querySelector('#btn-open-target-inventory-upload'),
@@ -19276,6 +19306,215 @@ function exportCsv() {
     URL.revokeObjectURL(url);
 }
 
+// -------------------- 수작업 투입수량 일괄 업로드 --------------------
+function resetManualInputUploadModal() {
+    const m = dom.manualInputUpload;
+    if (!m) return;
+    if (m.fileInput) m.fileInput.value = '';
+    if (m.startButton) {
+        m.startButton.removeAttribute('disabled');
+        m.startButton.textContent = '업로드 시작';
+    }
+    setManualInputUploadStatus('');
+}
+
+function setManualInputUploadStatus(message, type = '') {
+    const el = dom.manualInputUpload?.status;
+    if (!el) return;
+    el.textContent = message;
+    el.className = 'bulk-status';
+    if (type === 'error') el.classList.add('status-error');
+    else if (type === 'success') el.classList.add('status-success');
+    else if (type === 'warning') el.classList.add('status-warning');
+}
+
+function handleManualInputTemplateDownload() {
+    try {
+        const header = ['자재코드', '자재명칭', '수작업투입수량(BOX)'];
+
+        /* 현재 선택된 계획 월 (필터 기준) */
+        const selectedMonth = dom.filters?.month?.value || '';
+
+        /* 생산계획 현황에 등록된 자재 추출 (현재 월 필터 기준, 중복 제거) */
+        const seen = new Set();
+        const itemList = [];
+        (state.rawData || []).forEach((record) => {
+            const code = sanitizeText(record.item_code).trim();
+            if (!code || seen.has(code)) return;
+            const recMonth = sanitizeText(record.month || record.plan_month || '').trim();
+            if (selectedMonth && recMonth !== selectedMonth) return;
+            seen.add(code);
+            const name = sanitizeText(record.item_name).trim();
+            const currentQty = (Number.isFinite(record.manual_input_quantity) && record.manual_input_quantity > 0)
+                ? record.manual_input_quantity : '';
+            itemList.push({ code, name, currentQty });
+        });
+        itemList.sort((a, b) => a.code.localeCompare(b.code));
+
+        let dataRows;
+        if (itemList.length > 0) {
+            dataRows = itemList.map((item) => [item.code, item.name, item.currentQty]);
+        } else {
+            dataRows = [
+                ['SBW-EZP0003A', '(예시) 자재명칭', 100],
+                ['KNR-SF030', '(예시) 자재명칭', 200],
+            ];
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
+        worksheet['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 22 }];
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, '수작업 투입수량');
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const monthSuffix = selectedMonth || 'all';
+        link.download = `snop_manual_input_template_${monthSuffix}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        const countMsg = itemList.length > 0 ? `(${itemList.length}개 자재 포함)` : '';
+        setManualInputUploadStatus(`수작업 투입수량 템플릿 파일을 다운로드했습니다. ${countMsg} 수량을 입력 후 업로드하세요.`, 'success');
+    } catch (error) {
+        console.error(error);
+        setManualInputUploadStatus('템플릿을 생성하는 중 오류가 발생했습니다.', 'error');
+    }
+}
+
+function mapManualInputRow(rawRow, index) {
+    const normalized = {};
+    for (const [key, value] of Object.entries(rawRow)) {
+        const trimmedKey = normalizeBulkKey(sanitizeText(key).trim());
+        const mappedKey = MANUAL_INPUT_COLUMN_MAP[trimmedKey];
+        if (mappedKey) {
+            normalized[mappedKey] = value;
+        }
+    }
+
+    const errors = [];
+    const rowNumber = index + 2;
+
+    const itemCode = sanitizeText(normalized.item_code || '').trim().toUpperCase();
+    if (!itemCode) {
+        errors.push('자재코드를 입력하세요.');
+    }
+
+    const rawValue = sanitizeText(normalized.manual_input_quantity ?? '').trim();
+    let qty = 0;
+    if (rawValue !== '') {
+        const parsed = toNumber(rawValue);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+            errors.push('수작업투입수량은 0 이상의 숫자를 입력하세요.');
+        } else {
+            qty = Math.round(parsed);
+        }
+    }
+
+    return {
+        rowNumber,
+        errors,
+        payload: {
+            item_code: itemCode,
+            manual_input_quantity: qty,
+        },
+    };
+}
+
+async function handleManualInputUploadStart() {
+    const m = dom.manualInputUpload;
+    if (!m || !m.fileInput || !m.fileInput.files.length) {
+        setManualInputUploadStatus('업로드할 파일을 선택하세요.', 'error');
+        return;
+    }
+
+    /* 현재 선택된 계획 월 확인 */
+    const selectedMonth = dom.filters?.month?.value || '';
+    if (!selectedMonth) {
+        setManualInputUploadStatus('계획 월을 먼저 선택하세요. (필터에서 계획 월 선택 후 다시 시도)', 'error');
+        return;
+    }
+
+    const file = m.fileInput.files[0];
+    if (m.startButton) {
+        m.startButton.setAttribute('disabled', 'disabled');
+        m.startButton.textContent = '업로드 중...';
+    }
+    setManualInputUploadStatus('파일을 분석하는 중입니다...');
+
+    try {
+        const rows = await parseBulkFile(file);
+        if (!rows || rows.length === 0) {
+            setManualInputUploadStatus('시트에서 데이터를 찾지 못했습니다. 템플릿 양식을 확인하세요.', 'error');
+            return;
+        }
+
+        const mapped = rows.map((row, index) => mapManualInputRow(row, index));
+        const errors = mapped.filter((item) => item.errors.length > 0);
+        const validRecords = mapped.filter((item) => item.errors.length === 0);
+
+        if (validRecords.length === 0) {
+            const errorMessages = errors
+                .slice(0, 5)
+                .map((e) => `Row ${e.rowNumber}: ${e.errors.join(', ')}`)
+                .join('\n');
+            setManualInputUploadStatus(`모든 행에 오류가 있습니다.\n${errorMessages}`, 'error');
+            return;
+        }
+
+        /* 서버 전송용 payload 구성 (plan_month 추가) */
+        const payloads = validRecords.map((r) => ({
+            item_code: r.payload.item_code,
+            plan_month: selectedMonth,
+            manual_input_quantity: r.payload.manual_input_quantity,
+        }));
+
+        setManualInputUploadStatus(`총 ${payloads.length}건의 수작업 투입수량을 업로드합니다... (계획 월: ${selectedMonth})`);
+
+        const response = await fetch('/sales-api/snop-records/manual-input-bulk', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloads),
+        });
+
+        if (!response.ok) {
+            throw new Error(`서버 오류: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const resultData = result.data || result;
+
+        const msgs = [`업로드 완료: ${resultData.updated ?? 0}건 업데이트`];
+        if (resultData.not_found > 0) msgs.push(`${resultData.not_found}건 레코드 미발견`);
+        if (resultData.skipped > 0) msgs.push(`${resultData.skipped}건 건너뜀`);
+        if (errors.length > 0) msgs.push(`파일 오류 ${errors.length}건`);
+        if (resultData.errors && resultData.errors.length > 0) {
+            resultData.errors.slice(0, 5).forEach((e) => {
+                msgs.push(`  - ${e.item_code}: ${e.reason}`);
+            });
+        }
+
+        const statusType = resultData.updated > 0 ? 'success' : 'warning';
+        setManualInputUploadStatus(msgs.join('\n'), statusType);
+
+        /* 데이터 다시 불러오기 */
+        await loadData();
+
+    } catch (error) {
+        console.error('수작업 투입수량 업로드 오류:', error);
+        setManualInputUploadStatus(`업로드 중 오류 발생: ${error.message}`, 'error');
+    } finally {
+        if (m.startButton) {
+            m.startButton.removeAttribute('disabled');
+            m.startButton.textContent = '업로드 시작';
+        }
+        if (m.fileInput) m.fileInput.value = '';
+    }
+}
+
 // -------------------- OEM 협력업체/MOQ 일괄 업로드 --------------------
 function setOemUploadStatus(message, type = '') {
     const el = document.getElementById('oem-vendor-moq-status');
@@ -20137,6 +20376,42 @@ function bindEvents() {
             if (!button) return;
             button.addEventListener('click', handleBulkTemplateDownload);
         });
+    }
+
+    /* 수작업 투입수량 업로드 모달 이벤트 */
+    if (dom.manualInputUpload) {
+        const miu = dom.manualInputUpload;
+        if (miu.openButton) {
+            miu.openButton.addEventListener('click', () => {
+                if (miu.modal) {
+                    miu.modal.classList.remove('hidden');
+                    resetManualInputUploadModal();
+                }
+            });
+        }
+        if (miu.closeButton) {
+            miu.closeButton.addEventListener('click', () => {
+                if (miu.modal) miu.modal.classList.add('hidden');
+            });
+        }
+        if (miu.backdrop) {
+            miu.backdrop.addEventListener('click', () => {
+                if (miu.modal) miu.modal.classList.add('hidden');
+            });
+        }
+        if (miu.templateButton) {
+            miu.templateButton.addEventListener('click', handleManualInputTemplateDownload);
+        }
+        if (miu.startButton) {
+            miu.startButton.addEventListener('click', handleManualInputUploadStart);
+        }
+        if (miu.fileInput) {
+            miu.fileInput.addEventListener('change', () => {
+                if (miu.fileInput.files && miu.fileInput.files.length > 0) {
+                    setManualInputUploadStatus('파일을 선택했습니다. 업로드를 시작하세요.');
+                }
+            });
+        }
     }
 
     /* SKU별 적정재고 업로드 모달 이벤트 */

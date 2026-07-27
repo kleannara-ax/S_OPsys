@@ -19330,7 +19330,7 @@ function setManualInputUploadStatus(message, type = '') {
 
 function handleManualInputTemplateDownload() {
     try {
-        const header = ['자재코드', '자재명칭', '수작업투입수량(BOX)'];
+        const header = ['자재코드', '수작업투입수량(BOX)'];
 
         /* 현재 선택된 계획 월 (필터 기준) */
         const selectedMonth = dom.filters?.month?.value || '';
@@ -19344,25 +19344,24 @@ function handleManualInputTemplateDownload() {
             const recMonth = sanitizeText(record.month || record.plan_month || '').trim();
             if (selectedMonth && recMonth !== selectedMonth) return;
             seen.add(code);
-            const name = sanitizeText(record.item_name).trim();
             const currentQty = (Number.isFinite(record.manual_input_quantity) && record.manual_input_quantity > 0)
                 ? record.manual_input_quantity : '';
-            itemList.push({ code, name, currentQty });
+            itemList.push({ code, currentQty });
         });
         itemList.sort((a, b) => a.code.localeCompare(b.code));
 
         let dataRows;
         if (itemList.length > 0) {
-            dataRows = itemList.map((item) => [item.code, item.name, item.currentQty]);
+            dataRows = itemList.map((item) => [item.code, item.currentQty]);
         } else {
             dataRows = [
-                ['SBW-EZP0003A', '(예시) 자재명칭', 100],
-                ['KNR-SF030', '(예시) 자재명칭', 200],
+                ['SBW-EZP0003A', 100],
+                ['KNR-SF030', 200],
             ];
         }
 
         const worksheet = XLSX.utils.aoa_to_sheet([header, ...dataRows]);
-        worksheet['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 22 }];
+        worksheet['!cols'] = [{ wch: 18 }, { wch: 22 }];
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, '수작업 투입수량');
         const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

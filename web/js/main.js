@@ -18988,6 +18988,11 @@ function exportProductionTableXlsx() {
     }
 
     const isOemExport = state.activeProductType === 'oem';
+    const ppLabel = isOemExport ? '제안 입고계획' : '제안 생산계획';
+    const adjLabel = isOemExport ? '보정 입고계획' : '보정 생산계획';
+    const paLabel = isOemExport ? '입고실적' : '생산실적';
+    const prLabel = isOemExport ? '잔여입고' : '잔여생산';
+    const progLabel = isOemExport ? '입고진행현황(%)' : '생산진행현황(%)';
     const headers = [
         '계획 월',
         '우선순위',
@@ -18995,7 +19000,7 @@ function exportProductionTableXlsx() {
         '자재 코드',
         '자재 명칭',
         '생산 라인',
-        '협력업체명',
+        ...(isOemExport ? ['협력업체명'] : []),
         '현재고(BOX)',
         '가용재고(BOX)',
         '재고일수(현재고기준)',
@@ -19007,14 +19012,15 @@ function exportProductionTableXlsx() {
         '최근 3개월 판매실적 편차(BOX)',
         '잔여 판매(BOX)',
         '수작업 투입수량(BOX)',
-        isOemExport ? '제안 입고계획(BOX)' : '제안 생산계획(BOX)',
-        '적정재고 대비 필요량(BOX)',
-        isOemExport ? '보정 입고계획(BOX)' : '보정 생산계획(BOX)',
-        '차량대수',
-        'MOQ(BOX)',
-        '라인 총생산(BOX)',
-        '생산실적(BOX)',
-        '잔여생산(BOX)',
+        `${ppLabel}(EA)`, `${ppLabel}(BAG)`, `${ppLabel}(BOX)`,
+        '적정재고 대비 필요량(EA)', '적정재고 대비 필요량(BAG)', '적정재고 대비 필요량(BOX)',
+        `${adjLabel}(EA)`, `${adjLabel}(BAG)`, `${adjLabel}(BOX)`,
+        ...(isOemExport ? ['분할(MOQ기준)'] : []),
+        ...(isOemExport ? ['MOQ(EA)', 'MOQ(BAG)', 'MOQ(BOX)'] : []),
+        '라인 총생산(EA)', '라인 총생산(BAG)', '라인 총생산(BOX)',
+        `${paLabel}(EA)`, `${paLabel}(BAG)`, `${paLabel}(BOX)`,
+        `${prLabel}(EA)`, `${prLabel}(BAG)`, `${prLabel}(BOX)`,
+        progLabel,
         '예상 월말 재고(BOX)',
         '재고일수(예상월말재고기준)',
         '소진일자(예상월말재고기준)',
@@ -19023,6 +19029,7 @@ function exportProductionTableXlsx() {
         '라인 CAPA',
         'CAPA 대비',
         'CAPA 상태',
+        '생산소요시간',
         '비고',
     ];
 
@@ -19038,7 +19045,8 @@ function exportProductionTableXlsx() {
     });
 
     const rows = sortedRecords.map((record) => {
-        const totalProduction = Number.isFinite(record.lineTotalProduction)
+        const convRates = getConversionRates(record.item_code);
+        const totalProductionBox = Number.isFinite(record.lineTotalProduction)
             ? record.lineTotalProduction
             : (Number.isFinite(record.production_plan) ? record.production_plan : null);
         const capacityLimit = Number.isFinite(record.lineCapacityLimit)
@@ -19048,16 +19056,55 @@ function exportProductionTableXlsx() {
             ? `${(record.lineCapacityRatio * 100).toFixed(1)}%`
             : '';
 
-        return {
+        /* BOX → EA/BAG 환산 헬퍼 */
+        const toEA = (box) => { const u = convertFromBox(box, convRates); return Number.isFinite(u.ea) ? u.ea : null; };
+        const toBAG = (box) => { const u = convertFromBox(box, convRates); return Number.isFinite(u.bag) ? u.bag : null; };
+        const toNullBox = (v) => Number.isFinite(v) ? v : null;
+
+        /* 제안 생산/입고계획 BOX */
+        const suggestedBox = toNullBox(record.suggested_production);
+        /* 적정재고 대비 필요량 BOX */
+        const requiredBox = toNullBox(record.required_quantity);
+        /* 보정 생산/입고계획 BOX */
+        const adjustedBox = toNullBox(record.adjusted_production_plan);
+        /* 생산실적 BOX */
+        const prodActualBox = toNullBox(record.production_actual);
+        /* 잔여생산 BOX */
+        const prodRemainingBox = toNullBox(record.production_remaining);
+
+        /* 분할(MOQ기준) — OEM 전용 */
+        const vehicleCount = (() => {
+            if (!isOemExport) return null;
+            const adjBox = adjustedBox;
+            let moqBoxVal = (Number.isFinite(record.moq) && record.moq > 0) ? record.moq : null;
+            if (moqBoxVal === null) {
+                const mst = (state.baseMaterialMasters || []).find(m => m.item_code === record.item_code);
+                if (mst && Number.isFinite(mst.moq) && mst.moq > 0) moqBoxVal = mst.moq;
+            }
+            if (adjBox !== null && moqBoxVal !== null && moqBoxVal > 0) {
+                return Number((adjBox / moqBoxVal).toFixed(1));
+            }
+            return null;
+        })();
+
+        /* 생산진행현황 */
+        const progressValue = (() => {
+            const plan = adjustedBox !== null ? adjustedBox : suggestedBox;
+            if (!Number.isFinite(plan) || plan === 0) return '';
+            const actual = prodActualBox !== null ? prodActualBox : 0;
+            return `${((actual / plan) * 100).toFixed(1)}%`;
+        })();
+
+        const obj = {
             '계획 월': sanitizeText(record.month),
             '우선순위': Number.isFinite(record.priority) ? record.priority : null,
             '카테고리': sanitizeText(record.category),
             '자재 코드': sanitizeText(record.item_code),
             '자재 명칭': sanitizeText(record.item_name),
             '생산 라인': sanitizeText(record.production_line),
-            '협력업체명': sanitizeText(record.vendor_name),
-            '현재고(BOX)': Number.isFinite(record.available_inventory) ? record.available_inventory : null,
-            '가용재고(BOX)': Number.isFinite(record.beginning_inventory) ? record.beginning_inventory : null,
+            ...(isOemExport ? { '협력업체명': sanitizeText(record.vendor_name) } : {}),
+            '현재고(BOX)': toNullBox(record.available_inventory),
+            '가용재고(BOX)': toNullBox(record.beginning_inventory),
             '재고일수(현재고기준)': (Number.isFinite(record.available_inventory) && Number.isFinite(record.salesActualAvg3m) && record.salesActualAvg3m > 0)
                 ? Number(((record.available_inventory / record.salesActualAvg3m) * 30.42).toFixed(1))
                 : null,
@@ -19069,35 +19116,39 @@ function exportProductionTableXlsx() {
                 }
                 return null;
             })(),
-            '판매 계획(BOX)': Number.isFinite(record.sales_plan) ? record.sales_plan : null,
-            '판매 실적(BOX)': Number.isFinite(record.sales_actual) ? record.sales_actual : null,
+            '판매 계획(BOX)': toNullBox(record.sales_plan),
+            '판매 실적(BOX)': toNullBox(record.sales_actual),
             '납품율(%)': Number.isFinite(record.delivery_rate) ? `${(record.delivery_rate * 100).toFixed(1)}%` : '',
             '최근 3개월 판매실적 평균(BOX)': Number.isFinite(record.salesActualAvg3m) ? Math.round(record.salesActualAvg3m) : null,
             '최근 3개월 판매실적 편차(BOX)': Number.isFinite(record.salesActualStdDev3m) ? Math.round(record.salesActualStdDev3m) : null,
-            '잔여 판매(BOX)': Number.isFinite(record.sales_remaining) ? record.sales_remaining : null,
+            '잔여 판매(BOX)': toNullBox(record.sales_remaining),
             '수작업 투입수량(BOX)': (Number.isFinite(record.manual_input_quantity) && record.manual_input_quantity > 0) ? record.manual_input_quantity : null,
-            [isOemExport ? '제안 입고계획(BOX)' : '제안 생산계획(BOX)']: Number.isFinite(record.suggested_production) ? record.suggested_production : null,
-            '적정재고 대비 필요량(BOX)': Number.isFinite(record.required_quantity) ? record.required_quantity : null,
-            [isOemExport ? '보정 입고계획(BOX)' : '보정 생산계획(BOX)']: Number.isFinite(record.adjusted_production_plan) ? record.adjusted_production_plan : null,
-            '차량대수': (() => {
-                const adjBox = Number.isFinite(record.adjusted_production_plan) ? record.adjusted_production_plan : null;
-                let moqBoxVal = (Number.isFinite(record.moq) && record.moq > 0) ? record.moq : null;
-                if (moqBoxVal === null) {
-                    const mst = (state.baseMaterialMasters || []).find(m => m.item_code === record.item_code);
-                    if (mst && Number.isFinite(mst.moq) && mst.moq > 0) moqBoxVal = mst.moq;
-                }
-                if (adjBox !== null && moqBoxVal !== null && moqBoxVal > 0) {
-                    return Number((adjBox / moqBoxVal).toFixed(1));
-                }
-                return null;
-            })(),
-            'MOQ(BOX)': Number.isFinite(record.moq) ? record.moq : null,
-            'MOQ(EA)': (() => { const r = getConversionRates(record.item_code); const u = convertFromBox(record.moq, r); return Number.isFinite(u.ea) ? u.ea : null; })(),  /* headers에는 미포함 — 별도 열 */
-            'MOQ(BAG)': (() => { const r = getConversionRates(record.item_code); const u = convertFromBox(record.moq, r); return Number.isFinite(u.bag) ? u.bag : null; })(),
-            '라인 총생산(BOX)': Number.isFinite(totalProduction) ? totalProduction : null,
-            '생산실적(BOX)': Number.isFinite(record.production_actual) ? record.production_actual : null,
-            '잔여생산(BOX)': Number.isFinite(record.production_remaining) ? record.production_remaining : null,
-            '예상 월말 재고(BOX)': Number.isFinite(record.ending_inventory) ? record.ending_inventory : null,
+            [`${ppLabel}(EA)`]: toEA(suggestedBox),
+            [`${ppLabel}(BAG)`]: toBAG(suggestedBox),
+            [`${ppLabel}(BOX)`]: suggestedBox,
+            '적정재고 대비 필요량(EA)': toEA(requiredBox),
+            '적정재고 대비 필요량(BAG)': toBAG(requiredBox),
+            '적정재고 대비 필요량(BOX)': requiredBox,
+            [`${adjLabel}(EA)`]: toEA(adjustedBox),
+            [`${adjLabel}(BAG)`]: toBAG(adjustedBox),
+            [`${adjLabel}(BOX)`]: adjustedBox,
+            ...(isOemExport ? { '분할(MOQ기준)': vehicleCount } : {}),
+            ...(isOemExport ? {
+                'MOQ(EA)': toEA(record.moq),
+                'MOQ(BAG)': toBAG(record.moq),
+                'MOQ(BOX)': toNullBox(record.moq),
+            } : {}),
+            '라인 총생산(EA)': toEA(totalProductionBox),
+            '라인 총생산(BAG)': toBAG(totalProductionBox),
+            '라인 총생산(BOX)': toNullBox(totalProductionBox),
+            [`${paLabel}(EA)`]: toEA(prodActualBox),
+            [`${paLabel}(BAG)`]: toBAG(prodActualBox),
+            [`${paLabel}(BOX)`]: prodActualBox,
+            [`${prLabel}(EA)`]: toEA(prodRemainingBox),
+            [`${prLabel}(BAG)`]: toBAG(prodRemainingBox),
+            [`${prLabel}(BOX)`]: prodRemainingBox,
+            [progLabel]: progressValue,
+            '예상 월말 재고(BOX)': toNullBox(record.ending_inventory),
             '재고일수(예상월말재고기준)': (Number.isFinite(record.ending_inventory) && Number.isFinite(record.salesActualAvg3m) && record.salesActualAvg3m > 0)
                 ? Number(((record.ending_inventory / record.salesActualAvg3m) * 30.42).toFixed(1))
                 : null,
@@ -19109,13 +19160,16 @@ function exportProductionTableXlsx() {
                 }
                 return null;
             })(),
-            'SKU별 적정재고(BOX)': Number.isFinite(record.target_ending_inventory) ? record.target_ending_inventory : null,
+            'SKU별 적정재고(BOX)': toNullBox(record.target_ending_inventory),
             '재고 상태': record.inventoryStatus ? sanitizeText(record.inventoryStatus.label) : '',
             '라인 CAPA': Number.isFinite(capacityLimit) ? capacityLimit : null,
             'CAPA 대비': ratio,
             'CAPA 상태': record.lineCapacityStatus ? sanitizeText(record.lineCapacityStatus.label) : '',
+            '생산소요시간': Number.isFinite(record.productionLeadTimeHours)
+                ? `${record.productionLeadTimeHours.toFixed(2)} 시간` : '',
             '비고': sanitizeText(record.notes),
         };
+        return obj;
     });
 
     const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });

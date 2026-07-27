@@ -911,6 +911,7 @@
                         <button id="btn-export-xlsx" type="button" class="secondary">엑셀 내보내기 (XLSX)</button>
                         <button id="btn-open-priority-upload" type="button" class="secondary">자재순서 업로드</button>
                         <button id="btn-confirm-production-changes" type="button" class="primary" disabled aria-disabled="true">변경 로그 확정 (0건)</button>
+                        <button id="btn-open-manual-input-upload" type="button" class="secondary">수작업 투입수량 업로드</button>
                         <button id="btn-open-target-inventory-upload" type="button" class="secondary">SKU별 적정재고 업로드</button>
                         <button id="btn-sync-from-master" type="button" class="secondary">자재마스터 동기화</button>
                         <button id="btn-expand-table" type="button" class="secondary" title="테이블 확대 보기">&#x26F6; 확대 보기</button>
@@ -1844,6 +1845,40 @@
         </div>
     </div>
 
+    <!-- 수작업 투입수량 업로드 모달 -->
+    <div id="manual-input-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="manual-input-upload-title">
+        <div class="modal-backdrop" data-close-manual-input-modal></div>
+        <div class="modal-window">
+            <div class="modal-header">
+                <h3 id="manual-input-upload-title">수작업 투입수량 업로드</h3>
+                <button class="ghost modal-close" type="button" id="btn-close-manual-input-upload">닫기</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">
+                    엑셀 또는 CSV 파일을 업로드하면 수작업 투입수량을 한 번에 등록할 수 있습니다.<br>
+                    아래 템플릿을 내려받아 작성하거나, 동일한 컬럼명을 사용해 파일을 준비하세요.
+                </p>
+                <div class="modal-instructions">
+                    <button type="button" class="secondary small" id="btn-manual-input-template">수작업 투입수량 템플릿 다운로드 (XLSX)</button>
+                    <ul>
+                        <li>필수 컬럼: <strong>자재코드, 수작업투입수량(BOX)</strong></li>
+                        <li>수작업투입수량은 BOX 단위 숫자로 입력하세요.</li>
+                        <li>현재 선택된 계획 월의 레코드에 일괄 반영됩니다.</li>
+                        <li>0 또는 공란 입력 시 해당 자재의 수작업 투입수량이 0으로 초기화됩니다.</li>
+                    </ul>
+                </div>
+                <div class="modal-upload">
+                    <label class="upload-label" for="manual-input-file-input">
+                        파일 선택 (xlsx, xls, csv)
+                    </label>
+                    <input type="file" id="manual-input-file-input" accept=".xlsx,.xls,.csv">
+                    <button type="button" id="btn-start-manual-input-upload" class="primary">업로드 시작</button>
+                </div>
+                <div id="manual-input-upload-status" class="bulk-status" aria-live="polite"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- SKU별 적정재고 업로드 모달 -->
     <div id="target-inventory-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="target-inventory-upload-title">
         <div class="modal-backdrop" data-close-target-inv-modal></div>
@@ -1985,6 +2020,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260724d" defer></script>
+    <script src="js/main.js?v=20260727a" defer></script>
 </body>
 </html>

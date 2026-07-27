@@ -396,6 +396,77 @@ public class SnopRecordService {
     }
 
     /**
+     * 수작업 투입수량(manual_input_quantity)을 일괄 업데이트.
+     * 프론트엔드 엑셀 업로드에서 { item_code, plan_month, manual_input_quantity } 목록을 받아
+     * 해당 item_code + plan_month 레코드의 manual_input_quantity를 갱신한다.
+     *
+     * @param items 각 항목은 "item_code", "plan_month", "manual_input_quantity" 키를 포함하는 Map
+     * @return 업데이트 결과 (updated, skipped, not_found, errors)
+     */
+    @Transactional
+    public Map<String, Object> bulkUpdateManualInputQuantity(List<Map<String, Object>> items) {
+        int updated = 0;
+        int skipped = 0;
+        int notFound = 0;
+        List<Map<String, String>> errors = new java.util.ArrayList<>();
+
+        for (Map<String, Object> item : items) {
+            String itemCode = item.get("item_code") != null ? item.get("item_code").toString().trim() : "";
+            String planMonth = item.get("plan_month") != null ? item.get("plan_month").toString().trim() : "";
+            Object qtyObj = item.get("manual_input_quantity");
+
+            if (itemCode.isEmpty() || planMonth.isEmpty()) {
+                skipped++;
+                continue;
+            }
+
+            Long qty;
+            try {
+                if (qtyObj == null) {
+                    qty = 0L;
+                } else if (qtyObj instanceof Number) {
+                    qty = ((Number) qtyObj).longValue();
+                } else {
+                    String qtyStr = qtyObj.toString().replaceAll("[^0-9\\-]", "");
+                    qty = qtyStr.isEmpty() ? 0L : Long.parseLong(qtyStr);
+                }
+            } catch (NumberFormatException e) {
+                Map<String, String> err = new LinkedHashMap<>();
+                err.put("item_code", itemCode);
+                err.put("reason", "수량 파싱 오류: " + qtyObj);
+                errors.add(err);
+                continue;
+            }
+
+            Optional<SnopRecord> recordOpt = repository.findFirstByItemCodeAndPlanMonth(itemCode, planMonth);
+            if (recordOpt.isPresent()) {
+                SnopRecord record = recordOpt.get();
+                record.setManualInputQuantity(qty);
+                repository.save(record);
+                updated++;
+            } else {
+                notFound++;
+                Map<String, String> err = new LinkedHashMap<>();
+                err.put("item_code", itemCode);
+                err.put("reason", "해당 월(" + planMonth + ") 레코드 없음");
+                errors.add(err);
+            }
+        }
+
+        log.info("[manual-input-bulk] 수작업 투입수량 일괄 업데이트 완료: updated={}, skipped={}, not_found={}, errors={}",
+                updated, skipped, notFound, errors.size());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("updated", updated);
+        result.put("skipped", skipped);
+        result.put("not_found", notFound);
+        if (!errors.isEmpty()) {
+            result.put("errors", errors);
+        }
+        return result;
+    }
+
+    /**
      * 특정 계획월의 수작업 투입수량(manual_input_quantity)을 일괄 0으로 초기화.
      * 매월 1일 자동 리셋 스케줄러에서 호출.
      *

@@ -19017,7 +19017,8 @@ function exportProductionTableXlsx() {
         `${adjLabel}(EA)`, `${adjLabel}(BAG)`, `${adjLabel}(BOX)`,
         ...(isOemExport ? ['분할(MOQ기준)'] : []),
         ...(isOemExport ? ['MOQ(EA)', 'MOQ(BAG)', 'MOQ(BOX)'] : []),
-        '라인 총생산(EA)', '라인 총생산(BAG)', '라인 총생산(BOX)',
+        /* OEM 모드에서는 라인 총생산 숨김 (CSS .oem-mode 동일) */
+        ...(!isOemExport ? ['라인 총생산(EA)', '라인 총생산(BAG)', '라인 총생산(BOX)'] : []),
         `${paLabel}(EA)`, `${paLabel}(BAG)`, `${paLabel}(BOX)`,
         `${prLabel}(EA)`, `${prLabel}(BAG)`, `${prLabel}(BOX)`,
         progLabel,
@@ -19026,10 +19027,8 @@ function exportProductionTableXlsx() {
         '소진일자(예상월말재고기준)',
         'SKU별 적정재고(BOX)',
         '재고 상태',
-        '라인 CAPA',
-        'CAPA 대비',
-        'CAPA 상태',
-        '생산소요시간',
+        /* OEM 모드에서는 라인 CAPA / CAPA 대비 / CAPA 상태 / 생산소요시간 숨김 */
+        ...(!isOemExport ? ['라인 CAPA', 'CAPA 대비', 'CAPA 상태', '생산소요시간'] : []),
         '비고',
     ];
 
@@ -19138,9 +19137,12 @@ function exportProductionTableXlsx() {
                 'MOQ(BAG)': toBAG(record.moq),
                 'MOQ(BOX)': toNullBox(record.moq),
             } : {}),
-            '라인 총생산(EA)': toEA(totalProductionBox),
-            '라인 총생산(BAG)': toBAG(totalProductionBox),
-            '라인 총생산(BOX)': toNullBox(totalProductionBox),
+            /* OEM 모드에서는 라인 총생산 제외 */
+            ...(!isOemExport ? {
+                '라인 총생산(EA)': toEA(totalProductionBox),
+                '라인 총생산(BAG)': toBAG(totalProductionBox),
+                '라인 총생산(BOX)': toNullBox(totalProductionBox),
+            } : {}),
             [`${paLabel}(EA)`]: toEA(prodActualBox),
             [`${paLabel}(BAG)`]: toBAG(prodActualBox),
             [`${paLabel}(BOX)`]: prodActualBox,
@@ -19162,11 +19164,14 @@ function exportProductionTableXlsx() {
             })(),
             'SKU별 적정재고(BOX)': toNullBox(record.target_ending_inventory),
             '재고 상태': record.inventoryStatus ? sanitizeText(record.inventoryStatus.label) : '',
-            '라인 CAPA': Number.isFinite(capacityLimit) ? capacityLimit : null,
-            'CAPA 대비': ratio,
-            'CAPA 상태': record.lineCapacityStatus ? sanitizeText(record.lineCapacityStatus.label) : '',
-            '생산소요시간': Number.isFinite(record.productionLeadTimeHours)
-                ? `${record.productionLeadTimeHours.toFixed(2)} 시간` : '',
+            /* OEM 모드에서는 라인 CAPA / CAPA 대비 / CAPA 상태 / 생산소요시간 제외 */
+            ...(!isOemExport ? {
+                '라인 CAPA': Number.isFinite(capacityLimit) ? capacityLimit : null,
+                'CAPA 대비': ratio,
+                'CAPA 상태': record.lineCapacityStatus ? sanitizeText(record.lineCapacityStatus.label) : '',
+                '생산소요시간': Number.isFinite(record.productionLeadTimeHours)
+                    ? `${record.productionLeadTimeHours.toFixed(2)} 시간` : '',
+            } : {}),
             '비고': sanitizeText(record.notes),
         };
         return obj;

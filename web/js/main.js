@@ -4817,36 +4817,38 @@ function buildChainedRecords(rawRecords, lineStats, options = {}) {
 
             const enriched = enrichRecord(record, lineStats, overrides);
 
-            /* ── salesActualAvg3m: monthly-sales-records (RFC_005) 이전 3개월 평균 ── */
+            /* ── salesActualAvg3m: monthly-sales-records (RFC_005) 데이터 존재하는 최근 3개월 평균 ──
+             * 월별 판매실적 현황 화면의 calcAvg 로직과 동일:
+             * recordMonth 미만인 월 중 데이터가 존재하는 최근 3개월을 사용.
+             * 예) 8월 레코드, 7월 데이터 미확정 → 4,5,6월 평균
+             *     7월 데이터 입력 후 → 5,6,7월 평균 (자동 전환) */
             let salesAvg3m = null;
             let salesStdDev3m = null;
             const msrCode = sanitizeText(record.item_code).trim().toUpperCase();
             const msrMonthMap = msrItemMonthMap.get(msrCode);
             if (msrMonthMap && msrMonthMap.size > 0) {
                 const recordMonth = sanitizeText(record.month).trim();
-                /* recordMonth 이전 3개월 계산 (예: 2026-07 → 2026-04, 2026-05, 2026-06) */
-                const prev3months = [];
                 if (recordMonth && recordMonth.length >= 7) {
-                    const [baseY, baseM] = recordMonth.split('-').map(Number);
-                    for (let i = 1; i <= 3; i++) {
-                        const d = new Date(baseY, baseM - 1 - i, 1);
-                        const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-                        prev3months.push(ym);
-                    }
-                }
-                const msrValues = prev3months.map((m) => msrMonthMap.has(m) ? msrMonthMap.get(m) : null);
-                const validMsrValues = msrValues.filter((v) => v !== null && Number.isFinite(v));
-                if (validMsrValues.length > 0) {
-                    /* 데이터가 있는 월만 합산 후 3으로 나눔 (데이터 없는 월은 0 취급과 동일하게 3 고정 분모) */
-                    const msrSum = validMsrValues.reduce((s, v) => s + v, 0);
-                    salesAvg3m = Math.round(msrSum / 3);
-                    enriched.salesActualAvg3mSource = 'monthly_closing';
-                    /* 표준편차 계산 (STDEV.S = 표본 표준편차, N-1) — 2개월 이상 데이터 필요 */
-                    if (validMsrValues.length >= 2) {
-                        const n = validMsrValues.length;
-                        const mean = validMsrValues.reduce((s, v) => s + v, 0) / n;
-                        const variance = validMsrValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
-                        salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
+                    /* recordMonth 미만인 모든 월 중 데이터가 존재하는 최근 3개월 추출 */
+                    const availableMonths = Array.from(msrMonthMap.keys())
+                        .filter((m) => m < recordMonth)
+                        .sort();
+                    const recent3months = availableMonths.slice(-3);
+                    const validMsrValues = recent3months
+                        .map((m) => msrMonthMap.get(m))
+                        .filter((v) => v !== null && Number.isFinite(v));
+                    if (validMsrValues.length > 0) {
+                        /* 데이터가 있는 월만 합산 후 3으로 나눔 (분모 3 고정) */
+                        const msrSum = validMsrValues.reduce((s, v) => s + v, 0);
+                        salesAvg3m = Math.round(msrSum / 3);
+                        enriched.salesActualAvg3mSource = 'monthly_closing';
+                        /* 표준편차 계산 (STDEV.S = 표본 표준편차, N-1) — 2개월 이상 데이터 필요 */
+                        if (validMsrValues.length >= 2) {
+                            const n = validMsrValues.length;
+                            const mean = validMsrValues.reduce((s, v) => s + v, 0) / n;
+                            const variance = validMsrValues.reduce((s, v) => s + (v - mean) ** 2, 0) / (n - 1);
+                            salesStdDev3m = Math.round(Math.sqrt(variance) * 10) / 10;
+                        }
                     }
                 }
             }

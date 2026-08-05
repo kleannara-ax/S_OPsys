@@ -17093,9 +17093,15 @@ async function handleSalesUploadStart() {
             const warningMessage = uploadedAt
                 ? `이미 업로드된 파일입니다. (${fileName}, 업로드 시각: ${uploadedAt})`
                 : `이미 업로드된 파일입니다. (${fileName})`;
-            setSalesUploadStatus(`${warningMessage}\n동일 파일을 다시 업로드하려면 파일명을 변경하거나 기존 데이터를 삭제하세요.`, 'warning');
-            dom.salesUpload.fileInput.value = '';
-            return;
+            const confirmReupload = confirm(
+                `${warningMessage}\n\n동일 월·자재코드·채널의 기존 데이터가 최신 업로드 값으로 업데이트됩니다.\n계속 진행하시겠습니까?`
+            );
+            if (!confirmReupload) {
+                setSalesUploadStatus('재업로드가 취소되었습니다.', 'warning');
+                dom.salesUpload.fileInput.value = '';
+                return;
+            }
+            setSalesUploadStatus('재업로드를 진행합니다. 기존 데이터를 업데이트합니다...');
         }
 
         const rows = await parseSalesUploadFile(arrayBuffer);

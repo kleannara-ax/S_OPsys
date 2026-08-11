@@ -10200,11 +10200,24 @@ function renderTable() {
         const actionsCell = row.querySelector('.actions');
         const editButton = actionsCell ? actionsCell.querySelector('.btn-edit') : null;
         const deleteButton = actionsCell ? actionsCell.querySelector('.btn-delete') : null;
-        if (editButton) {
-            editButton.addEventListener('click', () => loadRecordIntoForm(record.id));
-        }
-        if (deleteButton) {
-            deleteButton.addEventListener('click', () => handleDelete(record.id));
+
+        if (record.isProjected) {
+            /* projected(DB 미존재) 행은 편집/삭제 불가 — 버튼 비활성화 */
+            if (editButton) {
+                editButton.disabled = true;
+                editButton.title = '전월 연동(예상) 행은 편집할 수 없습니다';
+            }
+            if (deleteButton) {
+                deleteButton.disabled = true;
+                deleteButton.title = '전월 연동(예상) 행은 삭제할 수 없습니다';
+            }
+        } else {
+            if (editButton) {
+                editButton.addEventListener('click', () => loadRecordIntoForm(record.id));
+            }
+            if (deleteButton) {
+                deleteButton.addEventListener('click', () => handleDelete(record.id));
+            }
         }
 
         fragment.appendChild(row);
@@ -14581,6 +14594,12 @@ async function handleDelete(id) {
     const target = state.rawData.find((record) => record && record.id === id);
     if (!target) return;
 
+    /* projected(DB 미존재) 행은 삭제 불가 — 안전장치 */
+    if (target.isProjected) {
+        alert('전월 연동(예상) 행은 삭제할 수 없습니다.\n실제 DB에 등록된 데이터만 삭제 가능합니다.');
+        return;
+    }
+
     const normalizeCode = (code) => sanitizeText(code).trim();
     const canonicalCode = normalizeCode(getRecordCanonicalCode(target));
     const originalCode = normalizeCode(target.item_code);
@@ -14698,6 +14717,12 @@ function startRowInlineEdit(recordId) {
 
     const record = state.rawData.find((r) => r && r.id == recordId);
     if (!record) return;
+
+    /* projected(DB 미존재) 행은 편집 불가 — 안전장치 */
+    if (record.isProjected) {
+        alert('전월 연동(예상) 행은 편집할 수 없습니다.\n실제 DB에 등록된 데이터만 편집 가능합니다.');
+        return;
+    }
 
     row.classList.add('row-editing');
     row.dataset.editOriginal = JSON.stringify(record);

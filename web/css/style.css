@@ -3302,6 +3302,11 @@ th.col-priority {
     justify-content: center;
 }
 
+.projected-row .actions button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
 
 td.number {
     text-align: right;

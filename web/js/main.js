@@ -14578,7 +14578,8 @@ async function deleteMaterialLinkageRecord(id) {
 }
 
 async function handleDelete(id) {
-    const target = state.rawData.find((record) => record && record.id === id);
+    const target = state.rawData.find((record) => record && record.id === id)
+        || (state.filteredData || []).find((record) => record && record.id === id);
     if (!target) return;
 
     const normalizeCode = (code) => sanitizeText(code).trim();
@@ -14617,10 +14618,16 @@ async function handleDelete(id) {
         relatedRecords.map((record) => record.id).filter(Boolean),
     ));
 
-    if (recordIdsToDelete.length === 0 && target.id) {
+    /* projected 행에서 삭제를 눌렀지만 DB 레코드가 0건인 경우 — target 자체가 projected이면 가상 ID 추가하지 않음 */
+    if (recordIdsToDelete.length === 0 && target.id && !target.isProjected) {
         if (!recordIdsToDelete.includes(target.id)) {
             recordIdsToDelete.push(target.id);
         }
+    }
+
+    if (recordIdsToDelete.length === 0) {
+        alert('삭제할 DB 레코드가 없습니다.\n이 행은 전월 데이터에서 자동 생성된 예상 행입니다.');
+        return;
     }
 
     const displayName = sanitizeText(getRecordCanonicalName(target) || target.item_name).trim() || '해당 자재';
@@ -14696,7 +14703,8 @@ function startRowInlineEdit(recordId) {
         : null;
     if (!row) return;
 
-    const record = state.rawData.find((r) => r && r.id == recordId);
+    const record = state.rawData.find((r) => r && r.id == recordId)
+        || (state.filteredData || []).find((r) => r && r.id == recordId);
     if (!record) return;
 
     row.classList.add('row-editing');
@@ -14821,7 +14829,8 @@ async function saveRowInlineEdit(recordId) {
         : null;
     if (!row || !row.classList.contains('row-editing')) return;
 
-    const record = state.rawData.find((r) => r && r.id == recordId);
+    const record = state.rawData.find((r) => r && r.id == recordId)
+        || (state.filteredData || []).find((r) => r && r.id == recordId);
     if (!record) return;
 
     /* 입력값 수집 */
@@ -14849,8 +14858,28 @@ async function saveRowInlineEdit(recordId) {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중...'; }
 
     try {
-        await updateRecord(recordId, payload);
-        alert('비고가 저장되었습니다.');
+        if (record.isProjected) {
+            /* projected(DB 미존재) 행 → 새 레코드 생성(CREATE) */
+            try {
+                await createRecord(payload);
+            } catch (dupError) {
+                if (dupError.code === 'DUPLICATE') {
+                    /* 이미 DB에 동일 자재+월 레코드가 있으면 기존 레코드 업데이트 */
+                    const existingId = dupError.detail && dupError.detail.existing_id;
+                    if (existingId) {
+                        await updateRecord(existingId, payload);
+                    } else {
+                        throw dupError;
+                    }
+                } else {
+                    throw dupError;
+                }
+            }
+            alert('비고가 저장되었습니다.');
+        } else {
+            await updateRecord(recordId, payload);
+            alert('비고가 저장되었습니다.');
+        }
         await loadData();
     } catch (error) {
         console.error(error);

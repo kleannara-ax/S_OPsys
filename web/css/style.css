@@ -849,6 +849,21 @@ button.danger:hover {
     box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.08);
 }
 
+/* 비고정 셀(투입단품/환산수량 등) — sticky 셀 아래로 텍스트 투과 방지
+ * thead th 전체가 position:sticky(top:0)이므로 z-index로 계층을 분리:
+ *   - prod-sticky thead: z-index 5  (좌측 고정 + 상단 고정)
+ *   - prod-sticky tbody: z-index 2  (좌측 고정)
+ *   - 비고정 thead: z-index 1       (상단 고정만, 좌측 고정 아님)
+ *   - 비고정 tbody: z-index auto     (일반 흐름)
+ */
+.manual-bom-table thead th:not(.prod-sticky) {
+    z-index: 1;
+}
+.manual-bom-table tbody td:not(.prod-sticky) {
+    position: relative;
+    z-index: 0;
+}
+
 /* 각 컬럼 left 위치 (누적) */
 .prod-sticky-1 { left: 0;    min-width: 44px;  width: 44px; }
 .prod-sticky-2 { left: 44px;  min-width: 80px; }

@@ -23202,7 +23202,88 @@ const manualProdState = {
 };
 
 /**
- * 수작업 생산 계획량 환산 전체 조회 API
+ * 생산탭 enrichedData에서 생리대 수작업 라인 데이터를 추출하여
+ * 수작업 생산 계획량 환산 테이블 형식으로 변환
+ *
+ * @param {string} [targetMonth] - 특정 월만 추출 (미지정 시 시스템 현재월)
+ * @returns {Array} manualProd 형식의 가상 레코드 배열
+ */
+function buildManualProdFromEnriched(targetMonth) {
+    const enriched = Array.isArray(state.enrichedData) ? state.enrichedData : [];
+    if (enriched.length === 0) return [];
+
+    /* 시스템 현재월 */
+    const now = new Date();
+    const systemMonth = targetMonth || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+
+    /* 생리대 수작업 라인 & 시스템월 필터 */
+    const matched = enriched.filter((r) => {
+        const line = (r.production_line || '').trim();
+        const month = (r.month || '').trim();
+        return line === '생리대 수작업' && month === systemMonth;
+    });
+
+    /* manualProd 형식으로 매핑 */
+    return matched.map((r) => ({
+        /* DB 저장 대상이 아닌 가상(auto) 행임을 표시 */
+        _auto: true,
+        _sourceRecordId: r.id,
+        plan_date: systemMonth,
+        production_line: '생리대 수작업',
+        type: sanitizeText(r.category || ''),
+        composition: '',
+        product_code: sanitizeText(r.item_code || ''),
+        product_name: sanitizeText(r.item_name || ''),
+        production_qty: Number.isFinite(r.adjusted_production_plan) ? r.adjusted_production_plan : null,
+        /* 투입단품/환산수량은 수작업 BOM에서 매칭하여 채움 */
+        input_item1_code: '', converted_qty1: null,
+        input_item2_code: '', converted_qty2: null,
+        input_item3_code: '', converted_qty3: null,
+        input_item4_code: '', converted_qty4: null,
+        remark: '',
+    }));
+}
+
+/**
+ * 수작업 BOM 데이터를 기반으로 auto 행의 투입단품 + 환산수량을 채움
+ *
+ * @param {Array} autoRows - buildManualProdFromEnriched()에서 생성한 가상 행 배열
+ * @returns {Array} 투입단품/환산수량이 채워진 배열
+ */
+function fillManualProdWithBom(autoRows) {
+    const boms = manualBomState.data || [];
+    if (boms.length === 0 || autoRows.length === 0) return autoRows;
+
+    /* BOM을 제품코드별로 인덱싱 */
+    const bomByProduct = new Map();
+    boms.forEach((b) => {
+        const code = (b.product_code || '').trim();
+        if (code && !bomByProduct.has(code)) {
+            bomByProduct.set(code, b);
+        }
+    });
+
+    return autoRows.map((row) => {
+        const bom = bomByProduct.get((row.product_code || '').trim());
+        if (!bom) return row;
+
+        const filled = { ...row, composition: sanitizeText(bom.composition || '') || row.composition };
+        const prodQty = row.production_qty;
+        for (let i = 1; i <= 4; i++) {
+            const itemCode = bom[`input_item${i}_code`] || '';
+            const inputQty = bom[`input_qty${i}`];
+            filled[`input_item${i}_code`] = itemCode;
+            /* 환산수량 = 생산수량 × 투입수량(BOM 비율) */
+            if (Number.isFinite(prodQty) && Number.isFinite(inputQty) && inputQty > 0) {
+                filled[`converted_qty${i}`] = prodQty * inputQty;
+            }
+        }
+        return filled;
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 전체 조회 API + enrichedData 자동 채움
  */
 async function fetchManualProds() {
     try {
@@ -23220,7 +23301,36 @@ async function fetchManualProds() {
         manualProdState.data = [];
     } finally {
         manualProdState.loading = false;
+        /* enrichedData에서 생리대 수작업 데이터 자동 추출 + BOM 매핑 */
+        mergeAutoManualProdRows();
         renderManualProdTable();
+    }
+}
+
+/**
+ * enrichedData → 가상 auto 행 생성 → BOM 매핑 → DB 데이터와 병합
+ * DB에 이미 동일 product_code + plan_date가 있으면 auto 행 생략 (중복 방지)
+ */
+function mergeAutoManualProdRows() {
+    const autoRows = fillManualProdWithBom(buildManualProdFromEnriched());
+    if (autoRows.length === 0) return;
+
+    /* DB 데이터의 (product_code + plan_date) 집합 — 중복 방지용 */
+    const dbKeys = new Set();
+    (manualProdState.data || []).forEach((r) => {
+        if (r._auto) return; /* auto 행은 제외 */
+        const key = `${(r.product_code || '').trim()}__${(r.plan_date || '').substring(0, 7)}`;
+        dbKeys.add(key);
+    });
+
+    /* DB에 없는 auto 행만 추가 */
+    const newAutos = autoRows.filter((r) => {
+        const key = `${(r.product_code || '').trim()}__${(r.plan_date || '').substring(0, 7)}`;
+        return !dbKeys.has(key);
+    });
+
+    if (newAutos.length > 0) {
+        manualProdState.data = [...(manualProdState.data || []), ...newAutos];
     }
 }
 
@@ -23334,6 +23444,9 @@ function renderManualProdTable() {
         /* allData에서의 원래 인덱스 (삭제/수정 시 사용) */
         const origIdx = allData.indexOf(row);
         const tr = document.createElement('tr');
+        if (row._auto) tr.classList.add('auto-row');
+
+        const isAutoRow = !!row._auto;
 
         /* 체크박스 */
         const tdCheck = document.createElement('td');
@@ -23341,6 +23454,10 @@ function renderManualProdTable() {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.dataset.idx = origIdx;
+        if (isAutoRow) {
+            cb.disabled = true;
+            cb.title = '자동 연동 행은 선택할 수 없습니다';
+        }
         tdCheck.appendChild(cb);
         tr.appendChild(tdCheck);
 
@@ -23415,57 +23532,71 @@ function renderManualProdTable() {
         /* 비고 */
         const tdRemark = document.createElement('td');
         tdRemark.className = 'col-remark';
-        const remarkInput = document.createElement('input');
-        remarkInput.type = 'text';
-        remarkInput.value = sanitizeText(row.remark || '');
-        remarkInput.placeholder = '';
-        remarkInput.dataset.idx = origIdx;
-        remarkInput.addEventListener('change', async (e) => {
-            const newVal = e.target.value.trim();
-            const record = manualProdState.data[origIdx];
-            if (!record || !record.id) return;
-            try {
-                await fetch(`/sales-api/manual-prods/${record.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ remark: newVal }),
-                });
-                record.remark = newVal;
-            } catch (err) {
-                console.error('비고 저장 실패:', err);
-            }
-        });
-        tdRemark.appendChild(remarkInput);
+        if (isAutoRow) {
+            /* auto 행(생산탭 연동)은 비고 읽기 전용 */
+            tdRemark.textContent = sanitizeText(row.remark || '');
+        } else {
+            const remarkInput = document.createElement('input');
+            remarkInput.type = 'text';
+            remarkInput.value = sanitizeText(row.remark || '');
+            remarkInput.placeholder = '';
+            remarkInput.dataset.idx = origIdx;
+            remarkInput.addEventListener('change', async (e) => {
+                const newVal = e.target.value.trim();
+                const record = manualProdState.data[origIdx];
+                if (!record || !record.id) return;
+                try {
+                    await fetch(`/sales-api/manual-prods/${record.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ remark: newVal }),
+                    });
+                    record.remark = newVal;
+                } catch (err) {
+                    console.error('비고 저장 실패:', err);
+                }
+            });
+            tdRemark.appendChild(remarkInput);
+        }
         tr.appendChild(tdRemark);
 
         /* 관리 (편집/삭제) */
         const tdActions = document.createElement('td');
         tdActions.className = 'col-actions';
 
-        const btnEdit = document.createElement('button');
-        btnEdit.type = 'button';
-        btnEdit.className = 'btn-edit';
-        btnEdit.textContent = '편집';
-        btnEdit.addEventListener('click', () => {
-            const record = manualProdState.data[origIdx];
-            if (record) alert('편집 기능은 추후 구현 예정입니다.\nID: ' + (record.id || origIdx));
-        });
-        tdActions.appendChild(btnEdit);
+        if (isAutoRow) {
+            /* auto 행(생산탭 연동): 자동 연동 표시 */
+            const autoTag = document.createElement('span');
+            autoTag.className = 'auto-tag';
+            autoTag.textContent = '자동';
+            autoTag.title = '생산탭 생리대 수작업 라인에서 자동으로 가져온 데이터입니다';
+            tdActions.appendChild(autoTag);
+        } else {
+            const btnEdit = document.createElement('button');
+            btnEdit.type = 'button';
+            btnEdit.className = 'btn-edit';
+            btnEdit.textContent = '편집';
+            btnEdit.addEventListener('click', () => {
+                const record = manualProdState.data[origIdx];
+                if (record) alert('편집 기능은 추후 구현 예정입니다.\nID: ' + (record.id || origIdx));
+            });
+            tdActions.appendChild(btnEdit);
 
-        const btnDelete = document.createElement('button');
-        btnDelete.type = 'button';
-        btnDelete.className = 'btn-delete';
-        btnDelete.textContent = '삭제';
-        btnDelete.addEventListener('click', async () => {
-            const record = manualProdState.data[origIdx];
-            if (!record || !record.id) return;
-            if (!confirm('이 항목을 삭제하시겠습니까?')) return;
-            const ok = await deleteManualProdsBulk([record.id]);
-            if (ok) {
-                await fetchManualProds();
-            }
-        });
-        tdActions.appendChild(btnDelete);
+            const btnDelete = document.createElement('button');
+            btnDelete.type = 'button';
+            btnDelete.className = 'btn-delete';
+            btnDelete.textContent = '삭제';
+            btnDelete.addEventListener('click', async () => {
+                const record = manualProdState.data[origIdx];
+                if (!record || !record.id) return;
+                if (!confirm('이 항목을 삭제하시겠습니까?')) return;
+                const ok = await deleteManualProdsBulk([record.id]);
+                if (ok) {
+                    await fetchManualProds();
+                }
+            });
+            tdActions.appendChild(btnDelete);
+        }
         tr.appendChild(tdActions);
 
         tbody.appendChild(tr);

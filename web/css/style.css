@@ -924,6 +924,25 @@ button.danger:hover {
     border-color: #fda4af;
 }
 
+/* 자동 연동(auto) 행 스타일 */
+#manual-prod-table .auto-row {
+    background: #f0f9ff;
+}
+#manual-prod-table .auto-row td.prod-sticky {
+    background: #e0f2fe;
+}
+#manual-prod-table td.col-actions .auto-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #0369a1;
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
 /* 환산수량 헤더 파란색 */
 .manual-bom-table thead th.col-converted {
     color: #3b82f6;

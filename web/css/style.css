@@ -664,6 +664,308 @@ button.danger:hover {
     background: rgba(124, 58, 237, 0.05);
 }
 
+.product-type-tab[data-product-type="manual"].active {
+    color: #059669;
+    border-bottom-color: #059669;
+    background: rgba(5, 150, 105, 0.08);
+}
+
+.product-type-tab[data-product-type="manual"]:hover {
+    color: #059669;
+    background: rgba(5, 150, 105, 0.05);
+}
+
+/* ── 수작업 탭 빈 화면 ── */
+.manual-tab-placeholder {
+    margin: 20px 0;
+}
+
+/* ── 수작업 BOM 섹션 ── */
+.manual-bom-section {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.manual-bom-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: #fff;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.manual-bom-header h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.manual-bom-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.manual-bom-actions button {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.manual-bom-actions button:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.manual-bom-actions button.danger {
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.manual-bom-actions button.danger:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
+}
+
+/* ── 수작업 BOM 테이블 (자재마스터 스타일) ── */
+.manual-bom-table-wrapper {
+    overflow-x: auto;
+    max-height: 700px;
+    overflow-y: auto;
+}
+
+.manual-bom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+.manual-bom-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.manual-bom-table thead th {
+    padding: 14px 16px;
+    background: #fff;
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 0.84rem;
+    text-align: center;
+    border-top: none;
+    border-bottom: 3px double #cbd5e1;
+    border-right: none;
+    letter-spacing: -0.01em;
+}
+
+.manual-bom-table thead th.col-checkbox {
+    width: 44px;
+    padding: 12px 8px;
+}
+
+.manual-bom-table thead th.col-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.manual-bom-table tbody td {
+    padding: 14px 16px;
+    color: #475569;
+    border-bottom: 1px solid #edf2f7;
+    border-right: none;
+    text-align: center;
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+/* 수작업 생산계획량 환산 섹션 — BOM 아래 간격 */
+.manual-prod-section {
+    margin-top: 20px;
+}
+
+/* ── 수작업 생산계획량 환산: 틀고정 (체크박스~생산수량) ── */
+.manual-bom-table .prod-sticky {
+    position: sticky;
+    z-index: 2;
+    background: #f8fafc;
+}
+.manual-bom-table thead .prod-sticky {
+    z-index: 3;
+    background: #f1f5f9;
+}
+/* 틀고정 마지막 열 오른쪽 구분선 */
+.manual-bom-table .prod-sticky-8 {
+    border-right: 2px solid #cbd5e1 !important;
+}
+
+/* 각 컬럼 left 위치 (누적) */
+.prod-sticky-1 { left: 0;    min-width: 44px;  width: 44px; }
+.prod-sticky-2 { left: 44px;  min-width: 80px; }
+.prod-sticky-3 { left: 124px; min-width: 80px; }
+.prod-sticky-4 { left: 204px; min-width: 60px; }
+.prod-sticky-5 { left: 264px; min-width: 60px; }
+.prod-sticky-6 { left: 324px; min-width: 140px; }
+.prod-sticky-7 { left: 464px; min-width: 160px; }
+.prod-sticky-8 { left: 624px; min-width: 90px; }
+
+/* 수작업 생산 계획량 환산 — 전체 중앙정렬 */
+#manual-prod-table thead th,
+#manual-prod-table tbody td {
+    text-align: center;
+}
+
+/* 비고 컬럼 */
+#manual-prod-table .col-remark {
+    min-width: 180px;
+}
+#manual-prod-table td.col-remark input[type="text"] {
+    width: 100%;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    outline: none;
+    transition: border-color 0.15s;
+}
+#manual-prod-table td.col-remark input[type="text"]:focus {
+    border-color: #3b82f6;
+}
+
+/* 관리 컬럼 */
+#manual-prod-table .col-actions {
+    min-width: 120px;
+}
+#manual-prod-table td.col-actions {
+    white-space: nowrap;
+}
+#manual-prod-table td.col-actions .btn-edit {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+#manual-prod-table td.col-actions .btn-edit:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+#manual-prod-table td.col-actions .btn-delete {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #fecdd3;
+    border-radius: 4px;
+    background: #fff1f2;
+    color: #e11d48;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: background 0.15s, border-color 0.15s;
+}
+#manual-prod-table td.col-actions .btn-delete:hover {
+    background: #ffe4e6;
+    border-color: #fda4af;
+}
+
+/* 환산수량 헤더 파란색 */
+.manual-bom-table thead th.col-converted {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+/* 환산수량 셀 파란색 */
+.manual-bom-table tbody td.col-converted {
+    color: #3b82f6;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.manual-bom-table tbody td.col-name {
+    white-space: normal;
+    word-break: keep-all;
+    text-align: left;
+    min-width: 180px;
+}
+
+.manual-bom-table tbody td.col-checkbox {
+    width: 44px;
+    padding: 12px 8px;
+}
+
+.manual-bom-table tbody td.col-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.manual-bom-table tbody tr:hover {
+    background: rgba(37, 99, 235, 0.025);
+}
+
+.manual-bom-table tbody td.text-primary {
+    color: #3b82f6;
+    font-weight: 500;
+}
+
+.manual-bom-table tbody td.text-left {
+    text-align: left;
+}
+
+.manual-bom-table tbody td.text-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.manual-bom-table tbody td.actions {
+    text-align: center;
+}
+
+.manual-bom-table tbody td.actions .btn-edit {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.manual-bom-table tbody td.actions .btn-edit:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.manual-bom-table-wrapper .empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: #94a3b8;
+    font-size: 0.92rem;
+}
+
 .table-filters {
     margin: 24px 0 16px;
     padding: 16px 20px;

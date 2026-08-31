@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260630b">
+    <link rel="stylesheet" href="css/style.css?v=20260831c">
     <script src="js/chart.min.js"></script>
 </head>
 <body>
@@ -819,6 +819,7 @@
             <div class="product-type-tabs" role="tablist" aria-label="제품 유형 선택">
                 <button type="button" class="product-type-tab active" role="tab" aria-selected="true" data-product-type="all">생산</button>
                 <button type="button" class="product-type-tab" role="tab" aria-selected="false" data-product-type="oem">OEM</button>
+                <button type="button" class="product-type-tab" role="tab" aria-selected="false" data-product-type="manual">수작업</button>
             </div>
             <div class="table-filters">
                 <div class="filters">
@@ -919,7 +920,88 @@
                     <span class="toolbar-note" id="bulk-confirm-note">* 확정 대기 건수가 있는 경우에만 버튼이 활성화됩니다. 예측(전월 연동) 행을 수정한 값은 시뮬레이션 용도로만 적용되며 변경 로그에는 기록되지 않습니다.</span>
                 </div>
             </div>
-            <div class="table-scroll-container">
+            <!-- 수작업 탭 화면 -->
+            <div id="manual-tab-placeholder" class="manual-tab-placeholder" style="display:none;">
+                <!-- 수작업 BOM 테이블 -->
+                <div class="manual-bom-section">
+                    <div class="manual-bom-header">
+                        <h3>수작업 BOM</h3>
+                        <div class="manual-bom-actions">
+                            <button type="button" class="btn-manual-bom-upload secondary small">엑셀 업로드</button>
+                            <button type="button" class="btn-manual-bom-download secondary small">템플릿 다운로드</button>
+                            <button type="button" class="btn-manual-bom-delete-selected secondary small danger">선택 삭제</button>
+                        </div>
+                    </div>
+                    <div class="manual-bom-table-wrapper">
+                        <table id="manual-bom-table" class="manual-bom-table" aria-live="polite">
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox"><input type="checkbox" id="manual-bom-select-all" title="전체 선택"></th>
+                                    <th>구분</th>
+                                    <th>구성</th>
+                                    <th>수작업 제품 코드</th>
+                                    <th>수작업 제품명</th>
+                                    <th>투입단품1 코드</th>
+                                    <th>투입단품1 명</th>
+                                    <th>투입량</th>
+                                    <th>투입단품2 코드</th>
+                                    <th>투입단품2 명</th>
+                                    <th>투입량</th>
+                                    <th>투입단품3 코드</th>
+                                    <th>투입단품3 명</th>
+                                    <th>투입량</th>
+                                    <th>투입단품4 코드</th>
+                                    <th>투입단품4 명</th>
+                                    <th>투입량</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manual-bom-table-body"></tbody>
+                        </table>
+                        <div id="manual-bom-empty" class="empty">등록된 수작업 BOM이 없습니다. 엑셀 업로드로 데이터를 추가하세요.</div>
+                    </div>
+                </div>
+                <!-- 수작업 생산 계획량 환산 테이블 -->
+                <div class="manual-bom-section manual-prod-section">
+                    <div class="manual-bom-header">
+                        <h3>수작업 생산 계획량 환산</h3>
+                        <div class="manual-bom-actions"></div>
+                    </div>
+                    <div class="manual-bom-table-wrapper">
+                        <table id="manual-prod-table" class="manual-bom-table" aria-live="polite">
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox prod-sticky prod-sticky-1"><input type="checkbox" id="manual-prod-select-all" title="전체 선택"></th>
+                                    <th class="prod-sticky prod-sticky-2">계획 월</th>
+                                    <th class="prod-sticky prod-sticky-3">생산라인</th>
+                                    <th class="prod-sticky prod-sticky-4">구분</th>
+                                    <th class="prod-sticky prod-sticky-5">구성</th>
+                                    <th class="prod-sticky prod-sticky-6">수작업 제품 코드</th>
+                                    <th class="prod-sticky prod-sticky-7">수작업 제품명</th>
+                                    <th class="prod-sticky prod-sticky-8">생산수량</th>
+                                    <th>투입단품1 코드</th>
+                                    <th>투입단품명1</th>
+                                    <th class="col-converted">환산수량1</th>
+                                    <th>투입단품2 코드</th>
+                                    <th>투입단품명2</th>
+                                    <th class="col-converted">환산수량2</th>
+                                    <th>투입단품3 코드</th>
+                                    <th>투입단품명3</th>
+                                    <th class="col-converted">환산수량3</th>
+                                    <th>투입단품4 코드</th>
+                                    <th>투입단품명4</th>
+                                    <th class="col-converted">환산수량4</th>
+                                    <th class="col-remark">비고</th>
+                                    <th class="col-actions">관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manual-prod-table-body"></tbody>
+                        </table>
+                        <div id="manual-prod-empty" class="empty">등록된 수작업 생산 계획량 환산 데이터가 없습니다. 엑셀 업로드로 데이터를 추가하세요.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-scroll-container" id="main-table-container">
                 <div class="system-date-display" id="system-date-display"></div>
                 <button type="button" class="table-scroll-btn table-scroll-left hidden" aria-label="표를 왼쪽으로 스크롤" data-direction="left">
                     <span aria-hidden="true">◀</span>
@@ -2021,6 +2103,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260811a" defer></script>
+    <script src="js/main.js?v=20260831c" defer></script>
 </body>
 </html>

@@ -798,6 +798,43 @@ button.danger:hover {
     margin-top: 20px;
 }
 
+/* ── 수작업 생산 계획량 환산: 계획 월 필터 ── */
+.manual-prod-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.manual-prod-filter-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+}
+.manual-prod-filter-select {
+    padding: 5px 28px 5px 10px;
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: #334155;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M2.5 4.5l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E") no-repeat right 8px center;
+    background-size: 12px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    min-width: 120px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.manual-prod-filter-select:hover {
+    border-color: #94a3b8;
+}
+.manual-prod-filter-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
 /* ── 수작업 생산계획량 환산: 틀고정 (체크박스~생산수량) ── */
 .manual-bom-table .prod-sticky {
     position: sticky;

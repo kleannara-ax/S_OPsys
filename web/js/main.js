@@ -23198,6 +23198,7 @@ const manualProdState = {
     data: [],       /* 수작업 생산 계획량 환산 데이터 배열 (서버에서 조회) */
     loaded: false,  /* 최초 로드 여부 */
     loading: false, /* API 호출 중 여부 */
+    filterMonth: '', /* 계획 월 필터 값 ('' = 전체) */
 };
 
 /**
@@ -23274,13 +23275,54 @@ async function deleteManualProdsBulk(ids) {
 /**
  * 수작업 생산 계획량 환산 테이블 렌더링
  */
+/**
+ * 계획 월 필터 셀렉트 옵션 갱신
+ */
+function updateManualProdMonthFilterOptions() {
+    const sel = document.getElementById('manual-prod-month-filter');
+    if (!sel) return;
+    const allData = manualProdState.data || [];
+    /* 중복 없는 월 목록 추출 (YYYY-MM) — 정렬 */
+    const months = [...new Set(
+        allData
+            .map(r => (r.plan_date || '').substring(0, 7))
+            .filter(m => m.length >= 7)
+    )].sort();
+
+    const curVal = sel.value;
+    /* 기존 옵션 초기화 후 재생성 */
+    sel.innerHTML = '<option value="">전체</option>';
+    months.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        sel.appendChild(opt);
+    });
+    /* 이전 선택 값 복원 (해당 월이 여전히 존재할 때) */
+    if (curVal && months.includes(curVal)) {
+        sel.value = curVal;
+    } else {
+        sel.value = '';
+        manualProdState.filterMonth = '';
+    }
+}
+
 function renderManualProdTable() {
     const tbody = document.getElementById('manual-prod-table-body');
     const emptyMsg = document.getElementById('manual-prod-empty');
     if (!tbody) return;
 
     tbody.innerHTML = '';
-    const data = manualProdState.data || [];
+
+    /* 계획 월 필터 옵션 갱신 */
+    updateManualProdMonthFilterOptions();
+
+    const allData = manualProdState.data || [];
+    /* 필터 적용 */
+    const filterMonth = manualProdState.filterMonth || '';
+    const data = filterMonth
+        ? allData.filter(r => (r.plan_date || '').substring(0, 7) === filterMonth)
+        : allData;
 
     if (data.length === 0) {
         if (emptyMsg) emptyMsg.style.display = '';
@@ -23289,6 +23331,8 @@ function renderManualProdTable() {
     if (emptyMsg) emptyMsg.style.display = 'none';
 
     data.forEach((row, idx) => {
+        /* allData에서의 원래 인덱스 (삭제/수정 시 사용) */
+        const origIdx = allData.indexOf(row);
         const tr = document.createElement('tr');
 
         /* 체크박스 */
@@ -23296,7 +23340,7 @@ function renderManualProdTable() {
         tdCheck.className = 'col-checkbox prod-sticky prod-sticky-1';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
-        cb.dataset.idx = idx;
+        cb.dataset.idx = origIdx;
         tdCheck.appendChild(cb);
         tr.appendChild(tdCheck);
 
@@ -23375,10 +23419,10 @@ function renderManualProdTable() {
         remarkInput.type = 'text';
         remarkInput.value = sanitizeText(row.remark || '');
         remarkInput.placeholder = '';
-        remarkInput.dataset.idx = idx;
+        remarkInput.dataset.idx = origIdx;
         remarkInput.addEventListener('change', async (e) => {
             const newVal = e.target.value.trim();
-            const record = manualProdState.data[idx];
+            const record = manualProdState.data[origIdx];
             if (!record || !record.id) return;
             try {
                 await fetch(`/sales-api/manual-prods/${record.id}`, {
@@ -23403,8 +23447,8 @@ function renderManualProdTable() {
         btnEdit.className = 'btn-edit';
         btnEdit.textContent = '편집';
         btnEdit.addEventListener('click', () => {
-            const record = manualProdState.data[idx];
-            if (record) alert('편집 기능은 추후 구현 예정입니다.\nID: ' + (record.id || idx));
+            const record = manualProdState.data[origIdx];
+            if (record) alert('편집 기능은 추후 구현 예정입니다.\nID: ' + (record.id || origIdx));
         });
         tdActions.appendChild(btnEdit);
 
@@ -23413,7 +23457,7 @@ function renderManualProdTable() {
         btnDelete.className = 'btn-delete';
         btnDelete.textContent = '삭제';
         btnDelete.addEventListener('click', async () => {
-            const record = manualProdState.data[idx];
+            const record = manualProdState.data[origIdx];
             if (!record || !record.id) return;
             if (!confirm('이 항목을 삭제하시겠습니까?')) return;
             const ok = await deleteManualProdsBulk([record.id]);
@@ -23646,6 +23690,18 @@ function initManualProdTemplateDownload() {
 /**
  * 수작업 생산 계획량 환산 초기화 — 수작업 탭 진입 시 호출
  */
+function initManualProdMonthFilter() {
+    const sel = document.getElementById('manual-prod-month-filter');
+    if (!sel) return;
+    sel.addEventListener('change', () => {
+        manualProdState.filterMonth = sel.value;
+        renderManualProdTable();
+        /* 전체선택 체크 해제 */
+        const selectAll = document.getElementById('manual-prod-select-all');
+        if (selectAll) selectAll.checked = false;
+    });
+}
+
 function initManualProd() {
     if (!manualProdState.loaded) {
         manualProdState.loaded = true;
@@ -23653,6 +23709,7 @@ function initManualProd() {
         initManualProdDeleteSelected();
         initManualProdUpload();
         initManualProdTemplateDownload();
+        initManualProdMonthFilter();
     }
     /* 탭 진입 시마다 서버에서 최신 데이터 조회 */
     fetchManualProds();

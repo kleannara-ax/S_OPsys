@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260831c">
+    <link rel="stylesheet" href="css/style.css?v=20260831d">
     <script src="js/chart.min.js"></script>
 </head>
 <body>
@@ -965,7 +965,14 @@
                 <div class="manual-bom-section manual-prod-section">
                     <div class="manual-bom-header">
                         <h3>수작업 생산 계획량 환산</h3>
-                        <div class="manual-bom-actions"></div>
+                        <div class="manual-bom-actions">
+                            <div class="manual-prod-filter">
+                                <label for="manual-prod-month-filter" class="manual-prod-filter-label">계획 월</label>
+                                <select id="manual-prod-month-filter" class="manual-prod-filter-select">
+                                    <option value="">전체</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div class="manual-bom-table-wrapper">
                         <table id="manual-prod-table" class="manual-bom-table" aria-live="polite">
@@ -2103,6 +2110,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260831c" defer></script>
+    <script src="js/main.js?v=20260831d" defer></script>
 </body>
 </html>

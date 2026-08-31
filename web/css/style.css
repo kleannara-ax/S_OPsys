@@ -837,13 +837,13 @@ button.danger:hover {
 .manual-bom-table .prod-sticky {
     position: sticky;
     z-index: 2;
-    background: #fcfcfd !important;
+    background: #f0f7ff !important;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .manual-bom-table thead .prod-sticky {
     z-index: 5;
-    background: #f7f8fa !important;
+    background: #e8f1fc !important;
 }
 /* 틀고정 마지막 열 오른쪽 구분선 */
 .manual-bom-table .prod-sticky-8 {

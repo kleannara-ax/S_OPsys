@@ -837,7 +837,7 @@ button.danger:hover {
 .manual-bom-table .prod-sticky {
     position: sticky;
     z-index: 2;
-    background: #e8f1fc !important;
+    background: #f1f5f9 !important;
     overflow: hidden;
     text-overflow: ellipsis;
 }

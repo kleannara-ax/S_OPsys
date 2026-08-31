@@ -836,37 +836,19 @@ button.danger:hover {
 /* ── 수작업 생산계획량 환산: 틀고정 (체크박스~생산수량) ── */
 .manual-bom-table .prod-sticky {
     position: sticky;
-    z-index: 6;
+    z-index: 2;
     background: #f8fafc !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .manual-bom-table thead .prod-sticky {
-    z-index: 10;
+    z-index: 5;
     background: #f1f5f9 !important;
 }
-/* 틀고정 마지막 열 오른쪽 구분선 + 우측 텍스트 가림 방지 */
+/* 틀고정 마지막 열 오른쪽 구분선 */
 .manual-bom-table .prod-sticky-8 {
     border-right: 2px solid #cbd5e1 !important;
     box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.08);
-}
-
-/* ── 비고정 셀 z-index 계층 분리 ──
- * position:sticky 요소끼리만 z-index가 비교되므로 비고정 thead th도
- * sticky(top:0)인 이상 명시적으로 낮은 z-index를 부여해야 한다.
- *
- *   계층:  prod-sticky thead th  → z-index 10  (좌측+상단 고정)
- *          prod-sticky tbody td  → z-index  6  (좌측 고정)
- *          비고정 thead th       → z-index  1  (상단 고정만)
- *          비고정 tbody td       → z-index  0  (일반)
- *
- * 추가: 비고정 셀에도 불투명 배경을 강제하여
- *       셀 자체가 투명(rgba(0,0,0,0))일 때 뒤의 텍스트가 비치는 현상 방지
- */
-.manual-bom-table thead th:not(.prod-sticky) {
-    z-index: 1;
-    background: #fff !important;
-}
-.manual-bom-table tbody td:not(.prod-sticky) {
-    background: #fff;
 }
 
 /* 각 컬럼 left 위치 (누적) */
@@ -876,8 +858,8 @@ button.danger:hover {
 .prod-sticky-4 { left: 204px; min-width: 60px; }
 .prod-sticky-5 { left: 264px; min-width: 60px; }
 .prod-sticky-6 { left: 324px; min-width: 140px; }
-.prod-sticky-7 { left: 464px; min-width: 160px; }
-.prod-sticky-8 { left: 624px; min-width: 90px; }
+.prod-sticky-7 { left: 464px; min-width: 180px; max-width: 180px; }
+.prod-sticky-8 { left: 644px; min-width: 90px; }
 
 /* 수작업 생산 계획량 환산 — 전체 중앙정렬 */
 #manual-prod-table thead th,
@@ -944,8 +926,8 @@ button.danger:hover {
 }
 
 /* 자동 연동(auto) 행 스타일 */
-#manual-prod-table .auto-row td {
-    background: #f0f9ff !important;
+#manual-prod-table .auto-row {
+    background: #f0f9ff;
 }
 #manual-prod-table .auto-row td.prod-sticky {
     background: #e0f2fe !important;
@@ -995,11 +977,8 @@ button.danger:hover {
     cursor: pointer;
 }
 
-.manual-bom-table tbody tr:hover td {
-    background: #f8fafc !important;
-}
-.manual-bom-table tbody tr:hover td.prod-sticky {
-    background: #f0f4f8 !important;
+.manual-bom-table tbody tr:hover {
+    background: rgba(37, 99, 235, 0.025);
 }
 
 .manual-bom-table tbody td.text-primary {

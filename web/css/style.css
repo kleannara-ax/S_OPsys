@@ -747,7 +747,8 @@ button.danger:hover {
 
 .manual-bom-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.88rem;
     white-space: nowrap;
 }
@@ -836,15 +837,16 @@ button.danger:hover {
 .manual-bom-table .prod-sticky {
     position: sticky;
     z-index: 2;
-    background: #f8fafc;
+    background: #f8fafc !important;
 }
 .manual-bom-table thead .prod-sticky {
     z-index: 5;
-    background: #f1f5f9;
+    background: #f1f5f9 !important;
 }
-/* 틀고정 마지막 열 오른쪽 구분선 */
+/* 틀고정 마지막 열 오른쪽 구분선 + 우측 텍스트 가림 방지 */
 .manual-bom-table .prod-sticky-8 {
     border-right: 2px solid #cbd5e1 !important;
+    box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.08);
 }
 
 /* 각 컬럼 left 위치 (누적) */
@@ -926,7 +928,7 @@ button.danger:hover {
     background: #f0f9ff;
 }
 #manual-prod-table .auto-row td.prod-sticky {
-    background: #e0f2fe;
+    background: #e0f2fe !important;
 }
 #manual-prod-table td.col-actions .auto-tag {
     display: inline-block;

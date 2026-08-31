@@ -930,7 +930,7 @@ button.danger:hover {
     background: #f0f9ff;
 }
 #manual-prod-table .auto-row td.prod-sticky {
-    background: #e0f2fe !important;
+    background: #f1f5f9 !important;
 }
 #manual-prod-table td.col-actions .auto-tag {
     display: inline-block;

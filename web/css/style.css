@@ -752,13 +752,10 @@ button.danger:hover {
     white-space: nowrap;
 }
 
-.manual-bom-table thead {
+.manual-bom-table thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
-}
-
-.manual-bom-table thead th {
+    z-index: 4;
     padding: 14px 16px;
     background: #fff;
     color: #1e293b;
@@ -842,7 +839,7 @@ button.danger:hover {
     background: #f8fafc;
 }
 .manual-bom-table thead .prod-sticky {
-    z-index: 3;
+    z-index: 5;
     background: #f1f5f9;
 }
 /* 틀고정 마지막 열 오른쪽 구분선 */

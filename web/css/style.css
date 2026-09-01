@@ -845,10 +845,10 @@ button.danger:hover {
     z-index: 5;
     background: #f1f5f9 !important;
 }
-/* 틀고정 마지막 열 오른쪽 구분선 */
+/* 틀고정 마지막 열 — 구분선 제거 */
 .manual-bom-table .prod-sticky-8 {
-    border-right: 2px solid #cbd5e1 !important;
-    box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.08);
+    border-right: none !important;
+    box-shadow: none;
 }
 
 /* 각 컬럼 left 위치 (누적) */

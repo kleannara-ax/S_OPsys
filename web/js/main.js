@@ -23220,10 +23220,10 @@ function buildManualProdFromEnriched(targetMonth) {
         product_name: sanitizeText(r.item_name || ''),
         production_qty: Number.isFinite(r.adjusted_production_plan) ? r.adjusted_production_plan : null,
         /* 투입단품/환산수량은 수작업 BOM에서 매칭하여 채움 */
-        input_item1_code: '', converted_qty1: null,
-        input_item2_code: '', converted_qty2: null,
-        input_item3_code: '', converted_qty3: null,
-        input_item4_code: '', converted_qty4: null,
+        input_item1_code: '', input_item1_name: '', converted_qty1: null,
+        input_item2_code: '', input_item2_name: '', converted_qty2: null,
+        input_item3_code: '', input_item3_name: '', converted_qty3: null,
+        input_item4_code: '', input_item4_name: '', converted_qty4: null,
         remark: '',
     }));
 }
@@ -23251,13 +23251,19 @@ function fillManualProdWithBom(autoRows) {
         const bom = bomByProduct.get((row.product_code || '').trim());
         if (!bom) return row;
 
-        const filled = { ...row, composition: sanitizeText(bom.composition || '') || row.composition };
+        const filled = {
+            ...row,
+            composition: sanitizeText(bom.composition || '') || row.composition,
+            type: sanitizeText(bom.type || '') || row.type,
+        };
         const prodQty = row.production_qty;
         for (let i = 1; i <= 4; i++) {
             const itemCode = bom[`input_item${i}_code`] || '';
+            const itemName = bom[`input_item${i}_name`] || '';
             const inputQty = bom[`input_qty${i}`];
             filled[`input_item${i}_code`] = itemCode;
-            /* 환산수량 = 생산수량 × 투입수량(BOM 비율) */
+            filled[`input_item${i}_name`] = itemName;
+            /* 환산수량 = 생산수량 × 투입량(BOM) */
             if (Number.isFinite(prodQty) && Number.isFinite(inputQty) && inputQty > 0) {
                 filled[`converted_qty${i}`] = prodQty * inputQty;
             }

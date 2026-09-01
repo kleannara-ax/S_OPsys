@@ -23749,6 +23749,134 @@ function initManualProdMonthFilter() {
     });
 }
 
+/**
+ * 수작업 생산 계획량 환산 — 새로고침 버튼
+ * 생산탭 보정생산계획(enrichedData)을 재조회하여 환산 테이블을 갱신
+ */
+function initManualProdRefresh() {
+    const btn = document.getElementById('btn-manual-prod-refresh');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = '⏳ 갱신 중...';
+        try {
+            /* 생산탭 데이터(SNOP) 재조회 → enrichedData 갱신 */
+            await loadData();
+            /* auto 행 재생성 (기존 auto 행 제거 후 재매핑) */
+            manualProdState.data = (manualProdState.data || []).filter(r => !r._auto);
+            mergeAutoManualProdRows();
+            renderManualProdTable();
+            alert('✅ 보정생산계획 데이터를 갱신했습니다.');
+        } catch (err) {
+            console.error('새로고침 실패:', err);
+            alert('❌ 데이터 갱신 중 오류가 발생했습니다.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔄 새로고침';
+        }
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 — 저장 버튼
+ * 투입단품 코드별 환산수량을 합산하여 생산탭의 수작업 투입수량에 반영
+ *
+ * 로직:
+ * 1. 환산 테이블의 모든 행에서 투입단품1~4 코드 + 환산수량 추출
+ * 2. 동일 투입단품 코드의 환산수량을 합산
+ * 3. 생산탭(state.rawData) 중 같은 month + item_code인 레코드의
+ *    manual_input_quantity를 합산값으로 업데이트 (서버 저장)
+ */
+function initManualProdSave() {
+    const btn = document.getElementById('btn-manual-prod-save');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const allData = manualProdState.data || [];
+        if (allData.length === 0) {
+            alert('저장할 환산 데이터가 없습니다.');
+            return;
+        }
+
+        /* 1) 투입단품코드별 환산수량 합산 (코드 → { qty, month }) */
+        const qtyByCode = new Map();
+        allData.forEach(row => {
+            const month = (row.plan_date || '').substring(0, 7);
+            for (let i = 1; i <= 4; i++) {
+                const code = (row[`input_item${i}_code`] || '').trim();
+                const qty = row[`converted_qty${i}`];
+                if (!code || !Number.isFinite(qty)) continue;
+
+                const key = `${code}__${month}`;
+                if (qtyByCode.has(key)) {
+                    qtyByCode.get(key).qty += qty;
+                } else {
+                    qtyByCode.set(key, { code, month, qty });
+                }
+            }
+        });
+
+        if (qtyByCode.size === 0) {
+            alert('환산수량이 산출된 투입단품이 없습니다.\nBOM 등록 여부를 확인해주세요.');
+            return;
+        }
+
+        /* 2) 생산탭 rawData에서 매칭 → 수작업 투입수량 업데이트 */
+        const rawData = state.rawData || [];
+        let successCount = 0;
+        let failCount = 0;
+        const notFoundCodes = [];
+
+        btn.disabled = true;
+        btn.textContent = '⏳ 저장 중...';
+
+        for (const [, entry] of qtyByCode) {
+            const record = rawData.find(r =>
+                r && (r.item_code || '').trim() === entry.code &&
+                (r.month || '').substring(0, 7) === entry.month
+            );
+            if (!record) {
+                notFoundCodes.push(entry.code);
+                continue;
+            }
+
+            const roundedQty = Math.round(entry.qty);
+            /* 기존값과 동일하면 스킵 */
+            if (record.manual_input_quantity === roundedQty) {
+                successCount++;
+                continue;
+            }
+
+            try {
+                record.manual_input_quantity = roundedQty;
+                await updateRecord(record.id, {
+                    item_code: record.item_code,
+                    month: record.month,
+                    manual_input_quantity: roundedQty,
+                });
+                successCount++;
+            } catch (err) {
+                console.error(`수작업 투입수량 저장 실패 [${entry.code}]:`, err);
+                failCount++;
+            }
+        }
+
+        /* 3) 결과 알림 */
+        let msg = `✅ 저장 완료: ${successCount}건 반영`;
+        if (failCount > 0) msg += `\n❌ 실패: ${failCount}건`;
+        if (notFoundCodes.length > 0) {
+            msg += `\n⚠️ 생산탭에서 매칭 안 된 자재코드 ${notFoundCodes.length}건:`;
+            msg += '\n' + notFoundCodes.slice(0, 10).join(', ');
+            if (notFoundCodes.length > 10) msg += ` 외 ${notFoundCodes.length - 10}건`;
+        }
+        alert(msg);
+
+        /* 화면 갱신 */
+        applyFilters();
+        btn.disabled = false;
+        btn.textContent = '💾 저장';
+    });
+}
+
 function initManualProd() {
     if (!manualProdState.loaded) {
         manualProdState.loaded = true;
@@ -23757,6 +23885,8 @@ function initManualProd() {
         initManualProdUpload();
         initManualProdTemplateDownload();
         initManualProdMonthFilter();
+        initManualProdRefresh();
+        initManualProdSave();
     }
     /* 탭 진입 시마다 서버에서 최신 데이터 조회 */
     fetchManualProds();

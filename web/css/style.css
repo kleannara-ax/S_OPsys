@@ -860,6 +860,40 @@ button.danger:hover {
 .prod-sticky-7 { left: 420px; min-width: 180px; max-width: 180px; }
 .prod-sticky-8 { left: 600px; min-width: 90px; }
 
+/* 수작업 생산 계획량 환산 — 새로고침/저장 버튼 */
+.btn-manual-prod-refresh,
+.btn-manual-prod-save {
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.btn-manual-prod-refresh {
+    background: #f8fafc;
+    color: #334155;
+}
+.btn-manual-prod-refresh:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+}
+.btn-manual-prod-save {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+}
+.btn-manual-prod-save:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+.btn-manual-prod-save:disabled,
+.btn-manual-prod-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* 수작업 생산 계획량 환산 — 전체 중앙정렬 */
 #manual-prod-table thead th,
 #manual-prod-table tbody td {

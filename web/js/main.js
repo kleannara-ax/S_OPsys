@@ -23830,7 +23830,25 @@ function initManualProdSave() {
         btn.disabled = true;
         btn.textContent = '⏳ 저장 중...';
 
-        console.log('[환산 저장] 합산 결과:', [...qtyByCode.entries()].map(([k, v]) => `${v.code}(${v.month}): ${v.qty}`));
+        /* 디버깅: rawData 샘플 + 합산 결과 확인 */
+        const debugSamples = rawData.slice(0, 5).map(r => `${r.item_code}|${r.month}`);
+        const debugQty = [...qtyByCode.entries()].map(([k, v]) => `${v.code}(${v.month}): ${v.qty}`);
+        console.log('[환산 저장] rawData 총건수:', rawData.length, ', 샘플:', debugSamples);
+        console.log('[환산 저장] 합산 결과:', debugQty);
+
+        /* 디버깅: 첫 번째 투입단품코드로 rawData 검색 시도 */
+        const firstEntry = [...qtyByCode.values()][0];
+        if (firstEntry) {
+            const candidates = rawData.filter(r => (r.item_code || '').trim() === firstEntry.code);
+            console.log(`[환산 저장] ${firstEntry.code} rawData 검색:`, candidates.length, '건',
+                candidates.map(r => `id=${r.id}, month=${r.month}, line=${r.production_line}`));
+            if (candidates.length === 0) {
+                /* 부분 매칭 시도 */
+                const partial = rawData.filter(r => (r.item_code || '').includes(firstEntry.code.substring(0, 8)));
+                console.log(`[환산 저장] 부분매칭(${firstEntry.code.substring(0,8)}):`, partial.length, '건',
+                    partial.slice(0, 3).map(r => `${r.item_code}|${r.month}`));
+            }
+        }
 
         for (const [, entry] of qtyByCode) {
             /* item_code + month 매칭 (생산라인 무관) */
@@ -23868,12 +23886,17 @@ function initManualProdSave() {
         }
 
         /* 3) 결과 알림 */
-        let msg = `✅ 저장 완료: ${successCount}건 반영`;
+        let msg = `저장 완료: ${successCount}건 반영`;
         if (failCount > 0) msg += `\n❌ 실패: ${failCount}건`;
         if (notFoundCodes.length > 0) {
             msg += `\n⚠️ 생산탭에서 매칭 안 된 자재코드 ${notFoundCodes.length}건:`;
-            msg += '\n' + notFoundCodes.slice(0, 10).join(', ');
-            if (notFoundCodes.length > 10) msg += ` 외 ${notFoundCodes.length - 10}건`;
+            msg += '\n' + notFoundCodes.join(', ');
+        }
+        /* 디버깅 정보 */
+        msg += `\n\n[디버그] rawData 총: ${rawData.length}건`;
+        msg += `\n합산 대상: ${debugQty.join(', ')}`;
+        if (rawData.length > 0) {
+            msg += `\nrawData month 샘플: ${rawData[0].month}`;
         }
         alert(msg);
 

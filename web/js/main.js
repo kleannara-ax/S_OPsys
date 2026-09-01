@@ -23821,6 +23821,7 @@ function initManualProdSave() {
         }
 
         /* 2) 생산탭 rawData에서 매칭 → 수작업 투입수량 업데이트 */
+        /*    production_line 제한 없이, item_code + month 로만 매칭 */
         const rawData = state.rawData || [];
         let successCount = 0;
         let failCount = 0;
@@ -23829,17 +23830,23 @@ function initManualProdSave() {
         btn.disabled = true;
         btn.textContent = '⏳ 저장 중...';
 
+        console.log('[환산 저장] 합산 결과:', [...qtyByCode.entries()].map(([k, v]) => `${v.code}(${v.month}): ${v.qty}`));
+
         for (const [, entry] of qtyByCode) {
+            /* item_code + month 매칭 (생산라인 무관) */
             const record = rawData.find(r =>
                 r && (r.item_code || '').trim() === entry.code &&
                 (r.month || '').substring(0, 7) === entry.month
             );
             if (!record) {
+                console.warn(`[환산 저장] 매칭 실패: ${entry.code} (${entry.month}) — rawData에 해당 item_code+month 없음`);
                 notFoundCodes.push(entry.code);
                 continue;
             }
 
             const roundedQty = Math.round(entry.qty);
+            console.log(`[환산 저장] ${entry.code}: ${roundedQty} → record.id=${record.id}, 기존값=${record.manual_input_quantity}`);
+
             /* 기존값과 동일하면 스킵 */
             if (record.manual_input_quantity === roundedQty) {
                 successCount++;
@@ -23870,7 +23877,7 @@ function initManualProdSave() {
         }
         alert(msg);
 
-        /* 화면 갱신 */
+        /* 화면 갱신 — enrichedData 재계산 포함 */
         applyFilters();
         btn.disabled = false;
         btn.textContent = '💾 저장';

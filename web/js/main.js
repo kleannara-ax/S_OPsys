@@ -4620,27 +4620,11 @@ function enrichRecord(record, lineStats, overrides = {}) {
     const adjRequiredQuantity = Number.isFinite(adjInventoryDiff) ? -adjInventoryDiff : null;
 
     /* ── 납품율 계산 ──
-       산식: (판매실적 / 판매계획) / (오늘일자 / 해당월일수)
-       - 시스템 날짜 기준으로 오늘 일(day)과 해당 월의 총 일수를 자동 산출
-       - 과거/미래 월은 일자 비율을 1로 처리 (월 전체 기준)
+       산식: 판매실적 / 판매계획
        - 판매계획이 0이면 계산 불가 → null                        */
     let deliveryRate = null;
     if (Number.isFinite(salesActual) && Number.isFinite(salesPlan) && salesPlan > 0) {
-        const today = new Date();
-        const recordMonth = record.month; // 'YYYY-MM' 형식
-        const todayYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-
-        let dayRatio = 1; // 과거/미래 월은 전체 기준(1)
-        if (recordMonth === todayYM) {
-            // 당월: 오늘 일자 / 해당 월 총 일수
-            const dayOfMonth = today.getDate();
-            const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-            dayRatio = dayOfMonth / daysInMonth;
-        }
-
-        if (dayRatio > 0) {
-            deliveryRate = (salesActual / salesPlan) / dayRatio;
-        }
+        deliveryRate = salesActual / salesPlan;
     }
 
     return {

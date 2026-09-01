@@ -985,6 +985,10 @@ button.danger:hover {
     color: #3b82f6;
     font-weight: 500;
 }
+.manual-bom-table tbody td.text-danger {
+    color: #dc2626;
+    font-weight: 600;
+}
 
 .manual-bom-table tbody td.text-left {
     text-align: left;

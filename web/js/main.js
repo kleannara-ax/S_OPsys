@@ -23476,18 +23476,27 @@ function renderManualProdTable() {
         tdComposition.textContent = sanitizeText(row.composition || '');
         tr.appendChild(tdComposition);
 
+        /* BOM 매칭 여부 확인 — 매칭 안 되면 폰트 색상 경고(빨간) */
+        const hasBomMatch = (() => {
+            const code = (row.product_code || '').trim();
+            if (!code) return false;
+            const boms = manualBomState.data || [];
+            return boms.some(b => (b.product_code || '').trim() === code);
+        })();
+
         /* 수작업 제품 코드 */
         const tdProductCode = document.createElement('td');
-        tdProductCode.className = 'text-primary prod-sticky prod-sticky-6';
+        tdProductCode.className = (hasBomMatch ? 'text-primary' : 'text-danger') + ' prod-sticky prod-sticky-6';
         tdProductCode.textContent = sanitizeText(row.product_code || '');
+        if (!hasBomMatch && row.product_code) tdProductCode.title = 'BOM 미등록 — 환산수량 산출 불가';
         tr.appendChild(tdProductCode);
 
         /* 수작업 제품명 — 자재마스터에서 자동 매칭 */
         const tdProductName = document.createElement('td');
-        tdProductName.className = 'text-primary col-name prod-sticky prod-sticky-7';
+        tdProductName.className = (hasBomMatch ? 'text-primary' : 'text-danger') + ' col-name prod-sticky prod-sticky-7';
         const prodName = getItemNameFromMaster(row.product_code) || sanitizeText(row.product_name || '');
         tdProductName.textContent = prodName;
-        tdProductName.title = prodName;
+        tdProductName.title = hasBomMatch ? prodName : 'BOM 미등록 — 환산수량 산출 불가';
         tr.appendChild(tdProductName);
 
         /* 생산수량 */

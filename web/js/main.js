@@ -23438,19 +23438,6 @@ function renderManualProdTable() {
 
         const isAutoRow = !!row._auto;
 
-        /* 체크박스 */
-        const tdCheck = document.createElement('td');
-        tdCheck.className = 'col-checkbox prod-sticky prod-sticky-1';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.dataset.idx = origIdx;
-        if (isAutoRow) {
-            cb.disabled = true;
-            cb.title = '자동 연동 행은 선택할 수 없습니다';
-        }
-        tdCheck.appendChild(cb);
-        tr.appendChild(tdCheck);
-
         /* 계획 월 */
         const tdPlanDate = document.createElement('td');
         tdPlanDate.className = 'prod-sticky prod-sticky-2';
@@ -23527,76 +23514,6 @@ function renderManualProdTable() {
             tdQty.textContent = qty != null && qty !== '' ? Number(qty).toLocaleString() : '';
             tr.appendChild(tdQty);
         }
-
-        /* 비고 */
-        const tdRemark = document.createElement('td');
-        tdRemark.className = 'col-remark';
-        if (isAutoRow) {
-            /* auto 행(생산탭 연동)은 비고 읽기 전용 */
-            tdRemark.textContent = sanitizeText(row.remark || '');
-        } else {
-            const remarkInput = document.createElement('input');
-            remarkInput.type = 'text';
-            remarkInput.value = sanitizeText(row.remark || '');
-            remarkInput.placeholder = '';
-            remarkInput.dataset.idx = origIdx;
-            remarkInput.addEventListener('change', async (e) => {
-                const newVal = e.target.value.trim();
-                const record = manualProdState.data[origIdx];
-                if (!record || !record.id) return;
-                try {
-                    await fetch(`/sales-api/manual-prods/${record.id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ remark: newVal }),
-                    });
-                    record.remark = newVal;
-                } catch (err) {
-                    console.error('비고 저장 실패:', err);
-                }
-            });
-            tdRemark.appendChild(remarkInput);
-        }
-        tr.appendChild(tdRemark);
-
-        /* 관리 (편집/삭제) */
-        const tdActions = document.createElement('td');
-        tdActions.className = 'col-actions';
-
-        if (isAutoRow) {
-            /* auto 행(생산탭 연동): 자동 연동 표시 */
-            const autoTag = document.createElement('span');
-            autoTag.className = 'auto-tag';
-            autoTag.textContent = '자동';
-            autoTag.title = '생산탭 생리대 수작업 라인에서 자동으로 가져온 데이터입니다';
-            tdActions.appendChild(autoTag);
-        } else {
-            const btnEdit = document.createElement('button');
-            btnEdit.type = 'button';
-            btnEdit.className = 'btn-edit';
-            btnEdit.textContent = '편집';
-            btnEdit.addEventListener('click', () => {
-                const record = manualProdState.data[origIdx];
-                if (record) alert('편집 기능은 추후 구현 예정입니다.\nID: ' + (record.id || origIdx));
-            });
-            tdActions.appendChild(btnEdit);
-
-            const btnDelete = document.createElement('button');
-            btnDelete.type = 'button';
-            btnDelete.className = 'btn-delete';
-            btnDelete.textContent = '삭제';
-            btnDelete.addEventListener('click', async () => {
-                const record = manualProdState.data[origIdx];
-                if (!record || !record.id) return;
-                if (!confirm('이 항목을 삭제하시겠습니까?')) return;
-                const ok = await deleteManualProdsBulk([record.id]);
-                if (ok) {
-                    await fetchManualProds();
-                }
-            });
-            tdActions.appendChild(btnDelete);
-        }
-        tr.appendChild(tdActions);
 
         tbody.appendChild(tr);
     });

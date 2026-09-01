@@ -851,15 +851,14 @@ button.danger:hover {
     box-shadow: none;
 }
 
-/* 각 컬럼 left 위치 (누적) */
-.prod-sticky-1 { left: 0;    min-width: 44px;  width: 44px; }
-.prod-sticky-2 { left: 44px;  min-width: 80px; }
-.prod-sticky-3 { left: 124px; min-width: 80px; }
-.prod-sticky-4 { left: 204px; min-width: 60px; }
-.prod-sticky-5 { left: 264px; min-width: 60px; }
-.prod-sticky-6 { left: 324px; min-width: 140px; }
-.prod-sticky-7 { left: 464px; min-width: 180px; max-width: 180px; }
-.prod-sticky-8 { left: 644px; min-width: 90px; }
+/* 각 컬럼 left 위치 (누적) — 체크박스 열 제거 후 재계산 */
+.prod-sticky-2 { left: 0;     min-width: 80px; }
+.prod-sticky-3 { left: 80px;  min-width: 80px; }
+.prod-sticky-4 { left: 160px; min-width: 60px; }
+.prod-sticky-5 { left: 220px; min-width: 60px; }
+.prod-sticky-6 { left: 280px; min-width: 140px; }
+.prod-sticky-7 { left: 420px; min-width: 180px; max-width: 180px; }
+.prod-sticky-8 { left: 600px; min-width: 90px; }
 
 /* 수작업 생산 계획량 환산 — 전체 중앙정렬 */
 #manual-prod-table thead th,

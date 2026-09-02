@@ -23759,7 +23759,7 @@ function initManualProdRefresh() {
     if (!btn) return;
     btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.textContent = '⏳ 갱신 중...';
+        btn.textContent = '갱신 중...';
         try {
             /* 생산탭 데이터(SNOP) 재조회 → enrichedData 갱신 */
             await loadData();
@@ -23773,7 +23773,7 @@ function initManualProdRefresh() {
             alert('❌ 데이터 갱신 중 오류가 발생했습니다.');
         } finally {
             btn.disabled = false;
-            btn.textContent = '🔄 새로고침';
+            btn.textContent = '새로고침';
         }
     });
 }
@@ -23830,7 +23830,7 @@ function initManualProdSave() {
         let failCount = 0;
 
         btn.disabled = true;
-        btn.textContent = '⏳ 저장 중...';
+        btn.textContent = '저장 중...';
 
         for (const [, entry] of qtyByCode) {
             const roundedQty = Math.round(entry.qty);
@@ -23916,7 +23916,7 @@ function initManualProdSave() {
         /* 화면 갱신 — enrichedData 재계산 포함 */
         applyFilters();
         btn.disabled = false;
-        btn.textContent = '💾 저장';
+        btn.textContent = '저장';
     });
 }
 

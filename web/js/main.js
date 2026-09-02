@@ -23860,13 +23860,23 @@ function initManualProdSave() {
                 }
             } else {
                 /* ── 해당 월 SNOP 레코드 없음 → 새로 생성 ── */
-                console.info(`[환산 저장] ${entry.code}(${entry.month}) — rawData에 없음 → 새 SNOP 레코드 생성`);
+                /* 같은 item_code의 다른 월 레코드에서 자재 정보(이름/카테고리/라인) 복사 */
+                const ref = rawData.find(r => (r.item_code || '').trim() === entry.code);
+                const newPayload = {
+                    item_code: entry.code,
+                    month: entry.month,
+                    manual_input_quantity: roundedQty,
+                };
+                if (ref) {
+                    if (ref.item_name) newPayload.item_name = ref.item_name;
+                    if (ref.category) newPayload.category = ref.category;
+                    if (ref.production_line) newPayload.production_line = ref.production_line;
+                    if (ref.vendor_name) newPayload.vendor_name = ref.vendor_name;
+                    if (ref.moq) newPayload.moq = ref.moq;
+                }
+                console.info(`[환산 저장] ${entry.code}(${entry.month}) — rawData에 없음 → 새 SNOP 레코드 생성`, newPayload);
                 try {
-                    const created = await createRecord({
-                        item_code: entry.code,
-                        month: entry.month,
-                        manual_input_quantity: roundedQty,
-                    });
+                    const created = await createRecord(newPayload);
                     /* rawData에도 추가 (화면 갱신 시 반영) */
                     if (created && created.id) {
                         rawData.push(normalizeRecord(created));

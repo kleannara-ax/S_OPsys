@@ -23898,6 +23898,21 @@ function initManualProdSave() {
         if (rawData.length > 0) {
             msg += `\nrawData month 샘플: ${rawData[0].month}`;
         }
+        /* 디버그: 투입단품코드로 rawData 직접 검색 */
+        for (const [, entry] of qtyByCode) {
+            const found = rawData.filter(r => (r.item_code || '').trim() === entry.code);
+            msg += `\n🔍 ${entry.code}: rawData ${found.length}건`;
+            if (found.length > 0) {
+                msg += ` (months: ${found.map(r => r.month).join(',')})`;
+            } else {
+                /* item_code 앞 8자 부분매칭 */
+                const partial = rawData.filter(r => (r.item_code || '').includes(entry.code.substring(0, 8)));
+                msg += ` / 부분매칭(${entry.code.substring(0,8)}): ${partial.length}건`;
+                if (partial.length > 0) {
+                    msg += ` → ${partial.slice(0,3).map(r => r.item_code + '|' + r.month).join(', ')}`;
+                }
+            }
+        }
         alert(msg);
 
         /* 화면 갱신 — enrichedData 재계산 포함 */

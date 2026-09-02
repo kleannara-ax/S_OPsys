@@ -23822,97 +23822,84 @@ function initManualProdSave() {
 
         /* 2) 생산탭 rawData에서 매칭 → 수작업 투입수량 업데이트 */
         /*    production_line 제한 없이, item_code + month 로만 매칭 */
+        /*    매칭 실패 시 → 해당 월의 새 SNOP 레코드를 자동 생성 */
         const rawData = state.rawData || [];
-        let successCount = 0;
+        let updateCount = 0;
+        let createCount = 0;
         let failCount = 0;
-        const notFoundCodes = [];
 
         btn.disabled = true;
         btn.textContent = '⏳ 저장 중...';
 
-        /* 디버깅: rawData 샘플 + 합산 결과 확인 */
-        const debugSamples = rawData.slice(0, 5).map(r => `${r.item_code}|${r.month}`);
-        const debugQty = [...qtyByCode.entries()].map(([k, v]) => `${v.code}(${v.month}): ${v.qty}`);
-        console.log('[환산 저장] rawData 총건수:', rawData.length, ', 샘플:', debugSamples);
-        console.log('[환산 저장] 합산 결과:', debugQty);
-
-        /* 디버깅: 첫 번째 투입단품코드로 rawData 검색 시도 */
-        const firstEntry = [...qtyByCode.values()][0];
-        if (firstEntry) {
-            const candidates = rawData.filter(r => (r.item_code || '').trim() === firstEntry.code);
-            console.log(`[환산 저장] ${firstEntry.code} rawData 검색:`, candidates.length, '건',
-                candidates.map(r => `id=${r.id}, month=${r.month}, line=${r.production_line}`));
-            if (candidates.length === 0) {
-                /* 부분 매칭 시도 */
-                const partial = rawData.filter(r => (r.item_code || '').includes(firstEntry.code.substring(0, 8)));
-                console.log(`[환산 저장] 부분매칭(${firstEntry.code.substring(0,8)}):`, partial.length, '건',
-                    partial.slice(0, 3).map(r => `${r.item_code}|${r.month}`));
-            }
-        }
-
         for (const [, entry] of qtyByCode) {
+            const roundedQty = Math.round(entry.qty);
+
             /* item_code + month 매칭 (생산라인 무관) */
             const record = rawData.find(r =>
                 r && (r.item_code || '').trim() === entry.code &&
                 (r.month || '').substring(0, 7) === entry.month
             );
-            if (!record) {
-                console.warn(`[환산 저장] 매칭 실패: ${entry.code} (${entry.month}) — rawData에 해당 item_code+month 없음`);
-                notFoundCodes.push(entry.code);
-                continue;
-            }
 
-            const roundedQty = Math.round(entry.qty);
-            console.log(`[환산 저장] ${entry.code}: ${roundedQty} → record.id=${record.id}, 기존값=${record.manual_input_quantity}`);
-
-            /* 기존값과 동일하면 스킵 */
-            if (record.manual_input_quantity === roundedQty) {
-                successCount++;
-                continue;
-            }
-
-            try {
-                record.manual_input_quantity = roundedQty;
-                await updateRecord(record.id, {
-                    item_code: record.item_code,
-                    month: record.month,
-                    manual_input_quantity: roundedQty,
-                });
-                successCount++;
-            } catch (err) {
-                console.error(`수작업 투입수량 저장 실패 [${entry.code}]:`, err);
-                failCount++;
+            if (record) {
+                /* ── 기존 레코드 업데이트 ── */
+                if (record.manual_input_quantity === roundedQty) {
+                    updateCount++;
+                    continue;
+                }
+                try {
+                    record.manual_input_quantity = roundedQty;
+                    await updateRecord(record.id, {
+                        item_code: record.item_code,
+                        month: record.month,
+                        manual_input_quantity: roundedQty,
+                    });
+                    updateCount++;
+                } catch (err) {
+                    console.error(`[환산 저장] 업데이트 실패 [${entry.code}]:`, err);
+                    failCount++;
+                }
+            } else {
+                /* ── 해당 월 SNOP 레코드 없음 → 새로 생성 ── */
+                console.info(`[환산 저장] ${entry.code}(${entry.month}) — rawData에 없음 → 새 SNOP 레코드 생성`);
+                try {
+                    const created = await createRecord({
+                        item_code: entry.code,
+                        month: entry.month,
+                        manual_input_quantity: roundedQty,
+                    });
+                    /* rawData에도 추가 (화면 갱신 시 반영) */
+                    if (created && created.id) {
+                        rawData.push(normalizeRecord(created));
+                    }
+                    createCount++;
+                } catch (dupErr) {
+                    if (dupErr.code === 'DUPLICATE' && dupErr.detail && dupErr.detail.existing_id) {
+                        /* 이미 존재하는 레코드 → 업데이트로 전환 */
+                        try {
+                            await updateRecord(dupErr.detail.existing_id, {
+                                item_code: entry.code,
+                                month: entry.month,
+                                manual_input_quantity: roundedQty,
+                            });
+                            updateCount++;
+                        } catch (updateErr) {
+                            console.error(`[환산 저장] 중복 레코드 업데이트 실패 [${entry.code}]:`, updateErr);
+                            failCount++;
+                        }
+                    } else {
+                        console.error(`[환산 저장] 생성 실패 [${entry.code}]:`, dupErr);
+                        failCount++;
+                    }
+                }
             }
         }
 
         /* 3) 결과 알림 */
-        let msg = `저장 완료: ${successCount}건 반영`;
-        if (failCount > 0) msg += `\n❌ 실패: ${failCount}건`;
-        if (notFoundCodes.length > 0) {
-            msg += `\n⚠️ 생산탭에서 매칭 안 된 자재코드 ${notFoundCodes.length}건:`;
-            msg += '\n' + notFoundCodes.join(', ');
-        }
-        /* 디버깅 정보 */
-        msg += `\n\n[디버그] rawData 총: ${rawData.length}건`;
-        msg += `\n합산 대상: ${debugQty.join(', ')}`;
-        if (rawData.length > 0) {
-            msg += `\nrawData month 샘플: ${rawData[0].month}`;
-        }
-        /* 디버그: 투입단품코드로 rawData 직접 검색 */
-        for (const [, entry] of qtyByCode) {
-            const found = rawData.filter(r => (r.item_code || '').trim() === entry.code);
-            msg += `\n🔍 ${entry.code}: rawData ${found.length}건`;
-            if (found.length > 0) {
-                msg += ` (months: ${found.map(r => r.month).join(',')})`;
-            } else {
-                /* item_code 앞 8자 부분매칭 */
-                const partial = rawData.filter(r => (r.item_code || '').includes(entry.code.substring(0, 8)));
-                msg += ` / 부분매칭(${entry.code.substring(0,8)}): ${partial.length}건`;
-                if (partial.length > 0) {
-                    msg += ` → ${partial.slice(0,3).map(r => r.item_code + '|' + r.month).join(', ')}`;
-                }
-            }
-        }
+        const totalSuccess = updateCount + createCount;
+        let msg = `저장 완료: ${totalSuccess}건 반영`;
+        if (updateCount > 0) msg += `\n  ✏️ 기존 레코드 업데이트: ${updateCount}건`;
+        if (createCount > 0) msg += `\n  🆕 새 SNOP 레코드 생성: ${createCount}건`;
+        if (failCount > 0) msg += `\n  ❌ 실패: ${failCount}건`;
         alert(msg);
 
         /* 화면 갱신 — enrichedData 재계산 포함 */

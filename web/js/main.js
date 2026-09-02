@@ -2166,6 +2166,7 @@ function normalizeRecord(record) {
         target_ending_inventory: toNumber(record.target_ending_inventory),
         optimal_inventory_2025: toNullableNumber(record.optimal_inventory_2025),
         capacity_limit: toNumber(record.capacity_limit),
+        manual_input_quantity: toNullableNumber(record.manual_input_quantity),
         notes: record.notes ?? '',
         priority: record.priority != null ? Number(record.priority) : null,
         updated_at: record.updated_at ?? null,

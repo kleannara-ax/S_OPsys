@@ -23306,7 +23306,7 @@ function initManualBomFilters() {
     );
 }
 
-function initManualBom() {
+async function initManualBom() {
     if (!manualBomState.loaded) {
         manualBomState.loaded = true;
         initManualBomSelectAll();
@@ -23315,8 +23315,8 @@ function initManualBom() {
         initManualBomTemplateDownload();
         initManualBomFilters();
     }
-    /* 탭 진입 시마다 서버에서 최신 데이터 조회 */
-    fetchManualBoms();
+    /* BOM 데이터를 먼저 로드한 후 환산 테이블 초기화 (BOM 매핑에 필요) */
+    await fetchManualBoms();
     /* 수작업 생산 계획량 환산도 함께 초기화 */
     initManualProd();
 }

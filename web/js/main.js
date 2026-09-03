@@ -22760,6 +22760,8 @@ const manualBomState = {
     data: [],       /* 수작업 BOM 데이터 배열 (서버에서 조회) */
     loaded: false,  /* 최초 로드 여부 */
     loading: false, /* API 호출 중 여부 */
+    filterProductCode: '', /* 수작업 제품코드 필터 */
+    filterInputItem: '',   /* 투입단품 필터 */
 };
 
 /**
@@ -22853,13 +22855,78 @@ function getItemNameFromMaster(itemCode) {
 /**
  * 수작업 BOM 테이블 렌더링
  */
+/**
+ * 수작업 BOM 필터 셀렉트 옵션 갱신 (제품코드 + 투입단품)
+ */
+function updateManualBomFilterOptions() {
+    const allData = manualBomState.data || [];
+
+    /* 제품코드 필터 */
+    const productSel = document.getElementById('manual-bom-product-filter');
+    if (productSel) {
+        const codes = [...new Set(allData.map(r => (r.product_code || '').trim()).filter(Boolean))].sort();
+        const curVal = productSel.value;
+        productSel.innerHTML = '<option value="">전체</option>';
+        codes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            productSel.appendChild(opt);
+        });
+        if (curVal && codes.includes(curVal)) productSel.value = curVal;
+        else { productSel.value = ''; manualBomState.filterProductCode = ''; }
+    }
+
+    /* 투입단품 필터 — 투입단품1~4 코드에서 고유값 추출 */
+    const inputSel = document.getElementById('manual-bom-input-filter');
+    if (inputSel) {
+        const inputCodes = new Set();
+        allData.forEach(r => {
+            for (let i = 1; i <= 4; i++) {
+                const code = (r[`input_item${i}_code`] || '').trim();
+                if (code) inputCodes.add(code);
+            }
+        });
+        const sorted = [...inputCodes].sort();
+        const curVal = inputSel.value;
+        inputSel.innerHTML = '<option value="">전체</option>';
+        sorted.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            inputSel.appendChild(opt);
+        });
+        if (curVal && sorted.includes(curVal)) inputSel.value = curVal;
+        else { inputSel.value = ''; manualBomState.filterInputItem = ''; }
+    }
+}
+
 function renderManualBomTable() {
     const tbody = document.getElementById('manual-bom-table-body');
     const emptyMsg = document.getElementById('manual-bom-empty');
     if (!tbody) return;
 
     tbody.innerHTML = '';
-    const data = manualBomState.data || [];
+
+    /* 필터 옵션 갱신 */
+    updateManualBomFilterOptions();
+
+    const allData = manualBomState.data || [];
+
+    /* 필터 적용 */
+    const fpCode = manualBomState.filterProductCode || '';
+    const fiCode = manualBomState.filterInputItem || '';
+    const data = allData.filter(row => {
+        if (fpCode && (row.product_code || '').trim() !== fpCode) return false;
+        if (fiCode) {
+            let hasInput = false;
+            for (let i = 1; i <= 4; i++) {
+                if ((row[`input_item${i}_code`] || '').trim() === fiCode) { hasInput = true; break; }
+            }
+            if (!hasInput) return false;
+        }
+        return true;
+    });
 
     if (data.length === 0) {
         if (emptyMsg) emptyMsg.style.display = '';
@@ -22868,6 +22935,7 @@ function renderManualBomTable() {
     if (emptyMsg) emptyMsg.style.display = 'none';
 
     data.forEach((row, idx) => {
+        const origIdx = allData.indexOf(row);
         const tr = document.createElement('tr');
 
         /* 체크박스 */
@@ -22875,7 +22943,7 @@ function renderManualBomTable() {
         tdCheck.className = 'col-checkbox';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
-        cb.dataset.idx = idx;
+        cb.dataset.idx = origIdx;
         tdCheck.appendChild(cb);
         tr.appendChild(tdCheck);
 
@@ -23161,6 +23229,30 @@ function initManualBomTemplateDownload() {
 /**
  * 수작업 BOM 초기화 — 수작업 탭 최초 진입 시 호출
  */
+/**
+ * 수작업 BOM 필터 이벤트 바인딩
+ */
+function initManualBomFilters() {
+    const productSel = document.getElementById('manual-bom-product-filter');
+    if (productSel) {
+        productSel.addEventListener('change', () => {
+            manualBomState.filterProductCode = productSel.value;
+            renderManualBomTable();
+            const selectAll = document.getElementById('manual-bom-select-all');
+            if (selectAll) selectAll.checked = false;
+        });
+    }
+    const inputSel = document.getElementById('manual-bom-input-filter');
+    if (inputSel) {
+        inputSel.addEventListener('change', () => {
+            manualBomState.filterInputItem = inputSel.value;
+            renderManualBomTable();
+            const selectAll = document.getElementById('manual-bom-select-all');
+            if (selectAll) selectAll.checked = false;
+        });
+    }
+}
+
 function initManualBom() {
     if (!manualBomState.loaded) {
         manualBomState.loaded = true;
@@ -23168,6 +23260,7 @@ function initManualBom() {
         initManualBomDeleteSelected();
         initManualBomUpload();
         initManualBomTemplateDownload();
+        initManualBomFilters();
     }
     /* 탭 진입 시마다 서버에서 최신 데이터 조회 */
     fetchManualBoms();
@@ -23183,7 +23276,9 @@ const manualProdState = {
     data: [],       /* 수작업 생산 계획량 환산 데이터 배열 (서버에서 조회) */
     loaded: false,  /* 최초 로드 여부 */
     loading: false, /* API 호출 중 여부 */
-    filterMonth: '', /* 계획 월 필터 값 ('' = 전체) */
+    filterMonth: '',        /* 계획 월 필터 값 ('' = 전체) */
+    filterProductCode: '',  /* 수작업 제품코드 필터 */
+    filterInputItem: '',    /* 투입단품 필터 */
 };
 
 /**
@@ -23380,31 +23475,63 @@ async function deleteManualProdsBulk(ids) {
  * 계획 월 필터 셀렉트 옵션 갱신
  */
 function updateManualProdMonthFilterOptions() {
-    const sel = document.getElementById('manual-prod-month-filter');
-    if (!sel) return;
     const allData = manualProdState.data || [];
-    /* 중복 없는 월 목록 추출 (YYYY-MM) — 정렬 */
-    const months = [...new Set(
-        allData
-            .map(r => (r.plan_date || '').substring(0, 7))
-            .filter(m => m.length >= 7)
-    )].sort();
 
-    const curVal = sel.value;
-    /* 기존 옵션 초기화 후 재생성 */
-    sel.innerHTML = '<option value="">전체</option>';
-    months.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        sel.appendChild(opt);
-    });
-    /* 이전 선택 값 복원 (해당 월이 여전히 존재할 때) */
-    if (curVal && months.includes(curVal)) {
-        sel.value = curVal;
-    } else {
-        sel.value = '';
-        manualProdState.filterMonth = '';
+    /* 계획 월 필터 */
+    const sel = document.getElementById('manual-prod-month-filter');
+    if (sel) {
+        const months = [...new Set(
+            allData.map(r => (r.plan_date || '').substring(0, 7)).filter(m => m.length >= 7)
+        )].sort();
+        const curVal = sel.value;
+        sel.innerHTML = '<option value="">전체</option>';
+        months.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            sel.appendChild(opt);
+        });
+        if (curVal && months.includes(curVal)) sel.value = curVal;
+        else { sel.value = ''; manualProdState.filterMonth = ''; }
+    }
+
+    /* 제품코드 필터 */
+    const productSel = document.getElementById('manual-prod-product-filter');
+    if (productSel) {
+        const codes = [...new Set(allData.map(r => (r.product_code || '').trim()).filter(Boolean))].sort();
+        const curVal = productSel.value;
+        productSel.innerHTML = '<option value="">전체</option>';
+        codes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            productSel.appendChild(opt);
+        });
+        if (curVal && codes.includes(curVal)) productSel.value = curVal;
+        else { productSel.value = ''; manualProdState.filterProductCode = ''; }
+    }
+
+    /* 투입단품 필터 — 투입단품1~4 코드에서 고유값 추출 */
+    const inputSel = document.getElementById('manual-prod-input-filter');
+    if (inputSel) {
+        const inputCodes = new Set();
+        allData.forEach(r => {
+            for (let i = 1; i <= 4; i++) {
+                const code = (r[`input_item${i}_code`] || '').trim();
+                if (code) inputCodes.add(code);
+            }
+        });
+        const sorted = [...inputCodes].sort();
+        const curVal = inputSel.value;
+        inputSel.innerHTML = '<option value="">전체</option>';
+        sorted.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            inputSel.appendChild(opt);
+        });
+        if (curVal && sorted.includes(curVal)) inputSel.value = curVal;
+        else { inputSel.value = ''; manualProdState.filterInputItem = ''; }
     }
 }
 
@@ -23419,11 +23546,22 @@ function renderManualProdTable() {
     updateManualProdMonthFilterOptions();
 
     const allData = manualProdState.data || [];
-    /* 필터 적용 */
+    /* 필터 적용 (계획 월 + 제품코드 + 투입단품) */
     const filterMonth = manualProdState.filterMonth || '';
-    const data = filterMonth
-        ? allData.filter(r => (r.plan_date || '').substring(0, 7) === filterMonth)
-        : allData;
+    const fpCode = manualProdState.filterProductCode || '';
+    const fiCode = manualProdState.filterInputItem || '';
+    const data = allData.filter(r => {
+        if (filterMonth && (r.plan_date || '').substring(0, 7) !== filterMonth) return false;
+        if (fpCode && (r.product_code || '').trim() !== fpCode) return false;
+        if (fiCode) {
+            let hasInput = false;
+            for (let i = 1; i <= 4; i++) {
+                if ((r[`input_item${i}_code`] || '').trim() === fiCode) { hasInput = true; break; }
+            }
+            if (!hasInput) return false;
+        }
+        return true;
+    });
 
     if (data.length === 0) {
         if (emptyMsg) emptyMsg.style.display = '';
@@ -23740,14 +23878,28 @@ function initManualProdTemplateDownload() {
  */
 function initManualProdMonthFilter() {
     const sel = document.getElementById('manual-prod-month-filter');
-    if (!sel) return;
-    sel.addEventListener('change', () => {
-        manualProdState.filterMonth = sel.value;
-        renderManualProdTable();
-        /* 전체선택 체크 해제 */
-        const selectAll = document.getElementById('manual-prod-select-all');
-        if (selectAll) selectAll.checked = false;
-    });
+    if (sel) {
+        sel.addEventListener('change', () => {
+            manualProdState.filterMonth = sel.value;
+            renderManualProdTable();
+            const selectAll = document.getElementById('manual-prod-select-all');
+            if (selectAll) selectAll.checked = false;
+        });
+    }
+    const productSel = document.getElementById('manual-prod-product-filter');
+    if (productSel) {
+        productSel.addEventListener('change', () => {
+            manualProdState.filterProductCode = productSel.value;
+            renderManualProdTable();
+        });
+    }
+    const inputSel = document.getElementById('manual-prod-input-filter');
+    if (inputSel) {
+        inputSel.addEventListener('change', () => {
+            manualProdState.filterInputItem = inputSel.value;
+            renderManualProdTable();
+        });
+    }
 }
 
 /**

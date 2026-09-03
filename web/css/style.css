@@ -708,7 +708,9 @@ button.danger:hover {
 
 .manual-bom-actions {
     display: flex;
+    align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .manual-bom-actions button {

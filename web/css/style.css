@@ -805,14 +805,14 @@ button.danger:hover {
     gap: 8px;
 }
 .manual-prod-filter-label {
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #475569;
     white-space: nowrap;
 }
 .manual-prod-filter-select {
     padding: 5px 28px 5px 10px;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: #334155;
     border: 1.5px solid #cbd5e1;
@@ -932,8 +932,8 @@ button.danger:hover {
 /* 수작업 생산 계획량 환산 — 새로고침/저장 버튼 */
 .btn-manual-prod-refresh,
 .btn-manual-prod-save {
-    padding: 6px 14px;
-    font-size: 0.82rem;
+    padding: 8px 14px;
+    font-size: 0.85rem;
     font-weight: 600;
     border: 1px solid #cbd5e1;
     border-radius: 6px;

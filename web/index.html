@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css?v=20260903a">
+    <link rel="stylesheet" href="css/style.css?v=20260903b">
     <script src="js/chart.min.js"></script>
 </head>
 <body>
@@ -931,16 +931,18 @@
                             <button type="button" class="btn-manual-bom-download secondary small">템플릿 다운로드</button>
                             <button type="button" class="btn-manual-bom-delete-selected secondary small danger">선택 삭제</button>
                             <div class="manual-prod-filter">
-                                <label for="manual-bom-product-filter" class="manual-prod-filter-label">제품코드</label>
-                                <select id="manual-bom-product-filter" class="manual-prod-filter-select">
-                                    <option value="">전체</option>
-                                </select>
+                                <label class="manual-prod-filter-label">제품코드</label>
+                                <div class="manual-search-dropdown">
+                                    <input type="text" class="manual-search-input" id="manual-bom-product-input" placeholder="전체" autocomplete="off">
+                                    <div class="manual-search-list hidden" id="manual-bom-product-list"></div>
+                                </div>
                             </div>
                             <div class="manual-prod-filter">
-                                <label for="manual-bom-input-filter" class="manual-prod-filter-label">투입단품</label>
-                                <select id="manual-bom-input-filter" class="manual-prod-filter-select">
-                                    <option value="">전체</option>
-                                </select>
+                                <label class="manual-prod-filter-label">투입단품</label>
+                                <div class="manual-search-dropdown">
+                                    <input type="text" class="manual-search-input" id="manual-bom-input-input" placeholder="전체" autocomplete="off">
+                                    <div class="manual-search-list hidden" id="manual-bom-input-list"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -987,16 +989,18 @@
                                 </select>
                             </div>
                             <div class="manual-prod-filter">
-                                <label for="manual-prod-product-filter" class="manual-prod-filter-label">제품코드</label>
-                                <select id="manual-prod-product-filter" class="manual-prod-filter-select">
-                                    <option value="">전체</option>
-                                </select>
+                                <label class="manual-prod-filter-label">제품코드</label>
+                                <div class="manual-search-dropdown">
+                                    <input type="text" class="manual-search-input" id="manual-prod-product-input" placeholder="전체" autocomplete="off">
+                                    <div class="manual-search-list hidden" id="manual-prod-product-list"></div>
+                                </div>
                             </div>
                             <div class="manual-prod-filter">
-                                <label for="manual-prod-input-filter" class="manual-prod-filter-label">투입단품</label>
-                                <select id="manual-prod-input-filter" class="manual-prod-filter-select">
-                                    <option value="">전체</option>
-                                </select>
+                                <label class="manual-prod-filter-label">투입단품</label>
+                                <div class="manual-search-dropdown">
+                                    <input type="text" class="manual-search-input" id="manual-prod-input-input" placeholder="전체" autocomplete="off">
+                                    <div class="manual-search-list hidden" id="manual-prod-input-list"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2133,6 +2137,6 @@
     </div>
 
     <script src="js/xlsx.full.min.js"></script>
-    <script src="js/main.js?v=20260903a" defer></script>
+    <script src="js/main.js?v=20260903b" defer></script>
 </body>
 </html>

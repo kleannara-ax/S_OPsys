@@ -835,6 +835,63 @@ button.danger:hover {
     box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
 }
 
+/* ── 수작업 BOM/환산 검색형 필터 ── */
+.manual-search-dropdown {
+    position: relative;
+    min-width: 160px;
+}
+.manual-search-input {
+    width: 100%;
+    padding: 5px 10px;
+    font-size: 0.83rem;
+    font-weight: 500;
+    color: #334155;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+.manual-search-input:hover {
+    border-color: #94a3b8;
+}
+.manual-search-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+.manual-search-input::placeholder {
+    color: #94a3b8;
+}
+.manual-search-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.manual-search-list.hidden {
+    display: none;
+}
+.manual-search-list .item-search-option {
+    padding: 6px 10px;
+    font-size: 0.82rem;
+}
+.manual-search-list::-webkit-scrollbar {
+    width: 5px;
+}
+.manual-search-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 999px;
+}
+
 /* ── 수작업 생산계획량 환산: 틀고정 (체크박스~생산수량) ── */
 .manual-bom-table .prod-sticky {
     position: sticky;

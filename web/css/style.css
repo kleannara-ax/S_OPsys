@@ -664,6 +664,471 @@ button.danger:hover {
     background: rgba(124, 58, 237, 0.05);
 }
 
+.product-type-tab[data-product-type="manual"].active {
+    color: #059669;
+    border-bottom-color: #059669;
+    background: rgba(5, 150, 105, 0.08);
+}
+
+.product-type-tab[data-product-type="manual"]:hover {
+    color: #059669;
+    background: rgba(5, 150, 105, 0.05);
+}
+
+/* ── 수작업 탭 빈 화면 ── */
+.manual-tab-placeholder {
+    margin: 20px 0;
+}
+
+/* ── 수작업 BOM 섹션 ── */
+.manual-bom-section {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.manual-bom-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: #fff;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.manual-bom-header h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0;
+}
+
+.manual-bom-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.manual-bom-actions button {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.manual-bom-actions button:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.manual-bom-actions button.danger {
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+.manual-bom-actions button.danger:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
+}
+
+/* ── 수작업 BOM 테이블 (자재마스터 스타일) ── */
+.manual-bom-table-wrapper {
+    overflow-x: auto;
+    max-height: 700px;
+    overflow-y: auto;
+}
+
+.manual-bom-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+.manual-bom-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding: 14px 16px;
+    background: #fff;
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 0.84rem;
+    text-align: center;
+    border-top: none;
+    border-bottom: 3px double #cbd5e1;
+    border-right: none;
+    letter-spacing: -0.01em;
+}
+
+.manual-bom-table thead th.col-checkbox {
+    width: 44px;
+    padding: 12px 8px;
+}
+
+.manual-bom-table thead th.col-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.manual-bom-table tbody td {
+    padding: 14px 16px;
+    color: #475569;
+    border-bottom: 1px solid #edf2f7;
+    border-right: none;
+    text-align: center;
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+/* 수작업 생산계획량 환산 섹션 — BOM 아래 간격 */
+.manual-prod-section {
+    margin-top: 20px;
+}
+
+/* ── 수작업 생산 계획량 환산: 계획 월 필터 ── */
+.manual-prod-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.manual-prod-filter-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+}
+.manual-prod-filter-select {
+    padding: 5px 28px 5px 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #334155;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M2.5 4.5l3.5 3.5 3.5-3.5'/%3E%3C/svg%3E") no-repeat right 8px center;
+    background-size: 12px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    min-width: 120px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.manual-prod-filter-select:hover {
+    border-color: #94a3b8;
+}
+.manual-prod-filter-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+/* ── 수작업 BOM/환산 필터 바 (제목 바로 아래) ── */
+.manual-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #edf2f7;
+}
+
+/* ── 수작업 BOM/환산 검색형 필터 ── */
+.manual-search-dropdown {
+    position: relative;
+    min-width: 160px;
+}
+.manual-search-input {
+    width: 100%;
+    padding: 5px 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 6px;
+    background: #fff;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+.manual-search-input:hover {
+    border-color: #94a3b8;
+}
+.manual-search-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+.manual-search-input::placeholder {
+    color: #94a3b8;
+}
+.manual-search-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.manual-search-list.hidden {
+    display: none;
+}
+.manual-search-list .item-search-option {
+    padding: 6px 10px;
+    font-size: 0.82rem;
+}
+.manual-search-list::-webkit-scrollbar {
+    width: 5px;
+}
+.manual-search-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 999px;
+}
+
+/* ── 수작업 생산계획량 환산: 틀고정 (체크박스~생산수량) ── */
+.manual-bom-table .prod-sticky {
+    position: sticky;
+    z-index: 2;
+    background: #f1f5f9 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.manual-bom-table thead .prod-sticky {
+    z-index: 5;
+    background: #f1f5f9 !important;
+}
+/* 틀고정 마지막 열 — 구분선 제거 */
+.manual-bom-table .prod-sticky-8 {
+    border-right: none !important;
+    box-shadow: none;
+}
+
+/* 각 컬럼 left 위치 (누적) — 체크박스 열 제거 후 재계산 */
+.prod-sticky-2 { left: 0;     min-width: 80px; }
+.prod-sticky-3 { left: 80px;  min-width: 80px; }
+.prod-sticky-4 { left: 160px; min-width: 60px; }
+.prod-sticky-5 { left: 220px; min-width: 60px; }
+.prod-sticky-6 { left: 280px; min-width: 140px; }
+.prod-sticky-7 { left: 420px; min-width: 180px; max-width: 180px; }
+.prod-sticky-8 { left: 600px; min-width: 90px; }
+
+/* 수작업 생산 계획량 환산 — 새로고침/저장 버튼 */
+.btn-manual-prod-refresh,
+.btn-manual-prod-save {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.btn-manual-prod-refresh {
+    background: #f8fafc;
+    color: #334155;
+}
+.btn-manual-prod-refresh:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+}
+.btn-manual-prod-save {
+    background: #2563eb;
+    color: #fff;
+    border-color: #2563eb;
+}
+.btn-manual-prod-save:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+.btn-manual-prod-save:disabled,
+.btn-manual-prod-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 수작업 생산 계획량 환산 — 전체 중앙정렬 */
+#manual-prod-table thead th,
+#manual-prod-table tbody td {
+    text-align: center;
+}
+
+/* 비고 컬럼 */
+#manual-prod-table .col-remark {
+    min-width: 180px;
+}
+#manual-prod-table td.col-remark input[type="text"] {
+    width: 100%;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #334155;
+    outline: none;
+    transition: border-color 0.15s;
+}
+#manual-prod-table td.col-remark input[type="text"]:focus {
+    border-color: #3b82f6;
+}
+
+/* 관리 컬럼 */
+#manual-prod-table .col-actions {
+    min-width: 120px;
+}
+#manual-prod-table td.col-actions {
+    white-space: nowrap;
+}
+#manual-prod-table td.col-actions .btn-edit {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+#manual-prod-table td.col-actions .btn-edit:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+#manual-prod-table td.col-actions .btn-delete {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #fecdd3;
+    border-radius: 4px;
+    background: #fff1f2;
+    color: #e11d48;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: background 0.15s, border-color 0.15s;
+}
+#manual-prod-table td.col-actions .btn-delete:hover {
+    background: #ffe4e6;
+    border-color: #fda4af;
+}
+
+/* 자동 연동(auto) 행 스타일 */
+#manual-prod-table .auto-row {
+    background: #f0f9ff;
+}
+#manual-prod-table .auto-row td.prod-sticky {
+    background: #f1f5f9 !important;
+}
+#manual-prod-table td.col-actions .auto-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #0369a1;
+    background: #e0f2fe;
+    border: 1px solid #7dd3fc;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* 환산수량 헤더 파란색 */
+.manual-bom-table thead th.col-converted {
+    color: #3b82f6;
+    font-weight: 700;
+}
+
+/* 환산수량 셀 파란색 */
+.manual-bom-table tbody td.col-converted {
+    color: #3b82f6;
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.manual-bom-table tbody td.col-name {
+    white-space: normal;
+    word-break: keep-all;
+    text-align: left;
+    min-width: 180px;
+}
+
+.manual-bom-table tbody td.col-checkbox {
+    width: 44px;
+    padding: 12px 8px;
+}
+
+.manual-bom-table tbody td.col-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.manual-bom-table tbody tr:hover {
+    background: rgba(37, 99, 235, 0.025);
+}
+
+.manual-bom-table tbody td.text-primary {
+    color: #3b82f6;
+    font-weight: 500;
+}
+.manual-bom-table tbody td.text-danger {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.manual-bom-table tbody td.text-left {
+    text-align: left;
+}
+
+.manual-bom-table tbody td.text-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.manual-bom-table tbody td.actions {
+    text-align: center;
+}
+
+.manual-bom-table tbody td.actions .btn-edit {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.manual-bom-table tbody td.actions .btn-edit:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.manual-bom-table-wrapper .empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: #94a3b8;
+    font-size: 0.92rem;
+}
+
 .table-filters {
     margin: 24px 0 16px;
     padding: 16px 20px;
@@ -2934,10 +3399,10 @@ tr.already-registered .base-material-row-check:disabled {
     border-collapse: separate;
     border-spacing: 0;
     min-width: 1320px;
-    --plan-col-month-width: 120px;
+    --plan-col-month-width: 80px;
     --plan-col-priority-width: 90px;
     --plan-col-category-width: 120px;
-    --plan-col-code-width: 160px;
+    --plan-col-code-width: 130px;
     --plan-col-name-width: 200px;
     --plan-sticky-divider: rgba(148, 163, 184, 0.35);
     --plan-row-bg: #ffffff;
@@ -3474,8 +3939,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-available-inventory {
-    min-width: 120px;
-    width: 130px;
+    min-width: 70px;
+    width: 80px;
 }
 
 #plan-table th.col-available-inventory,
@@ -3619,6 +4084,21 @@ td.col-item-name .item-name-text {
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
+/* ── 소진일자 (현재고기준 / 예상월말재고기준) ── */
+.col-current-depletion-date,
+.col-depletion-date {
+    min-width: 100px;
+    white-space: nowrap;
+}
+
+#plan-table th.col-current-depletion-date,
+#plan-table td.col-current-depletion-date,
+#plan-table th.col-depletion-date,
+#plan-table td.col-depletion-date {
+    text-align: center;
+    white-space: nowrap;
+}
+
 /* ── 재고일수 ── */
 .col-inventory-days {
     min-width: 100px;
@@ -3657,8 +4137,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-current-inventory {
-    min-width: 120px;
-    width: 130px;
+    min-width: 70px;
+    width: 80px;
 }
 
 #plan-table th.col-current-inventory,
@@ -3714,8 +4194,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-sales-avg {
-    min-width: 140px;
-    width: 150px;
+    min-width: 90px;
+    width: 100px;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
@@ -3726,8 +4206,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-sales-stddev {
-    min-width: 140px;
-    width: 150px;
+    min-width: 90px;
+    width: 100px;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }

@@ -2166,6 +2166,7 @@ function normalizeRecord(record) {
         target_ending_inventory: toNumber(record.target_ending_inventory),
         optimal_inventory_2025: toNullableNumber(record.optimal_inventory_2025),
         capacity_limit: toNumber(record.capacity_limit),
+        manual_input_quantity: toNullableNumber(record.manual_input_quantity),
         notes: record.notes ?? '',
         priority: record.priority != null ? Number(record.priority) : null,
         updated_at: record.updated_at ?? null,
@@ -4620,27 +4621,11 @@ function enrichRecord(record, lineStats, overrides = {}) {
     const adjRequiredQuantity = Number.isFinite(adjInventoryDiff) ? -adjInventoryDiff : null;
 
     /* ── 납품율 계산 ──
-       산식: (판매실적 / 판매계획) / (오늘일자 / 해당월일수)
-       - 시스템 날짜 기준으로 오늘 일(day)과 해당 월의 총 일수를 자동 산출
-       - 과거/미래 월은 일자 비율을 1로 처리 (월 전체 기준)
+       산식: 판매실적 / 판매계획
        - 판매계획이 0이면 계산 불가 → null                        */
     let deliveryRate = null;
     if (Number.isFinite(salesActual) && Number.isFinite(salesPlan) && salesPlan > 0) {
-        const today = new Date();
-        const recordMonth = record.month; // 'YYYY-MM' 형식
-        const todayYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-
-        let dayRatio = 1; // 과거/미래 월은 전체 기준(1)
-        if (recordMonth === todayYM) {
-            // 당월: 오늘 일자 / 해당 월 총 일수
-            const dayOfMonth = today.getDate();
-            const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-            dayRatio = dayOfMonth / daysInMonth;
-        }
-
-        if (dayRatio > 0) {
-            deliveryRate = (salesActual / salesPlan) / dayRatio;
-        }
+        deliveryRate = salesActual / salesPlan;
     }
 
     return {
@@ -10065,7 +10050,7 @@ function renderTable() {
             const avgSalesCur = Number.isFinite(record.salesActualAvg3m) ? record.salesActualAvg3m : null;
             if (curInv !== null && avgSalesCur && avgSalesCur > 0) {
                 const curDays = (curInv / avgSalesCur) * 30.42;
-                currentInvDaysCell.textContent = `${curDays.toFixed(1)}일`;
+                currentInvDaysCell.textContent = `${Math.floor(curDays)}일`;
                 if (curDays >= 60) {
                     currentInvDaysCell.classList.add('days-high');
                 } else if (curDays < 15) {
@@ -10124,7 +10109,7 @@ function renderTable() {
             const avgSales = Number.isFinite(record.salesActualAvg3m) ? record.salesActualAvg3m : null;
             if (Number.isFinite(adjEnding) && avgSales && avgSales > 0) {
                 const days = (adjEnding / avgSales) * 30.42;
-                inventoryDaysCell.textContent = `${days.toFixed(1)}일`;
+                inventoryDaysCell.textContent = `${Math.floor(days)}일`;
                 if (days >= 60) {
                     inventoryDaysCell.classList.add('days-high');
                 } else if (days < 15) {
@@ -19944,7 +19929,7 @@ function bindEvents() {
         });
     }
 
-    /* ── 제품 유형 탭 (전체 / OEM) ── */
+    /* ── 제품 유형 탭 (생산 / OEM / 수작업) ── */
     document.querySelectorAll('.product-type-tab').forEach((tab) => {
         tab.addEventListener('click', () => {
             const type = tab.dataset.productType || 'all';
@@ -19955,6 +19940,22 @@ function bindEvents() {
                 t.classList.toggle('active', isActive);
                 t.setAttribute('aria-selected', String(isActive));
             });
+
+            /* ── 수작업 탭: 기존 테이블 숨기고 빈 화면 표시 ── */
+            const isManual = type === 'manual';
+            const mainTableContainer = document.getElementById('main-table-container');
+            const manualPlaceholder = document.getElementById('manual-tab-placeholder');
+            const tableFilters = document.querySelector('.table-filters');
+            const tableToolbar = document.querySelector('.table-toolbar');
+            if (mainTableContainer) mainTableContainer.style.display = isManual ? 'none' : '';
+            if (manualPlaceholder) manualPlaceholder.style.display = isManual ? '' : 'none';
+            if (tableFilters) tableFilters.style.display = isManual ? 'none' : '';
+            if (tableToolbar) tableToolbar.style.display = isManual ? 'none' : '';
+            if (isManual) {
+                initManualBom(); /* 수작업 BOM 초기화 (최초 1회) */
+                return; /* 수작업 탭은 여기서 종료 — 아래 OEM/생산 로직 실행하지 않음 */
+            }
+
             /* OEM 모드 클래스 토글 — CSS로 컬럼 숨김 처리 */
             const isOem = type === 'oem';
             const planTable = document.getElementById('plan-table');
@@ -22749,6 +22750,1362 @@ function initUserMgmt() {
     bindUserMgmtEvents();
     bindMenuPermissionEvents();
     loadUsers();
+}
+
+/* =========================================================================
+ *  수작업 BOM 관리
+ * ========================================================================= */
+
+const manualBomState = {
+    data: [],       /* 수작업 BOM 데이터 배열 (서버에서 조회) */
+    loaded: false,  /* 최초 로드 여부 */
+    loading: false, /* API 호출 중 여부 */
+    filterProductCode: '', /* 수작업 제품코드 필터 */
+    filterInputItem: '',   /* 투입단품 필터 */
+};
+
+/**
+ * 수작업 BOM 전체 조회 API
+ */
+async function fetchManualBoms() {
+    try {
+        manualBomState.loading = true;
+        const resp = await fetch('/sales-api/manual-boms');
+        const json = await resp.json();
+        if (json.success && Array.isArray(json.data)) {
+            manualBomState.data = json.data;
+        } else {
+            console.warn('수작업 BOM 조회 실패:', json.error || json.message);
+            manualBomState.data = [];
+        }
+    } catch (err) {
+        console.error('수작업 BOM 조회 오류:', err);
+        manualBomState.data = [];
+    } finally {
+        manualBomState.loading = false;
+        renderManualBomTable();
+    }
+}
+
+/**
+ * 수작업 BOM 벌크 저장 API (엑셀 업로드용)
+ * @param {Array} records - 저장할 레코드 배열
+ * @param {string} mode - 'append' | 'replace'
+ * @returns {Promise<Object|null>} 서버 응답 data 또는 null
+ */
+async function saveManualBomsBulk(records, mode) {
+    try {
+        const resp = await fetch('/sales-api/manual-boms/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode, records }),
+        });
+        const json = await resp.json();
+        if (json.success) {
+            return json.data;
+        } else {
+            alert('수작업 BOM 저장 실패: ' + (json.error || json.message || ''));
+            return null;
+        }
+    } catch (err) {
+        console.error('수작업 BOM 저장 오류:', err);
+        alert('수작업 BOM 저장 중 네트워크 오류가 발생했습니다.');
+        return null;
+    }
+}
+
+/**
+ * 수작업 BOM 다건 삭제 API
+ * @param {Array<number>} ids - 삭제할 ID 배열
+ * @returns {Promise<boolean>}
+ */
+async function deleteManualBomsBulk(ids) {
+    try {
+        const resp = await fetch('/sales-api/manual-boms/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        });
+        const json = await resp.json();
+        if (json.success) {
+            return true;
+        } else {
+            alert('수작업 BOM 삭제 실패: ' + (json.error || json.message || ''));
+            return false;
+        }
+    } catch (err) {
+        console.error('수작업 BOM 삭제 오류:', err);
+        alert('수작업 BOM 삭제 중 네트워크 오류가 발생했습니다.');
+        return false;
+    }
+}
+
+/**
+ * 자재코드로 기본 자재마스터에서 자재명칭을 조회
+ */
+function getItemNameFromMaster(itemCode) {
+    if (!itemCode) return '';
+    const code = String(itemCode).trim();
+    const master = (state.baseMaterialMasters || []).find(
+        (m) => sanitizeText(m.item_code).trim() === code
+    );
+    return master ? sanitizeText(master.item_name) : '';
+}
+
+/**
+ * 수작업 BOM 테이블 렌더링
+ */
+/* ── 수작업 BOM / 환산 공용 — 검색형 드롭다운 유틸 ── */
+
+/**
+ * 검색형 드롭다운 목록 렌더링
+ * @param {HTMLElement} listEl - 드롭다운 리스트 DIV
+ * @param {string[]} allCodes - 전체 코드 배열 (정렬 완료 상태)
+ * @param {string} query - 검색어
+ * @param {function} onSelect - 항목 선택 콜백 (code) => void
+ */
+function renderManualSearchList(listEl, allCodes, query, onSelect) {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const q = (query || '').trim().toUpperCase();
+
+    /* '전체' 옵션 */
+    const allDiv = document.createElement('div');
+    allDiv.className = 'item-search-option option-all';
+    allDiv.textContent = '전체';
+    allDiv.addEventListener('mousedown', (e) => { e.preventDefault(); onSelect(''); });
+    listEl.appendChild(allDiv);
+
+    const filtered = q ? allCodes.filter(c => c.toUpperCase().includes(q)) : allCodes;
+    const maxDisplay = 100;
+    filtered.slice(0, maxDisplay).forEach(code => {
+        const div = document.createElement('div');
+        div.className = 'item-search-option';
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'item-code';
+        codeSpan.textContent = code;
+        div.appendChild(codeSpan);
+        div.addEventListener('mousedown', (e) => { e.preventDefault(); onSelect(code); });
+        listEl.appendChild(div);
+    });
+    if (filtered.length > maxDisplay) {
+        const moreDiv = document.createElement('div');
+        moreDiv.className = 'item-search-option';
+        moreDiv.style.cssText = 'color:#94a3b8;font-style:italic;cursor:default;';
+        moreDiv.textContent = `... 외 ${filtered.length - maxDisplay}건`;
+        listEl.appendChild(moreDiv);
+    }
+    listEl.classList.remove('hidden');
+}
+
+/**
+ * 검색형 드롭다운 이벤트 바인딩 (공용)
+ * @param {string} inputId - input 요소 ID
+ * @param {string} listId - 드롭다운 리스트 DIV ID
+ * @param {function} getOptions - () => string[] (현재 데이터 기반 옵션 목록)
+ * @param {function} onApply - (filterValue: string) => void (필터 적용 콜백)
+ */
+function initManualSearchFilter(inputId, listId, getOptions, onApply) {
+    const input = document.getElementById(inputId);
+    const list = document.getElementById(listId);
+    if (!input || !list) return;
+
+    const doSelect = (code) => {
+        input.value = code || '';
+        list.classList.add('hidden');
+        onApply(code);
+    };
+
+    input.addEventListener('focus', () => {
+        renderManualSearchList(list, getOptions(), input.value, doSelect);
+    });
+    input.addEventListener('input', () => {
+        renderManualSearchList(list, getOptions(), input.value, doSelect);
+    });
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            list.classList.add('hidden');
+            /* 입력값 검증 — 정확히 매칭되는 코드가 있으면 선택, 없으면 부분일치 허용 */
+            const q = (input.value || '').trim();
+            if (!q) {
+                onApply('');
+            } else {
+                const exact = getOptions().find(c => c === q);
+                if (exact) {
+                    onApply(exact);
+                } else {
+                    /* 부분 입력도 필터로 동작 — 입력한 텍스트를 포함하는 항목만 필터링 */
+                    onApply(q);
+                }
+            }
+        }, 200);
+    });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { list.classList.add('hidden'); input.blur(); }
+        if (e.key === 'Enter') { e.preventDefault(); list.classList.add('hidden'); input.blur(); }
+    });
+}
+
+/**
+ * 수작업 BOM — 제품코드 목록 추출
+ */
+function getManualBomProductCodes() {
+    return [...new Set((manualBomState.data || []).map(r => (r.product_code || '').trim()).filter(Boolean))].sort();
+}
+
+/**
+ * 수작업 BOM — 투입단품코드 목록 추출
+ */
+function getManualBomInputCodes() {
+    const codes = new Set();
+    (manualBomState.data || []).forEach(r => {
+        for (let i = 1; i <= 4; i++) {
+            const c = (r[`input_item${i}_code`] || '').trim();
+            if (c) codes.add(c);
+        }
+    });
+    return [...codes].sort();
+}
+
+function renderManualBomTable() {
+    const tbody = document.getElementById('manual-bom-table-body');
+    const emptyMsg = document.getElementById('manual-bom-empty');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    const allData = manualBomState.data || [];
+
+    /* 필터 적용 (부분 일치 지원) */
+    const fpCode = (manualBomState.filterProductCode || '').trim().toUpperCase();
+    const fiCode = (manualBomState.filterInputItem || '').trim().toUpperCase();
+    const data = allData.filter(row => {
+        if (fpCode && !(row.product_code || '').trim().toUpperCase().includes(fpCode)) return false;
+        if (fiCode) {
+            let hasInput = false;
+            for (let i = 1; i <= 4; i++) {
+                if ((row[`input_item${i}_code`] || '').trim().toUpperCase().includes(fiCode)) { hasInput = true; break; }
+            }
+            if (!hasInput) return false;
+        }
+        return true;
+    });
+
+    if (data.length === 0) {
+        if (emptyMsg) emptyMsg.style.display = '';
+        return;
+    }
+    if (emptyMsg) emptyMsg.style.display = 'none';
+
+    data.forEach((row, idx) => {
+        const origIdx = allData.indexOf(row);
+        const tr = document.createElement('tr');
+
+        /* 체크박스 */
+        const tdCheck = document.createElement('td');
+        tdCheck.className = 'col-checkbox';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.idx = origIdx;
+        tdCheck.appendChild(cb);
+        tr.appendChild(tdCheck);
+
+        /* 구분 */
+        const tdType = document.createElement('td');
+        tdType.className = 'text-left';
+        tdType.textContent = sanitizeText(row.type || '');
+        tr.appendChild(tdType);
+
+        /* 구성 */
+        const tdComposition = document.createElement('td');
+        tdComposition.className = 'text-left';
+        tdComposition.textContent = sanitizeText(row.composition || '');
+        tr.appendChild(tdComposition);
+
+        /* 수작업 제품 코드 */
+        const tdProductCode = document.createElement('td');
+        tdProductCode.className = 'text-primary text-left';
+        tdProductCode.textContent = sanitizeText(row.product_code || '');
+        tr.appendChild(tdProductCode);
+
+        /* 수작업 제품명 — 자재마스터에서 자동 매칭 */
+        const tdProductName = document.createElement('td');
+        tdProductName.className = 'text-primary text-left col-name';
+        const productName = getItemNameFromMaster(row.product_code) || sanitizeText(row.product_name || '');
+        tdProductName.textContent = productName;
+        tdProductName.title = productName;
+        tr.appendChild(tdProductName);
+
+        /* 투입단품 1~4 (코드, 명, 투입량) */
+        for (let i = 1; i <= 4; i++) {
+            const code = row[`input_item${i}_code`] || '';
+            const name = getItemNameFromMaster(code) || sanitizeText(row[`input_item${i}_name`] || '');
+            const qty = row[`input_qty${i}`];
+
+            const tdCode = document.createElement('td');
+            tdCode.className = 'text-primary text-left';
+            tdCode.textContent = sanitizeText(code);
+            tr.appendChild(tdCode);
+
+            const tdName = document.createElement('td');
+            tdName.className = 'text-primary text-left col-name';
+            tdName.textContent = name;
+            tdName.title = name;
+            tr.appendChild(tdName);
+
+            const tdQty = document.createElement('td');
+            tdQty.className = 'text-right';
+            tdQty.textContent = qty != null && qty !== '' ? Number(qty).toLocaleString() : '';
+            tr.appendChild(tdQty);
+        }
+
+        /* 관리 */
+        const tdActions = document.createElement('td');
+        tdActions.className = 'actions';
+        const btnEdit = document.createElement('button');
+        btnEdit.type = 'button';
+        btnEdit.className = 'btn-edit small';
+        btnEdit.textContent = '편집';
+        btnEdit.addEventListener('click', () => {
+            alert('수작업 BOM 편집 기능은 개발 예정입니다.');
+        });
+        tdActions.appendChild(btnEdit);
+        tr.appendChild(tdActions);
+
+        tbody.appendChild(tr);
+    });
+}
+
+/**
+ * 수작업 BOM 전체선택 체크박스
+ */
+function initManualBomSelectAll() {
+    const selectAll = document.getElementById('manual-bom-select-all');
+    if (!selectAll) return;
+    selectAll.addEventListener('change', () => {
+        const checkboxes = document.querySelectorAll('#manual-bom-table-body input[type="checkbox"]');
+        checkboxes.forEach((cb) => { cb.checked = selectAll.checked; });
+    });
+}
+
+/**
+ * 수작업 BOM 선택 삭제 버튼 — 서버 DELETE API 호출
+ */
+function initManualBomDeleteSelected() {
+    const btn = document.querySelector('.btn-manual-bom-delete-selected');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const checkboxes = document.querySelectorAll('#manual-bom-table-body input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            alert('삭제할 항목을 선택해주세요.');
+            return;
+        }
+        if (!confirm(`선택한 ${checkboxes.length}건을 삭제하시겠습니까?`)) return;
+
+        /* 체크된 행의 DB ID 수집 */
+        const ids = Array.from(checkboxes)
+            .map((cb) => {
+                const idx = Number(cb.dataset.idx);
+                const row = manualBomState.data[idx];
+                return row ? row.id : null;
+            })
+            .filter((id) => id != null);
+
+        if (ids.length === 0) {
+            alert('삭제할 대상이 없습니다.');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '삭제 중...';
+        try {
+            const ok = await deleteManualBomsBulk(ids);
+            if (ok) {
+                const selectAll = document.getElementById('manual-bom-select-all');
+                if (selectAll) selectAll.checked = false;
+                await fetchManualBoms();  /* 서버에서 재조회 */
+                alert(`${ids.length}건이 삭제되었습니다.`);
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '선택 삭제';
+        }
+    });
+}
+
+/**
+ * 수작업 BOM 엑셀 업로드
+ * 템플릿 컬럼: 구분, 구성, 수작업 제품 코드, 투입단품1 코드, 투입량1, ...투입단품4 코드, 투입량4
+ */
+function initManualBomUpload() {
+    const btn = document.querySelector('.btn-manual-bom-upload');
+    if (!btn) return;
+
+    /* hidden file input 생성 */
+    let fileInput = document.getElementById('manual-bom-file-input');
+    if (!fileInput) {
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'manual-bom-file-input';
+        fileInput.accept = '.xlsx,.xls,.csv';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+    }
+
+    btn.addEventListener('click', () => {
+        fileInput.value = '';
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+
+        try {
+            btn.disabled = true;
+            btn.textContent = '업로드 중...';
+
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
+            const sheetName = workbook.SheetNames[0];
+            if (!sheetName) {
+                alert('엑셀 파일에 시트가 없습니다.');
+                return;
+            }
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+            /* 빈 행 제거 */
+            const validRows = rows.filter((row) =>
+                Object.values(row).some((v) => String(v).trim() !== '')
+            );
+
+            if (validRows.length === 0) {
+                alert('업로드할 데이터가 없습니다. 템플릿에 맞게 데이터를 입력해주세요.');
+                return;
+            }
+
+            /* 컬럼명 매핑 (템플릿 헤더 → 내부 필드) */
+            const colMap = {
+                '구분': 'type',
+                '구성': 'composition',
+                '수작업 제품 코드': 'product_code',
+                '투입단품1 코드': 'input_item1_code',
+                '투입량1': 'input_qty1',
+                '투입단품2 코드': 'input_item2_code',
+                '투입량2': 'input_qty2',
+                '투입단품3 코드': 'input_item3_code',
+                '투입량3': 'input_qty3',
+                '투입단품4 코드': 'input_item4_code',
+                '투입량4': 'input_qty4',
+            };
+
+            const parsed = validRows.map((row) => {
+                const record = {};
+                for (const [excelCol, field] of Object.entries(colMap)) {
+                    const val = row[excelCol];
+                    if (field.startsWith('input_qty')) {
+                        const num = parseFloat(String(val).replace(/,/g, ''));
+                        record[field] = isNaN(num) ? '' : num;
+                    } else {
+                        record[field] = String(val || '').trim();
+                    }
+                }
+                return record;
+            });
+
+            /* 기존 데이터에 추가할지 / 덮어쓸지 선택 → 서버 API 호출 */
+            let mode = 'append';
+            if (manualBomState.data.length > 0) {
+                const action = confirm(
+                    `기존 ${manualBomState.data.length}건의 데이터가 있습니다.\n` +
+                    `[확인] → 기존 데이터에 ${parsed.length}건 추가\n` +
+                    `[취소] → 기존 데이터를 지우고 ${parsed.length}건으로 교체`
+                );
+                mode = action ? 'append' : 'replace';
+            }
+
+            const result = await saveManualBomsBulk(parsed, mode);
+            if (result) {
+                await fetchManualBoms();  /* 서버에서 재조회 */
+                alert(`수작업 BOM ${result.saved}건이 저장되었습니다. (총 ${result.total}건)`);
+            }
+
+        } catch (err) {
+            console.error('수작업 BOM 업로드 실패:', err);
+            alert('엑셀 파일 처리 중 오류가 발생했습니다.\n' + (err.message || ''));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '엑셀 업로드';
+        }
+    });
+}
+
+/**
+ * 수작업 BOM 템플릿 다운로드
+ * — 업로드 대상 필드만 포함 (자재마스터 자동매칭 필드 제외)
+ */
+function initManualBomTemplateDownload() {
+    const btn = document.querySelector('.btn-manual-bom-download');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        try {
+            const header = [
+                '구분',
+                '구성',
+                '수작업 제품 코드',
+                '투입단품1 코드',
+                '투입량1',
+                '투입단품2 코드',
+                '투입량2',
+                '투입단품3 코드',
+                '투입량3',
+                '투입단품4 코드',
+                '투입량4',
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet([header]);
+            ws['!cols'] = [
+                { wch: 12 },  /* 구분 */
+                { wch: 12 },  /* 구성 */
+                { wch: 22 },  /* 수작업 제품 코드 */
+                { wch: 22 },  /* 투입단품1 코드 */
+                { wch: 10 },  /* 투입량1 */
+                { wch: 22 },  /* 투입단품2 코드 */
+                { wch: 10 },  /* 투입량2 */
+                { wch: 22 },  /* 투입단품3 코드 */
+                { wch: 10 },  /* 투입량3 */
+                { wch: 22 },  /* 투입단품4 코드 */
+                { wch: 10 },  /* 투입량4 */
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '수작업BOM');
+            XLSX.writeFile(wb, '수작업BOM_템플릿.xlsx');
+        } catch (err) {
+            console.error('수작업 BOM 템플릿 다운로드 실패:', err);
+            alert('템플릿 다운로드에 실패했습니다.');
+        }
+    });
+}
+
+/**
+ * 수작업 BOM 초기화 — 수작업 탭 최초 진입 시 호출
+ */
+/**
+ * 수작업 BOM 필터 이벤트 바인딩 (검색형 드롭다운)
+ */
+function initManualBomFilters() {
+    initManualSearchFilter('manual-bom-product-input', 'manual-bom-product-list',
+        getManualBomProductCodes,
+        (val) => { manualBomState.filterProductCode = val; renderManualBomTable(); }
+    );
+    initManualSearchFilter('manual-bom-input-input', 'manual-bom-input-list',
+        getManualBomInputCodes,
+        (val) => { manualBomState.filterInputItem = val; renderManualBomTable(); }
+    );
+}
+
+async function initManualBom() {
+    if (!manualBomState.loaded) {
+        manualBomState.loaded = true;
+        initManualBomSelectAll();
+        initManualBomDeleteSelected();
+        initManualBomUpload();
+        initManualBomTemplateDownload();
+        initManualBomFilters();
+    }
+    /* BOM 데이터를 먼저 로드한 후 환산 테이블 초기화 (BOM 매핑에 필요) */
+    await fetchManualBoms();
+    /* 수작업 생산 계획량 환산도 함께 초기화 */
+    initManualProd();
+}
+
+/* =========================================================================
+ *  수작업 생산 계획량 환산 관리
+ * ========================================================================= */
+
+const manualProdState = {
+    data: [],       /* 수작업 생산 계획량 환산 데이터 배열 (서버에서 조회) */
+    loaded: false,  /* 최초 로드 여부 */
+    loading: false, /* API 호출 중 여부 */
+    filterMonth: '',        /* 계획 월 필터 값 ('' = 전체) */
+    filterProductCode: '',  /* 수작업 제품코드 필터 */
+    filterInputItem: '',    /* 투입단품 필터 */
+};
+
+/**
+ * 생산탭 enrichedData에서 생리대 수작업 라인 데이터를 추출하여
+ * 수작업 생산 계획량 환산 테이블 형식으로 변환
+ *
+ * @param {string} [targetMonth] - 특정 월만 추출 (미지정 시 시스템 현재월)
+ * @returns {Array} manualProd 형식의 가상 레코드 배열
+ */
+function buildManualProdFromEnriched(targetMonth) {
+    const enriched = Array.isArray(state.enrichedData) ? state.enrichedData : [];
+    if (enriched.length === 0) return [];
+
+    /* 시스템 현재월 */
+    const now = new Date();
+    const systemMonth = targetMonth || (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
+
+    /* 생리대 수작업 라인 & 시스템월 필터 */
+    const matched = enriched.filter((r) => {
+        const line = (r.production_line || '').trim();
+        const month = (r.month || '').trim();
+        return line === '생리대 수작업' && month === systemMonth;
+    });
+
+    /* manualProd 형식으로 매핑 */
+    return matched.map((r) => ({
+        /* DB 저장 대상이 아닌 가상(auto) 행임을 표시 */
+        _auto: true,
+        _sourceRecordId: r.id,
+        plan_date: systemMonth,
+        production_line: '생리대 수작업',
+        type: sanitizeText(r.category || ''),
+        composition: '',
+        product_code: sanitizeText(r.item_code || ''),
+        product_name: sanitizeText(r.item_name || ''),
+        production_qty: Number.isFinite(r.adjusted_production_plan) ? r.adjusted_production_plan : null,
+        /* 투입단품/환산수량은 수작업 BOM에서 매칭하여 채움 */
+        input_item1_code: '', input_item1_name: '', converted_qty1: null,
+        input_item2_code: '', input_item2_name: '', converted_qty2: null,
+        input_item3_code: '', input_item3_name: '', converted_qty3: null,
+        input_item4_code: '', input_item4_name: '', converted_qty4: null,
+        remark: '',
+    }));
+}
+
+/**
+ * 수작업 BOM 데이터를 기반으로 auto 행의 투입단품 + 환산수량을 채움
+ *
+ * @param {Array} autoRows - buildManualProdFromEnriched()에서 생성한 가상 행 배열
+ * @returns {Array} 투입단품/환산수량이 채워진 배열
+ */
+function fillManualProdWithBom(autoRows) {
+    const boms = manualBomState.data || [];
+    if (boms.length === 0 || autoRows.length === 0) return autoRows;
+
+    /* BOM을 제품코드별로 인덱싱 */
+    const bomByProduct = new Map();
+    boms.forEach((b) => {
+        const code = (b.product_code || '').trim();
+        if (code && !bomByProduct.has(code)) {
+            bomByProduct.set(code, b);
+        }
+    });
+
+    return autoRows.map((row) => {
+        const bom = bomByProduct.get((row.product_code || '').trim());
+        if (!bom) return row;
+
+        const filled = {
+            ...row,
+            composition: sanitizeText(bom.composition || '') || row.composition,
+            type: sanitizeText(bom.type || '') || row.type,
+        };
+        const prodQty = row.production_qty;
+        for (let i = 1; i <= 4; i++) {
+            const itemCode = bom[`input_item${i}_code`] || '';
+            const itemName = bom[`input_item${i}_name`] || '';
+            const inputQty = bom[`input_qty${i}`];
+            filled[`input_item${i}_code`] = itemCode;
+            filled[`input_item${i}_name`] = itemName;
+            /* 환산수량 = 생산수량 × 투입량(BOM) */
+            if (Number.isFinite(prodQty) && Number.isFinite(inputQty) && inputQty > 0) {
+                filled[`converted_qty${i}`] = prodQty * inputQty;
+            }
+        }
+        return filled;
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 전체 조회 API + enrichedData 자동 채움
+ */
+async function fetchManualProds() {
+    try {
+        manualProdState.loading = true;
+        const resp = await fetch('/sales-api/manual-prods');
+        const json = await resp.json();
+        if (json.success && Array.isArray(json.data)) {
+            manualProdState.data = json.data;
+        } else {
+            console.warn('수작업 생산 계획량 환산 조회 실패:', json.error || json.message);
+            manualProdState.data = [];
+        }
+    } catch (err) {
+        console.error('수작업 생산 계획량 환산 조회 오류:', err);
+        manualProdState.data = [];
+    } finally {
+        manualProdState.loading = false;
+        /* enrichedData에서 생리대 수작업 데이터 자동 추출 + BOM 매핑 */
+        mergeAutoManualProdRows();
+        renderManualProdTable();
+    }
+}
+
+/**
+ * enrichedData → 가상 auto 행 생성 → BOM 매핑 → DB 데이터와 병합
+ * DB에 이미 동일 product_code + plan_date가 있으면 auto 행 생략 (중복 방지)
+ */
+function mergeAutoManualProdRows() {
+    const autoRows = fillManualProdWithBom(buildManualProdFromEnriched());
+    if (autoRows.length === 0) return;
+
+    /* DB 데이터의 (product_code + plan_date) 집합 — 중복 방지용 */
+    const dbKeys = new Set();
+    (manualProdState.data || []).forEach((r) => {
+        if (r._auto) return; /* auto 행은 제외 */
+        const key = `${(r.product_code || '').trim()}__${(r.plan_date || '').substring(0, 7)}`;
+        dbKeys.add(key);
+    });
+
+    /* DB에 없는 auto 행만 추가 */
+    const newAutos = autoRows.filter((r) => {
+        const key = `${(r.product_code || '').trim()}__${(r.plan_date || '').substring(0, 7)}`;
+        return !dbKeys.has(key);
+    });
+
+    if (newAutos.length > 0) {
+        manualProdState.data = [...(manualProdState.data || []), ...newAutos];
+    }
+}
+
+/**
+ * 수작업 생산 계획량 환산 벌크 저장 API
+ */
+async function saveManualProdsBulk(records, mode) {
+    try {
+        const resp = await fetch('/sales-api/manual-prods/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode, records }),
+        });
+        const json = await resp.json();
+        if (json.success) {
+            return json.data;
+        } else {
+            alert('수작업 생산 계획량 환산 저장 실패: ' + (json.error || json.message || ''));
+            return null;
+        }
+    } catch (err) {
+        console.error('수작업 생산 계획량 환산 저장 오류:', err);
+        alert('수작업 생산 계획량 환산 저장 중 네트워크 오류가 발생했습니다.');
+        return null;
+    }
+}
+
+/**
+ * 수작업 생산 계획량 환산 다건 삭제 API
+ */
+async function deleteManualProdsBulk(ids) {
+    try {
+        const resp = await fetch('/sales-api/manual-prods/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids }),
+        });
+        const json = await resp.json();
+        if (json.success) {
+            return true;
+        } else {
+            alert('수작업 생산 계획량 환산 삭제 실패: ' + (json.error || json.message || ''));
+            return false;
+        }
+    } catch (err) {
+        console.error('수작업 생산 계획량 환산 삭제 오류:', err);
+        alert('수작업 생산 계획량 환산 삭제 중 네트워크 오류가 발생했습니다.');
+        return false;
+    }
+}
+
+/**
+ * 수작업 생산 계획량 환산 테이블 렌더링
+ */
+/**
+ * 계획 월 필터 셀렉트 옵션 갱신
+ */
+function updateManualProdMonthFilterOptions() {
+    const allData = manualProdState.data || [];
+
+    /* 계획 월 필터 */
+    const sel = document.getElementById('manual-prod-month-filter');
+    if (sel) {
+        const months = [...new Set(
+            allData.map(r => (r.plan_date || '').substring(0, 7)).filter(m => m.length >= 7)
+        )].sort();
+        const curVal = sel.value;
+        sel.innerHTML = '<option value="">전체</option>';
+        months.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            sel.appendChild(opt);
+        });
+        if (curVal && months.includes(curVal)) sel.value = curVal;
+        else { sel.value = ''; manualProdState.filterMonth = ''; }
+    }
+
+    /* 제품코드/투입단품 필터는 검색형 드롭다운으로 변경 — 옵션 갱신 불필요 (실시간 검색) */
+}
+
+function renderManualProdTable() {
+    const tbody = document.getElementById('manual-prod-table-body');
+    const emptyMsg = document.getElementById('manual-prod-empty');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    /* 계획 월 필터 옵션 갱신 */
+    updateManualProdMonthFilterOptions();
+
+    const allData = manualProdState.data || [];
+    /* 필터 적용 (계획 월 + 제품코드 + 투입단품, 부분 일치 지원) */
+    const filterMonth = manualProdState.filterMonth || '';
+    const fpCode = (manualProdState.filterProductCode || '').trim().toUpperCase();
+    const fiCode = (manualProdState.filterInputItem || '').trim().toUpperCase();
+    const data = allData.filter(r => {
+        if (filterMonth && (r.plan_date || '').substring(0, 7) !== filterMonth) return false;
+        if (fpCode && !(r.product_code || '').trim().toUpperCase().includes(fpCode)) return false;
+        if (fiCode) {
+            let hasInput = false;
+            for (let i = 1; i <= 4; i++) {
+                if ((r[`input_item${i}_code`] || '').trim().toUpperCase().includes(fiCode)) { hasInput = true; break; }
+            }
+            if (!hasInput) return false;
+        }
+        return true;
+    });
+
+    if (data.length === 0) {
+        if (emptyMsg) emptyMsg.style.display = '';
+        return;
+    }
+    if (emptyMsg) emptyMsg.style.display = 'none';
+
+    data.forEach((row, idx) => {
+        /* allData에서의 원래 인덱스 (삭제/수정 시 사용) */
+        const origIdx = allData.indexOf(row);
+        const tr = document.createElement('tr');
+        if (row._auto) tr.classList.add('auto-row');
+
+        const isAutoRow = !!row._auto;
+
+        /* 계획 월 */
+        const tdPlanDate = document.createElement('td');
+        tdPlanDate.className = 'prod-sticky prod-sticky-2';
+        const rawDate = sanitizeText(row.plan_date || '');
+        tdPlanDate.textContent = rawDate.length >= 7 ? rawDate.substring(0, 7) : rawDate;
+        tr.appendChild(tdPlanDate);
+
+        /* 생산라인 */
+        const tdLine = document.createElement('td');
+        tdLine.className = 'prod-sticky prod-sticky-3';
+        tdLine.textContent = sanitizeText(row.production_line || '');
+        tr.appendChild(tdLine);
+
+        /* 구분 */
+        const tdType = document.createElement('td');
+        tdType.className = 'prod-sticky prod-sticky-4';
+        tdType.textContent = sanitizeText(row.type || '');
+        tr.appendChild(tdType);
+
+        /* 구성 */
+        const tdComposition = document.createElement('td');
+        tdComposition.className = 'prod-sticky prod-sticky-5';
+        tdComposition.textContent = sanitizeText(row.composition || '');
+        tr.appendChild(tdComposition);
+
+        /* BOM 매칭 여부 확인 — 매칭 안 되면 폰트 색상 경고(빨간) */
+        const hasBomMatch = (() => {
+            const code = (row.product_code || '').trim();
+            if (!code) return false;
+            const boms = manualBomState.data || [];
+            return boms.some(b => (b.product_code || '').trim() === code);
+        })();
+
+        /* 수작업 제품 코드 */
+        const tdProductCode = document.createElement('td');
+        tdProductCode.className = (hasBomMatch ? 'text-primary' : 'text-danger') + ' prod-sticky prod-sticky-6';
+        tdProductCode.textContent = sanitizeText(row.product_code || '');
+        if (!hasBomMatch && row.product_code) tdProductCode.title = 'BOM 미등록 — 환산수량 산출 불가';
+        tr.appendChild(tdProductCode);
+
+        /* 수작업 제품명 — 자재마스터에서 자동 매칭 */
+        const tdProductName = document.createElement('td');
+        tdProductName.className = (hasBomMatch ? 'text-primary' : 'text-danger') + ' col-name prod-sticky prod-sticky-7';
+        const prodName = getItemNameFromMaster(row.product_code) || sanitizeText(row.product_name || '');
+        tdProductName.textContent = prodName;
+        tdProductName.title = hasBomMatch ? prodName : 'BOM 미등록 — 환산수량 산출 불가';
+        tr.appendChild(tdProductName);
+
+        /* 생산수량 */
+        const tdProdQty = document.createElement('td');
+        tdProdQty.className = 'prod-sticky prod-sticky-8';
+        tdProdQty.textContent = row.production_qty != null && row.production_qty !== '' ? Number(row.production_qty).toLocaleString() : '';
+        tr.appendChild(tdProdQty);
+
+        /* 투입단품 1~4 (코드, 명, 환산수량) */
+        for (let i = 1; i <= 4; i++) {
+            const code = row[`input_item${i}_code`] || '';
+            const name = getItemNameFromMaster(code) || sanitizeText(row[`input_item${i}_name`] || '');
+            const qty = row[`converted_qty${i}`];
+
+            const tdCode = document.createElement('td');
+            tdCode.className = 'text-primary';
+            tdCode.textContent = sanitizeText(code);
+            tr.appendChild(tdCode);
+
+            const tdName = document.createElement('td');
+            tdName.className = 'text-primary col-name';
+            tdName.textContent = name;
+            tdName.title = name;
+            tr.appendChild(tdName);
+
+            const tdQty = document.createElement('td');
+            tdQty.className = 'col-converted';
+            tdQty.textContent = qty != null && qty !== '' ? Number(qty).toLocaleString() : '';
+            tr.appendChild(tdQty);
+        }
+
+        tbody.appendChild(tr);
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 전체 선택 체크박스
+ */
+function initManualProdSelectAll() {
+    const selectAll = document.getElementById('manual-prod-select-all');
+    if (!selectAll) return;
+    selectAll.addEventListener('change', () => {
+        const checkboxes = document.querySelectorAll('#manual-prod-table-body input[type="checkbox"]');
+        checkboxes.forEach((cb) => { cb.checked = selectAll.checked; });
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 선택 삭제 — 서버 DELETE API 호출
+ */
+function initManualProdDeleteSelected() {
+    const btn = document.querySelector('.btn-manual-prod-delete-selected');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const checkboxes = document.querySelectorAll('#manual-prod-table-body input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            alert('삭제할 항목을 선택해주세요.');
+            return;
+        }
+        if (!confirm(`선택한 ${checkboxes.length}건을 삭제하시겠습니까?`)) return;
+
+        const ids = Array.from(checkboxes)
+            .map((cb) => {
+                const idx = Number(cb.dataset.idx);
+                const row = manualProdState.data[idx];
+                return row ? row.id : null;
+            })
+            .filter((id) => id != null);
+
+        if (ids.length === 0) {
+            alert('삭제할 대상이 없습니다.');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '삭제 중...';
+        try {
+            const ok = await deleteManualProdsBulk(ids);
+            if (ok) {
+                const selectAll = document.getElementById('manual-prod-select-all');
+                if (selectAll) selectAll.checked = false;
+                await fetchManualProds();
+                alert(`${ids.length}건이 삭제되었습니다.`);
+            }
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '선택 삭제';
+        }
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 엑셀 업로드
+ */
+function initManualProdUpload() {
+    const btn = document.querySelector('.btn-manual-prod-upload');
+    if (!btn) return;
+
+    let fileInput = document.getElementById('manual-prod-file-input');
+    if (!fileInput) {
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'manual-prod-file-input';
+        fileInput.accept = '.xlsx,.xls,.csv';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+    }
+
+    btn.addEventListener('click', () => {
+        fileInput.value = '';
+        fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+
+        try {
+            btn.disabled = true;
+            btn.textContent = '업로드 중...';
+
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
+            const sheetName = workbook.SheetNames[0];
+            if (!sheetName) {
+                alert('엑셀 파일에 시트가 없습니다.');
+                return;
+            }
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+            const validRows = rows.filter((row) =>
+                Object.values(row).some((v) => String(v).trim() !== '')
+            );
+
+            if (validRows.length === 0) {
+                alert('업로드할 데이터가 없습니다. 템플릿에 맞게 데이터를 입력해주세요.');
+                return;
+            }
+
+            const colMap = {
+                '계획 월': 'plan_date',
+                '생산라인': 'production_line',
+                '구분': 'type',
+                '구성': 'composition',
+                '수작업 제품 코드': 'product_code',
+                '생산수량': 'production_qty',
+                '투입단품1 코드': 'input_item1_code',
+                '환산수량1': 'converted_qty1',
+                '투입단품2 코드': 'input_item2_code',
+                '환산수량2': 'converted_qty2',
+                '투입단품3 코드': 'input_item3_code',
+                '환산수량3': 'converted_qty3',
+                '투입단품4 코드': 'input_item4_code',
+                '환산수량4': 'converted_qty4',
+            };
+
+            const parsed = validRows.map((row) => {
+                const record = {};
+                for (const [excelCol, field] of Object.entries(colMap)) {
+                    const val = row[excelCol];
+                    if (field.includes('qty')) {
+                        const num = parseFloat(String(val).replace(/,/g, ''));
+                        record[field] = isNaN(num) ? '' : num;
+                    } else {
+                        record[field] = String(val || '').trim();
+                    }
+                }
+                return record;
+            });
+
+            let mode = 'append';
+            if (manualProdState.data.length > 0) {
+                const action = confirm(
+                    `기존 ${manualProdState.data.length}건의 데이터가 있습니다.\n` +
+                    `[확인] → 기존 데이터에 ${parsed.length}건 추가\n` +
+                    `[취소] → 기존 데이터를 지우고 ${parsed.length}건으로 교체`
+                );
+                mode = action ? 'append' : 'replace';
+            }
+
+            const result = await saveManualProdsBulk(parsed, mode);
+            if (result) {
+                await fetchManualProds();
+                alert(`수작업 생산 계획량 환산 ${result.saved}건이 저장되었습니다. (총 ${result.total}건)`);
+            }
+
+        } catch (err) {
+            console.error('수작업 생산 계획량 환산 업로드 실패:', err);
+            alert('엑셀 파일 처리 중 오류가 발생했습니다.\n' + (err.message || ''));
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '엑셀 업로드';
+        }
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 템플릿 다운로드
+ */
+function initManualProdTemplateDownload() {
+    const btn = document.querySelector('.btn-manual-prod-download');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        try {
+            const header = [
+                '계획 월',
+                '생산라인',
+                '구분',
+                '구성',
+                '수작업 제품 코드',
+                '생산수량',
+                '투입단품1 코드',
+                '환산수량1',
+                '투입단품2 코드',
+                '환산수량2',
+                '투입단품3 코드',
+                '환산수량3',
+                '투입단품4 코드',
+                '환산수량4',
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet([header]);
+            ws['!cols'] = [
+                { wch: 12 },  /* 계획 월 */
+                { wch: 14 },  /* 생산라인 */
+                { wch: 12 },  /* 구분 */
+                { wch: 12 },  /* 구성 */
+                { wch: 22 },  /* 수작업 제품 코드 */
+                { wch: 12 },  /* 생산수량 */
+                { wch: 22 },  /* 투입단품1 코드 */
+                { wch: 12 },  /* 환산수량1 */
+                { wch: 22 },  /* 투입단품2 코드 */
+                { wch: 12 },  /* 환산수량2 */
+                { wch: 22 },  /* 투입단품3 코드 */
+                { wch: 12 },  /* 환산수량3 */
+                { wch: 22 },  /* 투입단품4 코드 */
+                { wch: 12 },  /* 환산수량4 */
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '생산계획량환산');
+            XLSX.writeFile(wb, '수작업_생산계획량환산_템플릿.xlsx');
+        } catch (err) {
+            console.error('수작업 생산 계획량 환산 템플릿 다운로드 실패:', err);
+            alert('템플릿 다운로드에 실패했습니다.');
+        }
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 초기화 — 수작업 탭 진입 시 호출
+ */
+function initManualProdMonthFilter() {
+    const sel = document.getElementById('manual-prod-month-filter');
+    if (sel) {
+        sel.addEventListener('change', () => {
+            manualProdState.filterMonth = sel.value;
+            renderManualProdTable();
+            const selectAll = document.getElementById('manual-prod-select-all');
+            if (selectAll) selectAll.checked = false;
+        });
+    }
+    /* 제품코드 검색형 필터 */
+    initManualSearchFilter('manual-prod-product-input', 'manual-prod-product-list',
+        () => [...new Set((manualProdState.data || []).map(r => (r.product_code || '').trim()).filter(Boolean))].sort(),
+        (val) => { manualProdState.filterProductCode = val; renderManualProdTable(); }
+    );
+    /* 투입단품 검색형 필터 */
+    initManualSearchFilter('manual-prod-input-input', 'manual-prod-input-list',
+        () => {
+            const codes = new Set();
+            (manualProdState.data || []).forEach(r => {
+                for (let i = 1; i <= 4; i++) {
+                    const c = (r[`input_item${i}_code`] || '').trim();
+                    if (c) codes.add(c);
+                }
+            });
+            return [...codes].sort();
+        },
+        (val) => { manualProdState.filterInputItem = val; renderManualProdTable(); }
+    );
+}
+
+/**
+ * 수작업 생산 계획량 환산 — 새로고침 버튼
+ * 생산탭 보정생산계획(enrichedData)을 재조회하여 환산 테이블을 갱신
+ */
+function initManualProdRefresh() {
+    const btn = document.getElementById('btn-manual-prod-refresh');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = '갱신 중...';
+        try {
+            /* 생산탭 데이터(SNOP) 재조회 → enrichedData 갱신 */
+            await loadData();
+            /* auto 행 재생성 (기존 auto 행 제거 후 재매핑) */
+            manualProdState.data = (manualProdState.data || []).filter(r => !r._auto);
+            mergeAutoManualProdRows();
+            renderManualProdTable();
+            alert('✅ 보정생산계획 데이터를 갱신했습니다.');
+        } catch (err) {
+            console.error('새로고침 실패:', err);
+            alert('❌ 데이터 갱신 중 오류가 발생했습니다.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '새로고침';
+        }
+    });
+}
+
+/**
+ * 수작업 생산 계획량 환산 — 저장 버튼
+ * 투입단품 코드별 환산수량을 합산하여 생산탭의 수작업 투입수량에 반영
+ *
+ * 로직:
+ * 1. 환산 테이블의 모든 행에서 투입단품1~4 코드 + 환산수량 추출
+ * 2. 동일 투입단품 코드의 환산수량을 합산
+ * 3. 생산탭(state.rawData) 중 같은 month + item_code인 레코드의
+ *    manual_input_quantity를 합산값으로 업데이트 (서버 저장)
+ */
+function initManualProdSave() {
+    const btn = document.getElementById('btn-manual-prod-save');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const allData = manualProdState.data || [];
+        if (allData.length === 0) {
+            alert('저장할 환산 데이터가 없습니다.');
+            return;
+        }
+
+        /* 1) 투입단품코드별 환산수량 합산 (코드 → { qty, month }) */
+        const qtyByCode = new Map();
+        allData.forEach(row => {
+            const month = (row.plan_date || '').substring(0, 7);
+            for (let i = 1; i <= 4; i++) {
+                const code = (row[`input_item${i}_code`] || '').trim();
+                const qty = row[`converted_qty${i}`];
+                if (!code || !Number.isFinite(qty)) continue;
+
+                const key = `${code}__${month}`;
+                if (qtyByCode.has(key)) {
+                    qtyByCode.get(key).qty += qty;
+                } else {
+                    qtyByCode.set(key, { code, month, qty });
+                }
+            }
+        });
+
+        if (qtyByCode.size === 0) {
+            alert('환산수량이 산출된 투입단품이 없습니다.\nBOM 등록 여부를 확인해주세요.');
+            return;
+        }
+
+        /* 2) 생산탭 rawData에서 매칭 → 수작업 투입수량 업데이트 */
+        /*    production_line 제한 없이, item_code + month 로만 매칭 */
+        /*    매칭 실패 시 → 해당 월의 새 SNOP 레코드를 자동 생성 */
+        const rawData = state.rawData || [];
+        let updateCount = 0;
+        let createCount = 0;
+        let failCount = 0;
+
+        btn.disabled = true;
+        btn.textContent = '저장 중...';
+
+        for (const [, entry] of qtyByCode) {
+            const roundedQty = Math.round(entry.qty);
+
+            /* item_code + month 매칭 (생산라인 무관) */
+            const record = rawData.find(r =>
+                r && (r.item_code || '').trim() === entry.code &&
+                (r.month || '').substring(0, 7) === entry.month
+            );
+
+            if (record) {
+                /* ── 기존 레코드 업데이트 ── */
+                if (record.manual_input_quantity === roundedQty) {
+                    updateCount++;
+                    continue;
+                }
+                try {
+                    record.manual_input_quantity = roundedQty;
+                    await updateRecord(record.id, {
+                        item_code: record.item_code,
+                        month: record.month,
+                        manual_input_quantity: roundedQty,
+                    });
+                    updateCount++;
+                } catch (err) {
+                    console.error(`[환산 저장] 업데이트 실패 [${entry.code}]:`, err);
+                    failCount++;
+                }
+            } else {
+                /* ── 해당 월 SNOP 레코드 없음 → 새로 생성 ── */
+                /* 같은 item_code의 다른 월 레코드에서 자재 정보(이름/카테고리/라인) 복사 */
+                const ref = rawData.find(r => (r.item_code || '').trim() === entry.code);
+                const newPayload = {
+                    item_code: entry.code,
+                    month: entry.month,
+                    manual_input_quantity: roundedQty,
+                };
+                if (ref) {
+                    if (ref.item_name) newPayload.item_name = ref.item_name;
+                    if (ref.category) newPayload.category = ref.category;
+                    if (ref.production_line) newPayload.production_line = ref.production_line;
+                    if (ref.vendor_name) newPayload.vendor_name = ref.vendor_name;
+                    if (ref.moq) newPayload.moq = ref.moq;
+                }
+                console.info(`[환산 저장] ${entry.code}(${entry.month}) — rawData에 없음 → 새 SNOP 레코드 생성`, newPayload);
+                try {
+                    const created = await createRecord(newPayload);
+                    /* rawData에도 추가 (화면 갱신 시 반영) */
+                    if (created && created.id) {
+                        rawData.push(normalizeRecord(created));
+                    }
+                    createCount++;
+                } catch (dupErr) {
+                    if (dupErr.code === 'DUPLICATE' && dupErr.detail && dupErr.detail.existing_id) {
+                        /* 이미 존재하는 레코드 → 업데이트로 전환 */
+                        try {
+                            await updateRecord(dupErr.detail.existing_id, {
+                                item_code: entry.code,
+                                month: entry.month,
+                                manual_input_quantity: roundedQty,
+                            });
+                            updateCount++;
+                        } catch (updateErr) {
+                            console.error(`[환산 저장] 중복 레코드 업데이트 실패 [${entry.code}]:`, updateErr);
+                            failCount++;
+                        }
+                    } else {
+                        console.error(`[환산 저장] 생성 실패 [${entry.code}]:`, dupErr);
+                        failCount++;
+                    }
+                }
+            }
+        }
+
+        /* 3) 결과 알림 */
+        const totalSuccess = updateCount + createCount;
+        let msg = `저장 완료: ${totalSuccess}건 반영`;
+        if (updateCount > 0) msg += `\n  ✏️ 기존 레코드 업데이트: ${updateCount}건`;
+        if (createCount > 0) msg += `\n  🆕 새 SNOP 레코드 생성: ${createCount}건`;
+        if (failCount > 0) msg += `\n  ❌ 실패: ${failCount}건`;
+        alert(msg);
+
+        /* 화면 갱신 — enrichedData 재계산 포함 */
+        applyFilters();
+        btn.disabled = false;
+        btn.textContent = '저장';
+    });
+}
+
+function initManualProd() {
+    if (!manualProdState.loaded) {
+        manualProdState.loaded = true;
+        initManualProdSelectAll();
+        initManualProdDeleteSelected();
+        initManualProdUpload();
+        initManualProdTemplateDownload();
+        initManualProdMonthFilter();
+        initManualProdRefresh();
+        initManualProdSave();
+    }
+    /* 탭 진입 시마다 서버에서 최신 데이터 조회 */
+    fetchManualProds();
 }
 
 /* =========================================================================

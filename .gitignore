@@ -43,3 +43,8 @@ snop-data-export.json
 mock-menu-permissions.json
 ss-*.png
 ss1.png
+core
+*.sql
+*.png
+*.md
+check_*.js

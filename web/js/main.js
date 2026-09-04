@@ -10050,7 +10050,7 @@ function renderTable() {
             const avgSalesCur = Number.isFinite(record.salesActualAvg3m) ? record.salesActualAvg3m : null;
             if (curInv !== null && avgSalesCur && avgSalesCur > 0) {
                 const curDays = (curInv / avgSalesCur) * 30.42;
-                currentInvDaysCell.textContent = `${curDays.toFixed(1)}일`;
+                currentInvDaysCell.textContent = `${Math.floor(curDays)}일`;
                 if (curDays >= 60) {
                     currentInvDaysCell.classList.add('days-high');
                 } else if (curDays < 15) {
@@ -10109,7 +10109,7 @@ function renderTable() {
             const avgSales = Number.isFinite(record.salesActualAvg3m) ? record.salesActualAvg3m : null;
             if (Number.isFinite(adjEnding) && avgSales && avgSales > 0) {
                 const days = (adjEnding / avgSales) * 30.42;
-                inventoryDaysCell.textContent = `${days.toFixed(1)}일`;
+                inventoryDaysCell.textContent = `${Math.floor(days)}일`;
                 if (days >= 60) {
                     inventoryDaysCell.classList.add('days-high');
                 } else if (days < 15) {

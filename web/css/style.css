@@ -4084,6 +4084,21 @@ td.col-item-name .item-name-text {
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
+/* ── 소진일자 (현재고기준 / 예상월말재고기준) ── */
+.col-current-depletion-date,
+.col-depletion-date {
+    min-width: 100px;
+    white-space: nowrap;
+}
+
+#plan-table th.col-current-depletion-date,
+#plan-table td.col-current-depletion-date,
+#plan-table th.col-depletion-date,
+#plan-table td.col-depletion-date {
+    text-align: center;
+    white-space: nowrap;
+}
+
 /* ── 재고일수 ── */
 .col-inventory-days {
     min-width: 100px;

@@ -3399,10 +3399,10 @@ tr.already-registered .base-material-row-check:disabled {
     border-collapse: separate;
     border-spacing: 0;
     min-width: 1320px;
-    --plan-col-month-width: 120px;
+    --plan-col-month-width: 80px;
     --plan-col-priority-width: 90px;
     --plan-col-category-width: 120px;
-    --plan-col-code-width: 160px;
+    --plan-col-code-width: 130px;
     --plan-col-name-width: 200px;
     --plan-sticky-divider: rgba(148, 163, 184, 0.35);
     --plan-row-bg: #ffffff;
@@ -3939,8 +3939,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-available-inventory {
-    min-width: 120px;
-    width: 130px;
+    min-width: 70px;
+    width: 80px;
 }
 
 #plan-table th.col-available-inventory,
@@ -4137,8 +4137,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-current-inventory {
-    min-width: 120px;
-    width: 130px;
+    min-width: 70px;
+    width: 80px;
 }
 
 #plan-table th.col-current-inventory,
@@ -4194,8 +4194,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-sales-avg {
-    min-width: 140px;
-    width: 150px;
+    min-width: 90px;
+    width: 100px;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }
@@ -4206,8 +4206,8 @@ td.col-item-name .item-name-text {
 }
 
 .col-sales-stddev {
-    min-width: 140px;
-    width: 150px;
+    min-width: 90px;
+    width: 100px;
     text-align: center;
     font-variant-numeric: tabular-nums;
 }

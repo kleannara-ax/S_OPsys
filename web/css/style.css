@@ -902,6 +902,30 @@ button.danger:hover {
     border-radius: 999px;
 }
 
+/* ── 수작업 BOM: 틀고정 (체크박스~수작업 제품명) ── */
+.manual-bom-table .bom-sticky {
+    position: sticky;
+    z-index: 2;
+    background: #ffffff !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.manual-bom-table thead .bom-sticky {
+    z-index: 5;
+    background: #ffffff !important;
+}
+/* 틀고정 마지막 열 구분선 */
+.manual-bom-table .bom-sticky-5 {
+    border-right: 2px solid #cbd5e1 !important;
+}
+
+/* 각 컬럼 left 위치 (누적) */
+.bom-sticky-1 { left: 0;     min-width: 44px;  width: 44px; }   /* 체크박스 */
+.bom-sticky-2 { left: 44px;  min-width: 60px; }                  /* 구분 */
+.bom-sticky-3 { left: 104px; min-width: 60px; }                  /* 구성 */
+.bom-sticky-4 { left: 164px; min-width: 140px; }                 /* 수작업 제품 코드 */
+.bom-sticky-5 { left: 304px; min-width: 180px; max-width: 180px; } /* 수작업 제품명 */
+
 /* ── 수작업 생산계획량 환산: 틀고정 (체크박스~생산수량) ── */
 .manual-bom-table .prod-sticky {
     position: sticky;

@@ -23003,7 +23003,7 @@ function renderManualBomTable() {
 
         /* 체크박스 */
         const tdCheck = document.createElement('td');
-        tdCheck.className = 'col-checkbox';
+        tdCheck.className = 'col-checkbox bom-sticky bom-sticky-1';
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.dataset.idx = origIdx;
@@ -23012,25 +23012,25 @@ function renderManualBomTable() {
 
         /* 구분 */
         const tdType = document.createElement('td');
-        tdType.className = 'text-left';
+        tdType.className = 'text-left bom-sticky bom-sticky-2';
         tdType.textContent = sanitizeText(row.type || '');
         tr.appendChild(tdType);
 
         /* 구성 */
         const tdComposition = document.createElement('td');
-        tdComposition.className = 'text-left';
+        tdComposition.className = 'text-left bom-sticky bom-sticky-3';
         tdComposition.textContent = sanitizeText(row.composition || '');
         tr.appendChild(tdComposition);
 
         /* 수작업 제품 코드 */
         const tdProductCode = document.createElement('td');
-        tdProductCode.className = 'text-primary text-left';
+        tdProductCode.className = 'text-primary text-left bom-sticky bom-sticky-4';
         tdProductCode.textContent = sanitizeText(row.product_code || '');
         tr.appendChild(tdProductCode);
 
         /* 수작업 제품명 — 자재마스터에서 자동 매칭 */
         const tdProductName = document.createElement('td');
-        tdProductName.className = 'text-primary text-left col-name';
+        tdProductName.className = 'text-primary text-left col-name bom-sticky bom-sticky-5';
         const productName = getItemNameFromMaster(row.product_code) || sanitizeText(row.product_name || '');
         tdProductName.textContent = productName;
         tdProductName.title = productName;

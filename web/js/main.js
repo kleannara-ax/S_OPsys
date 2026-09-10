@@ -22959,7 +22959,7 @@ function getManualBomProductCodes() {
 function getManualBomInputCodes() {
     const codes = new Set();
     (manualBomState.data || []).forEach(r => {
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 10; i++) {
             const c = (r[`input_item${i}_code`] || '').trim();
             if (c) codes.add(c);
         }
@@ -22983,7 +22983,7 @@ function renderManualBomTable() {
         if (fpCode && !(row.product_code || '').trim().toUpperCase().includes(fpCode)) return false;
         if (fiCode) {
             let hasInput = false;
-            for (let i = 1; i <= 4; i++) {
+            for (let i = 1; i <= 10; i++) {
                 if ((row[`input_item${i}_code`] || '').trim().toUpperCase().includes(fiCode)) { hasInput = true; break; }
             }
             if (!hasInput) return false;
@@ -23037,7 +23037,7 @@ function renderManualBomTable() {
         tr.appendChild(tdProductName);
 
         /* 투입단품 1~4 (코드, 명, 투입량) */
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 10; i++) {
             const code = row[`input_item${i}_code`] || '';
             const name = getItemNameFromMaster(code) || sanitizeText(row[`input_item${i}_name`] || '');
             const qty = row[`input_qty${i}`];
@@ -23135,7 +23135,7 @@ function initManualBomDeleteSelected() {
 
 /**
  * 수작업 BOM 엑셀 업로드
- * 템플릿 컬럼: 구분, 구성, 수작업 제품 코드, 투입단품1 코드, 투입량1, ...투입단품4 코드, 투입량4
+ * 템플릿 컬럼: 구분, 구성, 수작업 제품 코드, 투입단품1 코드, 투입량1, ...투입단품10 코드, 투입량10
  */
 function initManualBomUpload() {
     const btn = document.querySelector('.btn-manual-bom-upload');
@@ -23373,6 +23373,12 @@ function buildManualProdFromEnriched(targetMonth) {
         input_item2_code: '', input_item2_name: '', converted_qty2: null,
         input_item3_code: '', input_item3_name: '', converted_qty3: null,
         input_item4_code: '', input_item4_name: '', converted_qty4: null,
+        input_item5_code: '', input_item5_name: '', converted_qty5: null,
+        input_item6_code: '', input_item6_name: '', converted_qty6: null,
+        input_item7_code: '', input_item7_name: '', converted_qty7: null,
+        input_item8_code: '', input_item8_name: '', converted_qty8: null,
+        input_item9_code: '', input_item9_name: '', converted_qty9: null,
+        input_item10_code: '', input_item10_name: '', converted_qty10: null,
         remark: '',
     }));
 }
@@ -23406,7 +23412,7 @@ function fillManualProdWithBom(autoRows) {
             type: sanitizeText(bom.type || '') || row.type,
         };
         const prodQty = row.production_qty;
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 10; i++) {
             const itemCode = bom[`input_item${i}_code`] || '';
             const itemName = bom[`input_item${i}_name`] || '';
             const inputQty = bom[`input_qty${i}`];
@@ -23571,7 +23577,7 @@ function renderManualProdTable() {
         if (fpCode && !(r.product_code || '').trim().toUpperCase().includes(fpCode)) return false;
         if (fiCode) {
             let hasInput = false;
-            for (let i = 1; i <= 4; i++) {
+            for (let i = 1; i <= 10; i++) {
                 if ((r[`input_item${i}_code`] || '').trim().toUpperCase().includes(fiCode)) { hasInput = true; break; }
             }
             if (!hasInput) return false;
@@ -23648,7 +23654,7 @@ function renderManualProdTable() {
         tr.appendChild(tdProdQty);
 
         /* 투입단품 1~4 (코드, 명, 환산수량) */
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 10; i++) {
             const code = row[`input_item${i}_code`] || '';
             const name = getItemNameFromMaster(code) || sanitizeText(row[`input_item${i}_name`] || '');
             const qty = row[`converted_qty${i}`];
@@ -23794,6 +23800,18 @@ function initManualProdUpload() {
                 '환산수량3': 'converted_qty3',
                 '투입단품4 코드': 'input_item4_code',
                 '환산수량4': 'converted_qty4',
+                '투입단품5 코드': 'input_item5_code',
+                '환산수량5': 'converted_qty5',
+                '투입단품6 코드': 'input_item6_code',
+                '환산수량6': 'converted_qty6',
+                '투입단품7 코드': 'input_item7_code',
+                '환산수량7': 'converted_qty7',
+                '투입단품8 코드': 'input_item8_code',
+                '환산수량8': 'converted_qty8',
+                '투입단품9 코드': 'input_item9_code',
+                '환산수량9': 'converted_qty9',
+                '투입단품10 코드': 'input_item10_code',
+                '환산수량10': 'converted_qty10',
             };
 
             const parsed = validRows.map((row) => {
@@ -23859,6 +23877,18 @@ function initManualProdTemplateDownload() {
                 '환산수량3',
                 '투입단품4 코드',
                 '환산수량4',
+                '투입단품5 코드',
+                '환산수량5',
+                '투입단품6 코드',
+                '환산수량6',
+                '투입단품7 코드',
+                '환산수량7',
+                '투입단품8 코드',
+                '환산수량8',
+                '투입단품9 코드',
+                '환산수량9',
+                '투입단품10 코드',
+                '환산수량10',
             ];
 
             const ws = XLSX.utils.aoa_to_sheet([header]);
@@ -23877,6 +23907,18 @@ function initManualProdTemplateDownload() {
                 { wch: 12 },  /* 환산수량3 */
                 { wch: 22 },  /* 투입단품4 코드 */
                 { wch: 12 },  /* 환산수량4 */
+                { wch: 22 },  /* 투입단품5 코드 */
+                { wch: 12 },  /* 환산수량5 */
+                { wch: 22 },  /* 투입단품6 코드 */
+                { wch: 12 },  /* 환산수량6 */
+                { wch: 22 },  /* 투입단품7 코드 */
+                { wch: 12 },  /* 환산수량7 */
+                { wch: 22 },  /* 투입단품8 코드 */
+                { wch: 12 },  /* 환산수량8 */
+                { wch: 22 },  /* 투입단품9 코드 */
+                { wch: 12 },  /* 환산수량9 */
+                { wch: 22 },  /* 투입단품10 코드 */
+                { wch: 12 },  /* 환산수량10 */
             ];
 
             const wb = XLSX.utils.book_new();
@@ -23912,7 +23954,7 @@ function initManualProdMonthFilter() {
         () => {
             const codes = new Set();
             (manualProdState.data || []).forEach(r => {
-                for (let i = 1; i <= 4; i++) {
+                for (let i = 1; i <= 10; i++) {
                     const c = (r[`input_item${i}_code`] || '').trim();
                     if (c) codes.add(c);
                 }
@@ -23956,7 +23998,7 @@ function initManualProdRefresh() {
  * 투입단품 코드별 환산수량을 합산하여 생산탭의 수작업 투입수량에 반영
  *
  * 로직:
- * 1. 환산 테이블의 모든 행에서 투입단품1~4 코드 + 환산수량 추출
+ * 1. 환산 테이블의 모든 행에서 투입단품1~10 코드 + 환산수량 추출
  * 2. 동일 투입단품 코드의 환산수량을 합산
  * 3. 생산탭(state.rawData) 중 같은 month + item_code인 레코드의
  *    manual_input_quantity를 합산값으로 업데이트 (서버 저장)
@@ -23975,7 +24017,7 @@ function initManualProdSave() {
         const qtyByCode = new Map();
         allData.forEach(row => {
             const month = (row.plan_date || '').substring(0, 7);
-            for (let i = 1; i <= 4; i++) {
+            for (let i = 1; i <= 10; i++) {
                 const code = (row[`input_item${i}_code`] || '').trim();
                 const qty = row[`converted_qty${i}`];
                 if (!code || !Number.isFinite(qty)) continue;

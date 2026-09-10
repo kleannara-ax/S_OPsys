@@ -71,4 +71,52 @@ public class ManualBom extends BaseAuditEntity {
     /** 투입량4 */
     @Column(name = "INPUT_QTY4")
     private Double inputQty4;
+
+    /** 투입단품5 코드 */
+    @Column(name = "INPUT_ITEM5_CODE", length = 50)
+    private String inputItem5Code;
+
+    /** 투입량5 */
+    @Column(name = "INPUT_QTY5")
+    private Double inputQty5;
+
+    /** 투입단품6 코드 */
+    @Column(name = "INPUT_ITEM6_CODE", length = 50)
+    private String inputItem6Code;
+
+    /** 투입량6 */
+    @Column(name = "INPUT_QTY6")
+    private Double inputQty6;
+
+    /** 투입단품7 코드 */
+    @Column(name = "INPUT_ITEM7_CODE", length = 50)
+    private String inputItem7Code;
+
+    /** 투입량7 */
+    @Column(name = "INPUT_QTY7")
+    private Double inputQty7;
+
+    /** 투입단품8 코드 */
+    @Column(name = "INPUT_ITEM8_CODE", length = 50)
+    private String inputItem8Code;
+
+    /** 투입량8 */
+    @Column(name = "INPUT_QTY8")
+    private Double inputQty8;
+
+    /** 투입단품9 코드 */
+    @Column(name = "INPUT_ITEM9_CODE", length = 50)
+    private String inputItem9Code;
+
+    /** 투입량9 */
+    @Column(name = "INPUT_QTY9")
+    private Double inputQty9;
+
+    /** 투입단품10 코드 */
+    @Column(name = "INPUT_ITEM10_CODE", length = 50)
+    private String inputItem10Code;
+
+    /** 투입량10 */
+    @Column(name = "INPUT_QTY10")
+    private Double inputQty10;
 }

@@ -922,79 +922,6 @@
             </div>
             <!-- 수작업 탭 화면 -->
             <div id="manual-tab-placeholder" class="manual-tab-placeholder" style="display:none;">
-                <!-- 수작업 BOM 테이블 -->
-                <div class="manual-bom-section">
-                    <div class="manual-bom-header">
-                        <h3>수작업 BOM</h3>
-                        <div class="manual-bom-actions">
-                            <button type="button" class="btn-manual-bom-upload secondary small">엑셀 업로드</button>
-                            <button type="button" class="btn-manual-bom-download secondary small">템플릿 다운로드</button>
-                            <button type="button" class="btn-manual-bom-delete-selected secondary small danger">선택 삭제</button>
-                        </div>
-                    </div>
-                    <div class="manual-filter-bar">
-                        <div class="manual-prod-filter">
-                            <label class="manual-prod-filter-label">제품코드</label>
-                            <div class="manual-search-dropdown">
-                                <input type="text" class="manual-search-input" id="manual-bom-product-input" placeholder="전체" autocomplete="off">
-                                <div class="manual-search-list hidden" id="manual-bom-product-list"></div>
-                            </div>
-                        </div>
-                        <div class="manual-prod-filter">
-                            <label class="manual-prod-filter-label">투입단품</label>
-                            <div class="manual-search-dropdown">
-                                <input type="text" class="manual-search-input" id="manual-bom-input-input" placeholder="전체" autocomplete="off">
-                                <div class="manual-search-list hidden" id="manual-bom-input-list"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="manual-bom-table-wrapper">
-                        <table id="manual-bom-table" class="manual-bom-table" aria-live="polite">
-                            <thead>
-                                <tr>
-                                    <th class="col-checkbox bom-sticky bom-sticky-1"><input type="checkbox" id="manual-bom-select-all" title="전체 선택"></th>
-                                    <th class="bom-sticky bom-sticky-2">구분</th>
-                                    <th class="bom-sticky bom-sticky-3">구성</th>
-                                    <th class="bom-sticky bom-sticky-4">수작업 제품 코드</th>
-                                    <th class="bom-sticky bom-sticky-5">수작업 제품명</th>
-                                    <th>투입단품1 코드</th>
-                                    <th>투입단품1 명</th>
-                                    <th>투입량1</th>
-                                    <th>투입단품2 코드</th>
-                                    <th>투입단품2 명</th>
-                                    <th>투입량2</th>
-                                    <th>투입단품3 코드</th>
-                                    <th>투입단품3 명</th>
-                                    <th>투입량3</th>
-                                    <th>투입단품4 코드</th>
-                                    <th>투입단품4 명</th>
-                                    <th>투입량4</th>
-                                    <th>투입단품5 코드</th>
-                                    <th>투입단품5 명</th>
-                                    <th>투입량5</th>
-                                    <th>투입단품6 코드</th>
-                                    <th>투입단품6 명</th>
-                                    <th>투입량6</th>
-                                    <th>투입단품7 코드</th>
-                                    <th>투입단품7 명</th>
-                                    <th>투입량7</th>
-                                    <th>투입단품8 코드</th>
-                                    <th>투입단품8 명</th>
-                                    <th>투입량8</th>
-                                    <th>투입단품9 코드</th>
-                                    <th>투입단품9 명</th>
-                                    <th>투입량9</th>
-                                    <th>투입단품10 코드</th>
-                                    <th>투입단품10 명</th>
-                                    <th>투입량10</th>
-                                    <th>관리</th>
-                                </tr>
-                            </thead>
-                            <tbody id="manual-bom-table-body"></tbody>
-                        </table>
-                        <div id="manual-bom-empty" class="empty">등록된 수작업 BOM이 없습니다. 엑셀 업로드로 데이터를 추가하세요.</div>
-                    </div>
-                </div>
                 <!-- 수작업 생산 계획량 환산 테이블 -->
                 <div class="manual-bom-section manual-prod-section">
                     <div class="manual-bom-header">
@@ -1072,6 +999,79 @@
                             <tbody id="manual-prod-table-body"></tbody>
                         </table>
                         <div id="manual-prod-empty" class="empty">등록된 수작업 생산 계획량 환산 데이터가 없습니다. 엑셀 업로드로 데이터를 추가하세요.</div>
+                    </div>
+                </div>
+                <!-- 수작업 BOM 테이블 -->
+                <div class="manual-bom-section">
+                    <div class="manual-bom-header">
+                        <h3>수작업 BOM</h3>
+                        <div class="manual-bom-actions">
+                            <button type="button" class="btn-manual-bom-upload secondary small">엑셀 업로드</button>
+                            <button type="button" class="btn-manual-bom-download secondary small">템플릿 다운로드</button>
+                            <button type="button" class="btn-manual-bom-delete-selected secondary small danger">선택 삭제</button>
+                        </div>
+                    </div>
+                    <div class="manual-filter-bar">
+                        <div class="manual-prod-filter">
+                            <label class="manual-prod-filter-label">제품코드</label>
+                            <div class="manual-search-dropdown">
+                                <input type="text" class="manual-search-input" id="manual-bom-product-input" placeholder="전체" autocomplete="off">
+                                <div class="manual-search-list hidden" id="manual-bom-product-list"></div>
+                            </div>
+                        </div>
+                        <div class="manual-prod-filter">
+                            <label class="manual-prod-filter-label">투입단품</label>
+                            <div class="manual-search-dropdown">
+                                <input type="text" class="manual-search-input" id="manual-bom-input-input" placeholder="전체" autocomplete="off">
+                                <div class="manual-search-list hidden" id="manual-bom-input-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="manual-bom-table-wrapper">
+                        <table id="manual-bom-table" class="manual-bom-table" aria-live="polite">
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox bom-sticky bom-sticky-1"><input type="checkbox" id="manual-bom-select-all" title="전체 선택"></th>
+                                    <th class="bom-sticky bom-sticky-2">구분</th>
+                                    <th class="bom-sticky bom-sticky-3">구성</th>
+                                    <th class="bom-sticky bom-sticky-4">수작업 제품 코드</th>
+                                    <th class="bom-sticky bom-sticky-5">수작업 제품명</th>
+                                    <th>투입단품1 코드</th>
+                                    <th>투입단품1 명</th>
+                                    <th>투입량1</th>
+                                    <th>투입단품2 코드</th>
+                                    <th>투입단품2 명</th>
+                                    <th>투입량2</th>
+                                    <th>투입단품3 코드</th>
+                                    <th>투입단품3 명</th>
+                                    <th>투입량3</th>
+                                    <th>투입단품4 코드</th>
+                                    <th>투입단품4 명</th>
+                                    <th>투입량4</th>
+                                    <th>투입단품5 코드</th>
+                                    <th>투입단품5 명</th>
+                                    <th>투입량5</th>
+                                    <th>투입단품6 코드</th>
+                                    <th>투입단품6 명</th>
+                                    <th>투입량6</th>
+                                    <th>투입단품7 코드</th>
+                                    <th>투입단품7 명</th>
+                                    <th>투입량7</th>
+                                    <th>투입단품8 코드</th>
+                                    <th>투입단품8 명</th>
+                                    <th>투입량8</th>
+                                    <th>투입단품9 코드</th>
+                                    <th>투입단품9 명</th>
+                                    <th>투입량9</th>
+                                    <th>투입단품10 코드</th>
+                                    <th>투입단품10 명</th>
+                                    <th>투입량10</th>
+                                    <th>관리</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manual-bom-table-body"></tbody>
+                        </table>
+                        <div id="manual-bom-empty" class="empty">등록된 수작업 BOM이 없습니다. 엑셀 업로드로 데이터를 추가하세요.</div>
                     </div>
                 </div>
             </div>

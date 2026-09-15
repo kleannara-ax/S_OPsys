@@ -358,6 +358,116 @@ if (PROXY_TARGET && !FORCE_MOCK) {
         res.json({ success: true, data: { status: 'SUCCESS', processed_count: 1 } });
     });
 
+    // ── 수작업 BOM Mock (인메모리) ──
+    let mockManualBoms = [];
+    let mockManualBomId = 1;
+
+    app.get('/sales-api/manual-boms', (req, res) => {
+        console.log(`[Mock] GET /sales-api/manual-boms (${mockManualBoms.length}건)`);
+        res.json({ success: true, data: mockManualBoms });
+    });
+
+    app.get('/sales-api/manual-boms/:id', (req, res) => {
+        const found = mockManualBoms.find(b => b.id === Number(req.params.id));
+        if (found) {
+            res.json({ success: true, data: found });
+        } else {
+            res.status(404).json({ success: false, error: '수작업 BOM을 찾을 수 없습니다' });
+        }
+    });
+
+    app.post('/sales-api/manual-boms/bulk', (req, res) => {
+        const { mode, records } = req.body || {};
+        let deleted = 0;
+        if (mode === 'replace') {
+            deleted = mockManualBoms.length;
+            mockManualBoms = [];
+        }
+        const saved = (records || []).map(r => ({ id: mockManualBomId++, ...r, created_at: new Date().toISOString() }));
+        mockManualBoms.push(...saved);
+        console.log(`[Mock] POST /sales-api/manual-boms/bulk mode=${mode} saved=${saved.length} total=${mockManualBoms.length}`);
+        res.json({ success: true, data: { saved: saved.length, deleted, mode: mode || 'append', total: mockManualBoms.length }, message: '벌크 저장 완료' });
+    });
+
+    app.post('/sales-api/manual-boms', (req, res) => {
+        const bom = { id: mockManualBomId++, ...req.body, created_at: new Date().toISOString() };
+        mockManualBoms.push(bom);
+        console.log(`[Mock] POST /sales-api/manual-boms id=${bom.id}`);
+        res.status(201).json({ success: true, data: bom, message: '등록 완료' });
+    });
+
+    app.put('/sales-api/manual-boms/:id', (req, res) => {
+        const idx = mockManualBoms.findIndex(b => b.id === Number(req.params.id));
+        if (idx >= 0) {
+            mockManualBoms[idx] = { ...mockManualBoms[idx], ...req.body };
+            res.json({ success: true, data: mockManualBoms[idx], message: '수정 완료' });
+        } else {
+            res.status(404).json({ success: false, error: '수작업 BOM을 찾을 수 없습니다' });
+        }
+    });
+
+    app.delete('/sales-api/manual-boms/bulk', (req, res) => {
+        const { ids } = req.body || {};
+        const idSet = new Set((ids || []).map(Number));
+        const before = mockManualBoms.length;
+        mockManualBoms = mockManualBoms.filter(b => !idSet.has(b.id));
+        const deletedCount = before - mockManualBoms.length;
+        console.log(`[Mock] DELETE /sales-api/manual-boms/bulk deleted=${deletedCount}`);
+        res.json({ success: true, data: { deleted: deletedCount }, message: '삭제 완료' });
+    });
+
+    app.delete('/sales-api/manual-boms/:id', (req, res) => {
+        const idx = mockManualBoms.findIndex(b => b.id === Number(req.params.id));
+        if (idx >= 0) {
+            mockManualBoms.splice(idx, 1);
+            res.json({ success: true, message: '삭제 완료' });
+        } else {
+            res.status(404).json({ success: false, error: '수작업 BOM을 찾을 수 없습니다' });
+        }
+    });
+
+    // ── 수작업 생산계획 Mock (인메모리) ──
+    let mockManualProds = [];
+    let mockManualProdId = 1;
+
+    app.get('/sales-api/manual-prods', (req, res) => {
+        console.log(`[Mock] GET /sales-api/manual-prods (${mockManualProds.length}건)`);
+        res.json({ success: true, data: mockManualProds });
+    });
+
+    app.post('/sales-api/manual-prods/bulk', (req, res) => {
+        const { mode, records } = req.body || {};
+        let deleted = 0;
+        if (mode === 'replace') {
+            deleted = mockManualProds.length;
+            mockManualProds = [];
+        }
+        const saved = (records || []).map(r => ({ id: mockManualProdId++, ...r, created_at: new Date().toISOString() }));
+        mockManualProds.push(...saved);
+        console.log(`[Mock] POST /sales-api/manual-prods/bulk mode=${mode} saved=${saved.length} total=${mockManualProds.length}`);
+        res.json({ success: true, data: { saved: saved.length, deleted, mode: mode || 'append', total: mockManualProds.length }, message: '벌크 저장 완료' });
+    });
+
+    app.put('/sales-api/manual-prods/:id', (req, res) => {
+        const idx = mockManualProds.findIndex(b => b.id === Number(req.params.id));
+        if (idx >= 0) {
+            mockManualProds[idx] = { ...mockManualProds[idx], ...req.body };
+            res.json({ success: true, data: mockManualProds[idx], message: '수정 완료' });
+        } else {
+            res.status(404).json({ success: false, error: '수작업 생산 계획량 환산을 찾을 수 없습니다' });
+        }
+    });
+
+    app.delete('/sales-api/manual-prods/bulk', (req, res) => {
+        const { ids } = req.body || {};
+        const idSet = new Set((ids || []).map(Number));
+        const before = mockManualProds.length;
+        mockManualProds = mockManualProds.filter(b => !idSet.has(b.id));
+        const deletedCount = before - mockManualProds.length;
+        console.log(`[Mock] DELETE /sales-api/manual-prods/bulk deleted=${deletedCount}`);
+        res.json({ success: true, data: { deleted: deletedCount }, message: '삭제 완료' });
+    });
+
     // ── 기타 POST/PUT/DELETE — 성공 응답 ──
     app.post('/sales-api/{*rest}', (req, res) => {
         console.log(`[Mock] POST ${req.path}`);

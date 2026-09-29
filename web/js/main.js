@@ -4513,21 +4513,21 @@ function enrichRecord(record, lineStats, overrides = {}) {
     let inventoryStatus;
     if (inventoryDiff < 0) {
         inventoryStatus = {
-            label: `부족 (${formatNumber(Math.abs(inventoryDiff))} EA)`,
+            label: `부족 (${formatNumber(Math.abs(inventoryDiff))} BOX)`,
             className: 'alert',
             diff: inventoryDiff,
             ratio: targetRatio,
         };
     } else if (Number.isFinite(targetRatio) && targetRatio >= 1.5) {
         inventoryStatus = {
-            label: `과재고 (+${formatNumber(inventoryDiff)} EA)`,
+            label: `과재고 (+${formatNumber(inventoryDiff)} BOX)`,
             className: 'overstock',
             diff: inventoryDiff,
             ratio: targetRatio,
         };
     } else {
         inventoryStatus = {
-            label: `적정 (+${formatNumber(inventoryDiff)} EA)`,
+            label: `적정 (+${formatNumber(inventoryDiff)} BOX)`,
             className: 'safe',
             diff: inventoryDiff,
             ratio: targetRatio,

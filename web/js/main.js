@@ -4513,21 +4513,21 @@ function enrichRecord(record, lineStats, overrides = {}) {
     let inventoryStatus;
     if (inventoryDiff < 0) {
         inventoryStatus = {
-            label: `부족 (${formatNumber(Math.abs(inventoryDiff))} EA)`,
+            label: `부족 (${formatNumber(Math.abs(inventoryDiff))} BOX)`,
             className: 'alert',
             diff: inventoryDiff,
             ratio: targetRatio,
         };
     } else if (Number.isFinite(targetRatio) && targetRatio >= 1.5) {
         inventoryStatus = {
-            label: `과재고 (+${formatNumber(inventoryDiff)} EA)`,
+            label: `과재고 (+${formatNumber(inventoryDiff)} BOX)`,
             className: 'overstock',
             diff: inventoryDiff,
             ratio: targetRatio,
         };
     } else {
         inventoryStatus = {
-            label: `적정 (+${formatNumber(inventoryDiff)} EA)`,
+            label: `적정 (+${formatNumber(inventoryDiff)} BOX)`,
             className: 'safe',
             diff: inventoryDiff,
             ratio: targetRatio,
@@ -4596,21 +4596,21 @@ function enrichRecord(record, lineStats, overrides = {}) {
     let adjInventoryStatus;
     if (adjInventoryDiff < 0) {
         adjInventoryStatus = {
-            label: `부족 (${formatNumber(Math.abs(adjInventoryDiff))} EA)`,
+            label: `부족 (${formatNumber(Math.abs(adjInventoryDiff))} BOX)`,
             className: 'alert',
             diff: adjInventoryDiff,
             ratio: adjTargetRatio,
         };
     } else if (Number.isFinite(adjTargetRatio) && adjTargetRatio >= 1.5) {
         adjInventoryStatus = {
-            label: `과재고 (+${formatNumber(adjInventoryDiff)} EA)`,
+            label: `과재고 (+${formatNumber(adjInventoryDiff)} BOX)`,
             className: 'overstock',
             diff: adjInventoryDiff,
             ratio: adjTargetRatio,
         };
     } else {
         adjInventoryStatus = {
-            label: `적정 (+${formatNumber(adjInventoryDiff)} EA)`,
+            label: `적정 (+${formatNumber(adjInventoryDiff)} BOX)`,
             className: 'safe',
             diff: adjInventoryDiff,
             ratio: adjTargetRatio,
